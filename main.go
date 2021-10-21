@@ -69,8 +69,6 @@ var m = flag.Int("m", 4, "the number of parity shards(2-4)")
 var diskPath = flag.String("diskPath", "", "the disks path")
 var file = flag.String("file", "", "the file path")
 var savePath = flag.String("savePath", "file.save", "the local saving path for file")
-var newFile = flag.String("newfile", "", "the new file path")
-var oldFile = flag.String("oldfile", "", "the old file path")
 var new_k = flag.Int("new_k", 16, "the new number of data shards(<256)")
 var new_m = flag.Int("new_m", 4, "the new number of parity shards(2-4)")
 var recoveredDiskPath = flag.String("recoveredDiskPath", "/tmp/data", "the data path for recovered disk, default to /tmp/data")
@@ -317,6 +315,27 @@ func (e *Erasure) readFileMeta(filename string) (*FileInfo, error) {
 
 var err error
 
+//consult user to avoid maloperation
+func consultUserBeforeAction() (bool, error) {
+	log.Println("If you are sure to proceed, type: [Y]es otherwise [N]o.")
+
+	inputReader := bufio.NewReader(os.Stdin)
+	for {
+		ans, err := inputReader.ReadString('\n')
+		if err != nil {
+			return false, err
+		}
+		ans = strings.TrimSuffix(ans, "\n")
+		if ans == "Y" || ans == "y" || ans == "Yes" || ans == "yes" {
+			return true, nil
+		} else if ans == "N" || ans == "n" || ans == "No" || ans == "no" {
+			return false, nil
+		} else {
+			fmt.Println("Please do not make joke")
+		}
+	}
+
+}
 func main() {
 	//We read each file and make byte flow
 	flag.Parse()
@@ -333,24 +352,11 @@ func main() {
 	case "init":
 		//initiate the erasure-coded system
 		fmt.Println("Warning: you are intializing a new erasure-coded system, which means the previous data will also be reset.\n Are you sure to proceed?[Y]es, or [N]o:")
-		//wait for user input
-		// inputReader := bufio.NewReader(os.Stdin)
-		for {
-			// ans, err := inputReader.ReadString('\n')
-			// if err != nil {
-			// 	log.Fatal(err)
-			// }
-			ans := "Y"
-			ans = strings.TrimSuffix(ans, "\n")
-			if ans == "Y" || ans == "y" || ans == "Yes" || ans == "yes" {
-				break
-			} else if ans == "N" || ans == "n" || ans == "No" || ans == "no" {
-				return
-			} else {
-				fmt.Println("Please do not make joke")
-			}
+		if ans, err := consultUserBeforeAction(); !ans {
+			return
+		} else if err != nil {
+			failOnErr(*mode, err)
 		}
-		failOnErr(*mode, err)
 		erasure.k = *k
 		erasure.m = *m
 		err = erasure.readDiskPath(diskPathFile)
@@ -371,7 +377,7 @@ func main() {
 		failOnErr(*mode, err)
 		err = erasure.readDiskPath(diskPathFile)
 		failOnErr(*mode, err)
-		erasure.destroy(*failMode, *failNum)
+		// erasure.destroy(*failMode, *failNum)
 		err = erasure.read(*file, *savePath)
 		failOnErr(*mode, err)
 	case "encode":
@@ -386,8 +392,13 @@ func main() {
 		failOnErr(*mode, err)
 	case "update":
 		//update an old file according to a new file
-		e.readConfig()
-		update(*newFile, *oldFile)
+		err = erasure.readConfig()
+		failOnErr(*mode, err)
+		err = erasure.readDiskPath(diskPathFile)
+		failOnErr(*mode, err)
+		err = erasure.update(*file)
+		failOnErr(*mode, err)
+
 	// case "scaling":
 	// 	//scaling the system, ALERT: this is a system-level operation and irreversible
 	// 	e.readConfig()
@@ -396,6 +407,8 @@ func main() {
 	// 	//recover all the blocks of a disk and put the recovered result to new path
 	// 	e.readConfig()
 	// 	recover(*recoveredDiskPath)
+	//case "delete":
+
 	default:
 		log.Fatalf("Can't parse the parameters, please check %s!", *mode)
 	}
@@ -443,6 +456,11 @@ func (e *Erasure) encode(filename string) (*FileInfo, error) {
 	if err != nil {
 		return nil, err
 	}
+	err = e.enc.Join(data, shards, int(size))
+	if err != nil {
+		return nil, err
+	}
+
 	//encode the data
 	err = e.enc.Encode(shards)
 	if err != nil {
@@ -491,7 +509,7 @@ func (e *Erasure) encode(filename string) (*FileInfo, error) {
 
 		}
 		//Create the file and write in the parted data
-		nf, err := os.OpenFile(partPath, os.O_RDWR|os.O_CREATE, 0666)
+		nf, err := os.OpenFile(partPath, os.O_WRONLY|os.O_CREATE, 0666)
 		if err != nil {
 			return nil, err
 		}
@@ -501,6 +519,7 @@ func (e *Erasure) encode(filename string) (*FileInfo, error) {
 		if err != nil {
 			return nil, err
 		}
+		buf.Flush()
 
 	}
 
@@ -583,7 +602,8 @@ func (e *Erasure) read(filename string, savepath string) error {
 			return err
 		}
 		defer f.Close()
-		err = e.enc.Join(f, dataBytes, int(fi.fileSize))
+
+		err = e.enc.Join(os.Stdout, dataBytes, int(fi.fileSize))
 		if err != nil {
 			return err
 		}
@@ -598,6 +618,7 @@ func (e *Erasure) read(filename string, savepath string) error {
 			return ErrFileIncompleted
 		}
 		log.Printf("%s successfully read (Joined)!", filename)
+		//then encoding file in background
 		return nil
 	}
 	if len(survivalData)+len(survivalParity) < e.k {
@@ -696,4 +717,96 @@ func (e *Erasure) destroy(mode string, failNum int) {
 	} else if mode == "bitRot" {
 
 	}
+}
+
+//update a file according to a new file, the local `filename` will be used to update the file in the cloud with the same name
+func (e *Erasure) update(filename string) error {
+	//two ways are available, one is RWM, other one is RCW
+	//we minimize the parity computation and transferring overhead as much as possible
+
+	//read new file
+	f, err := os.Open(filename)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	newFi := &FileInfo{}
+	fileInfo, err := f.Stat()
+	if err != nil {
+		return err
+	}
+	newFi.metaInfo = &fileInfo
+	//we allocate the buffer actually the same size of the file
+	// fmt.Println(fileInfo)
+	size := fileInfo.Size()
+	newFi.fileSize = size
+	buf := bufio.NewReader(f)
+	data := make([]byte, size)
+	_, err = buf.Read(data)
+	if err != nil {
+		return err
+	}
+	//if the len of local file is 0, we regard as deleting
+	if len(data) == 0 {
+		log.Println("The input file length is 0, this will lead to removal of present file")
+		if ans, err := consultUserBeforeAction(); !ans {
+			return nil
+		} else if err != nil {
+			return err
+		}
+		e.updateFileLists(newFi)
+		return nil
+	}
+	h := sha256.New()
+	f.Seek(0, 0)
+	if _, err := io.Copy(h, f); err != nil {
+		return err
+	}
+	newFi.hash = fmt.Sprintf("%x", h.Sum(nil))
+
+	oldFi, err := e.readFileMeta(filename)
+	if err != nil {
+		return err
+	}
+	//we split the data, and create empty parity
+	newShards, err := e.enc.Split(data)
+	if err != nil {
+		return err
+	}
+	//we read old shards
+	oldShards := make([][]byte, e.k)
+	g := new(errgroup.Group)
+	for i, path := range e.diskInfos {
+		i := i
+		path := path
+		if oldFi.distribution[i] > e.k {
+			continue
+		}
+		g.Go(func() error {
+			filepath := path.diskPath + "/" + filename + "/D_" +
+				fmt.Sprintf("%d", oldFi.distribution[i])
+			f, err := os.Open(filepath)
+			if err != nil {
+				return err
+			}
+			defer f.Close()
+			blockByte := (int(oldFi.fileSize) + e.k - 1) / e.k
+			oldShards[oldFi.distribution[i]] = make([]byte, blockByte)
+			f.Read(oldShards[oldFi.distribution[i]])
+			if err != nil {
+				return err
+			}
+			return nil
+		})
+	}
+	if err := g.Wait(); err != nil {
+		return err
+	}
+	err = e.enc.Update(oldShards, newShards)
+	if err != nil {
+		return err
+	}
+
+	//write into config
+	return nil
 }
