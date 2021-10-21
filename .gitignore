@@ -1,0 +1,6 @@
+.hdr.disks.path
+.hdr.sys
+test*.file
+.vscode/
+tmp/
+file.save
