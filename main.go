@@ -371,6 +371,7 @@ func main() {
 		failOnErr(*mode, err)
 		err = erasure.readDiskPath(diskPathFile)
 		failOnErr(*mode, err)
+		erasure.destroy(*failMode, *failNum)
 		err = erasure.read(*file, *savePath)
 		failOnErr(*mode, err)
 	case "encode":
@@ -383,18 +384,10 @@ func main() {
 		failOnErr(*mode, err)
 		err = erasure.updateFileLists(fi)
 		failOnErr(*mode, err)
-	case "decode":
-		//simulate disk failure and bitrot
-		err = erasure.readDiskPath(diskPathFile)
-		failOnErr(*mode, err)
-		erasure.destroy(*failMode, *failNum)
-		err := erasure.decode(*file)
-		failOnErr(*mode, err)
-
-	// case "update":
-	// 	//update an old file according to a new file
-	// 	e.readConfig()
-	// 	update(*newFile, *oldFile)
+	case "update":
+		//update an old file according to a new file
+		e.readConfig()
+		update(*newFile, *oldFile)
 	// case "scaling":
 	// 	//scaling the system, ALERT: this is a system-level operation and irreversible
 	// 	e.readConfig()
@@ -514,7 +507,7 @@ func (e *Erasure) encode(filename string) (*FileInfo, error) {
 	return fi, nil
 }
 
-//read file on the system and return byte stream
+//read file on the system and return byte stream, include recovering
 func (e *Erasure) read(filename string, savepath string) error {
 	//1. we find if it is recorded on the conf
 	fi, err := e.readFileMeta(filename)
@@ -560,9 +553,10 @@ func (e *Erasure) read(filename string, savepath string) error {
 	if err := g.Wait(); err != nil {
 		return err
 	}
-	dataBytes := make([][]byte, e.k)
+
 	if len(survivalData) == e.k {
 		//no need for reconstructing
+		dataBytes := make([][]byte, e.k)
 		for _, ind := range survivalData {
 			ind := ind
 			g.Go(func() error {
@@ -610,7 +604,7 @@ func (e *Erasure) read(filename string, savepath string) error {
 		return ErrSurvialNotEnoughForDecoding
 	}
 	//We need to decode the file using parity
-	parityBytes := make([][]byte, e.m)
+	totalBytes := make([][]byte, e.k+e.m)
 	survivalData = append(survivalData, survivalParity...)
 	rand.Seed(time.Now().UnixNano())
 	rand.Shuffle(len(survivalData), func(i, j int) { survivalData[i], survivalData[j] = survivalData[j], survivalData[i] })
@@ -632,18 +626,10 @@ func (e *Erasure) read(filename string, savepath string) error {
 			}
 			defer f.Close()
 			blockByte := (int(fi.fileSize) + e.k - 1) / e.k
-			if fi.distribution[ind] < e.k {
-				dataBytes[fi.distribution[ind]] = make([]byte, blockByte)
-				_, err := f.Read(dataBytes[fi.distribution[ind]])
-				if err != nil {
-					return err
-				}
-			} else {
-				parityBytes[fi.distribution[ind]] = make([]byte, blockByte)
-				_, err := f.Read(parityBytes[fi.distribution[ind]])
-				if err != nil {
-					return err
-				}
+			totalBytes[fi.distribution[ind]] = make([]byte, blockByte)
+			_, err = f.Read(totalBytes[fi.distribution[ind]])
+			if err != nil {
+				return err
 			}
 
 			return nil
@@ -654,23 +640,23 @@ func (e *Erasure) read(filename string, savepath string) error {
 	}
 	//reconstructing, we first decode data, once completed
 	//notify the customer, and parity reconstruction, we move it to back-end
-	err = e.enc.ReconstructData(dataBytes)
+	err = e.enc.Reconstruct(totalBytes)
 	if err != nil {
 		return err
 	}
-	g.Go(func() error {
-		err = e.enc.ReconstructParity(parityBytes)
-		if err != nil {
-			return err
-		}
-		return nil
-	})
+	// g.Go(func() error {
+	// 	err = ReconstructParity(parityBytes)
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// 	return nil
+	// })
 	f, err := os.OpenFile(savepath, os.O_CREATE|os.O_RDWR, 0666)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
-	err = e.enc.Join(f, dataBytes[:e.k], int(fi.fileSize))
+	err = e.enc.Join(f, totalBytes, int(fi.fileSize))
 	if err != nil {
 		return err
 	}
@@ -686,9 +672,9 @@ func (e *Erasure) read(filename string, savepath string) error {
 	}
 	log.Printf("%s successfully read (Decoded)!", filename)
 	//wait for completion of back-end parity reconstruction
-	if err := g.Wait(); err != nil {
-		return err
-	}
+	// if err := g.Wait(); err != nil {
+	// 	return err
+	// }
 	return nil
 }
 
@@ -702,20 +688,12 @@ func (e *Erasure) destroy(mode string, failNum int) {
 		}
 		rand.Seed(time.Now().UnixNano())
 		rand.Shuffle(len(shuff), func(i, j int) { shuff[i], shuff[j] = shuff[j], shuff[i] })
+		log.Println("simulate on failure of:")
 		for i := 0; i < failNum; i++ {
+			fmt.Println(e.diskInfos[shuff[i]].diskPath)
 			e.diskInfos[shuff[i]].available = false
 		}
 	} else if mode == "bitRot" {
 
 	}
-}
-
-//decode standalone file, according to survival parts
-func (e *Erasure) decode(filename string, fi *FileInfo) error {
-	//if the parity is lost ,the file can still be read and written
-	//but if the data is lost, the file has to be read under degraded mode
-	//where we must decode the data
-	//randomly pick up k blocks for file reconstruction
-
-	return nil
 }
