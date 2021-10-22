@@ -46,20 +46,20 @@ type DiskInfo struct {
 	available bool
 }
 type Erasure struct {
-	k          int                 // the number of data blocks in a stripe
-	m          int                 // the number of parity blocks in a stripe
-	enc        reedsolomon.Encoder // the reedsolomon encoder
-	diskInfos  []*DiskInfo         //disk paths
-	configFile string              //configure file
-	fileLists  []*FileInfo         //File info lists
-	rwmu       sync.RWMutex        //read write mutex
+	k          int                  // the number of data blocks in a stripe
+	m          int                  // the number of parity blocks in a stripe
+	enc        reedsolomon.Encoder  // the reedsolomon encoder
+	diskInfos  []*DiskInfo          //disk paths
+	configFile string               //configure file
+	fileMap    map[string]*FileInfo //File info lists
+	rwmu       sync.RWMutex         //read write mutex
 }
 type FileInfo struct {
-	fileName     string       //file name
-	fileSize     int64        //file size
-	metaInfo     *os.FileInfo //system-level file info
-	hash         string       //hash value (SHA256 by default)
-	distribution []int        //distribution represents the block replacement respect to disks
+	fileName string //file name
+	fileSize int64  //file size
+	// metaInfo     *os.FileInfo //system-level file info
+	hash         string //hash value (SHA256 by default)
+	distribution []int  //distribution represents the block replacement respect to disks
 }
 
 //the parameter lists
@@ -73,7 +73,7 @@ var new_k = flag.Int("new_k", 16, "the new number of data shards(<256)")
 var new_m = flag.Int("new_m", 4, "the new number of parity shards(2-4)")
 var recoveredDiskPath = flag.String("recoveredDiskPath", "/tmp/data", "the data path for recovered disk, default to /tmp/data")
 var failMode = flag.String("failMode", "diskFail", "simulate diskFail or bitRot mode")
-var failNum = flag.Int("failNum", 2, "simulate multiple disk failure, provides the fail number of disks")
+var failNum = flag.Int("failNum", 0, "simulate multiple disk failure, provides the fail number of disks")
 var override = flag.Bool("override", false, "whether to override former files or directories")
 
 //Error definitions
@@ -83,11 +83,12 @@ var ErrDataDirExist = errors.New("data directory already exists")
 var ErrTooFewDisks = errors.New("too few disks, i.e., k+m < N")
 var ErrNotInitialized = errors.New("system not initialized, please initialize with `-mode init` first")
 var ErrFileNotFound = errors.New("file not found")
-var ErrSurvivalNotEnoughForDecoding = errors.New("the failed parity number exceeds fault tolerance, data renders unrecoverable")
+var ErrSurvivalNotEnoughForDecoding = errors.New("the failed block number exceeds fault tolerance, data renders unrecoverable")
 var ErrFileIncompleted = errors.New("file hash check fails, file renders incompleted")
 var ErrFailModeNotRecognized = errors.New("the fail mode is not recognizable, please specify in \"diskFail\" or \"bitRot\"")
 
 //read the config info in config file
+//Every time read file list in system warm-up
 func (e *Erasure) readConfig() error {
 	if ex, err := PathExist(e.configFile); !ex && err == nil {
 		return ErrConfFileNotExist
@@ -126,10 +127,48 @@ func (e *Erasure) readConfig() error {
 	if err != nil {
 		return err
 	}
-	//next is the file lists
-	//filename
-	//hash
-	//distribution
+	//next is the file lists //read all file meta
+	for {
+		line, err := buf.ReadString('\n')
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			return err
+		}
+		fi := &FileInfo{}
+		fi.fileName = strings.TrimSuffix(line, "\n")
+		line, err = buf.ReadString('\n')
+		if err == io.EOF {
+			return fmt.Errorf("%s 's meta data fileSize is incompleted, please check", fi.fileName)
+		} else if err != nil {
+			return err
+		}
+		fi.fileSize, _ = strconv.ParseInt(strings.TrimSuffix(line, "\n"), 10, 64)
+		//read next line
+		line, err = buf.ReadString('\n')
+		if err == io.EOF {
+			return fmt.Errorf("%s 's meta data hash is incompleted, please check", fi.fileName)
+		} else if err != nil {
+			return err
+		}
+		fi.hash = strings.TrimSuffix(line, "\n")
+		line, err = buf.ReadString('\n')
+		if err == io.EOF {
+			return fmt.Errorf("%s 's meta data distribution is incompleted, please check", fi.fileName)
+		} else if err != nil {
+			return err
+		}
+		line = strings.Trim(line, "[]\n")
+		for _, s := range strings.Split(line, " ") {
+			num, err := strconv.Atoi(s)
+			if err != nil {
+				return err
+			}
+			fi.distribution = append(fi.distribution, num)
+		}
+		e.fileMap[fi.fileName] = fi
+
+	}
 	return nil
 }
 
@@ -168,7 +207,7 @@ func (e *Erasure) readDiskPath(filename string) error {
 	return nil
 }
 
-//We write the erasure parameters into config files
+//write the erasure parameters into config files
 func (e *Erasure) writeConfig() error {
 
 	f, err := os.OpenFile(e.configFile, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0754)
@@ -189,8 +228,11 @@ func (e *Erasure) writeConfig() error {
 	if err != nil {
 		return err
 	}
-	//Read the file lists
-
+	//when fileMap is changed, we update the fileList
+	for _, v := range e.fileMap {
+		line := fmt.Sprintf("%s\n%d\n%s\n%v\n", v.fileName, v.fileSize, v.hash, v.distribution)
+		buf.WriteString(line)
+	}
 	buf.Flush()
 	f.Sync()
 	return nil
@@ -198,8 +240,7 @@ func (e *Erasure) writeConfig() error {
 
 //reset the storage assets
 func (e *Erasure) reset() error {
-	var wg sync.WaitGroup
-	defer wg.Wait()
+	g := new(errgroup.Group)
 
 	for _, path := range e.diskInfos {
 		path := path
@@ -210,110 +251,49 @@ func (e *Erasure) reset() error {
 		if len(files) == 0 {
 			continue
 		}
-		go func() {
+		g.Go(func() error {
 			for _, file := range files {
 				err = os.RemoveAll(path.diskPath + "/" + file.Name())
-				wg.Done()
+				if err != nil {
+					return err
+				}
 
 			}
-		}()
+			return nil
+		})
 	}
-	wg.Wait()
-	return nil
-}
-
-//update the file lists in conf file
-func (e *Erasure) updateFileLists(fi *FileInfo) error {
-	//we add file info to config file
-	cf, err := os.OpenFile(e.configFile, os.O_RDWR, 0666)
-	if err != nil {
+	if err := g.Wait(); err != nil {
 		return err
 	}
-	defer cf.Close()
-	//we find if the item list contains filename, if false, append it
-	//to the end of the file, otherwise update the metas
-	bfReader := bufio.NewReader(cf)
-	pos := int64(0)
-	for {
-		line, err := bfReader.ReadString('\n')
-
-		if err == io.EOF {
-			break
-		} else if err != nil {
-			return err
-		}
-		if strings.Contains(line, fi.fileName) {
-			//update the next few lines
-			pos += int64(len(line))
-			rep := fmt.Sprintf("%d\n%s\n%v\n", fi.fileSize, fi.hash, fi.distribution)
-			cf.WriteAt([]byte(rep), pos)
-			log.Printf("%s successfully updated(replaced)", fi.fileName)
-			return nil
-		}
-		pos += int64(len(line))
-
-	}
-	//append
-	rep := fmt.Sprintf("%s\n%d\n%s\n%v\n", fi.fileName, fi.fileSize, fi.hash, fi.distribution)
-	cf.WriteAt([]byte(rep), pos)
-	log.Printf("%s successfully updated(appended)", fi.fileName)
-	cf.Sync()
 	return nil
 }
 
-//read meta data if a file exists, otherwise return nil,false
-func (e *Erasure) readFileMeta(filename string) (*FileInfo, error) {
-	cf, err := os.Open(e.configFile)
-	if err != nil {
-		return nil, err
-	}
-	defer cf.Close()
-	bfReader := bufio.NewReader(cf)
-	for {
-		line, err := bfReader.ReadString('\n')
+//delete specific file
+func (e *Erasure) removeFile(filename string) error {
+	g := new(errgroup.Group)
 
-		if err == io.EOF {
-			break
-		} else if err != nil {
-			return nil, err
+	for _, path := range e.diskInfos {
+		path := path
+		files, err := os.ReadDir(path.diskPath)
+		if err != nil {
+			return err
 		}
-		if strings.Contains(line, filename) {
-			fi := &FileInfo{}
-			fi.fileName = filename
-			line, err := bfReader.ReadString('\n')
-			if err == io.EOF {
-				break
-			} else if err != nil {
-				return nil, err
-			}
-			fi.fileSize, _ = strconv.ParseInt(strings.TrimSuffix(line, "\n"), 10, 64)
-			//read next line
-			line, err = bfReader.ReadString('\n')
-			if err == io.EOF {
-				break
-			} else if err != nil {
-				return nil, err
-			}
-			fi.hash = strings.TrimSuffix(line, "\n")
-			line, err = bfReader.ReadString('\n')
-			if err == io.EOF {
-				break
-			} else if err != nil {
-				return nil, err
-			}
-			line = strings.Trim(line, "[]\n")
-			for _, s := range strings.Split(line, " ") {
-				num, err := strconv.Atoi(s)
-				if err != nil {
-					return nil, err
-				}
-				fi.distribution = append(fi.distribution, num)
-			}
-			return fi, nil
+		if len(files) == 0 {
+			continue
 		}
-
+		g.Go(func() error {
+			err = os.RemoveAll(path.diskPath + "/" + filename)
+			if err != nil {
+				return err
+			}
+			return nil
+		})
 	}
-	return nil, ErrFileNotFound
+	if err := g.Wait(); err != nil {
+		return err
+	}
+	delete(e.fileMap, filename)
+	return nil
 }
 
 var err error
@@ -345,6 +325,7 @@ func main() {
 	//We read the config file
 	erasure := new(Erasure)
 	erasure.configFile = ".hdr.sys"
+	erasure.fileMap = make(map[string]*FileInfo)
 	diskPathFile := ".hdr.disks.path"
 	failOnErr := func(mode string, e error) {
 		if e != nil {
@@ -380,7 +361,7 @@ func main() {
 		failOnErr(*mode, err)
 		err = erasure.readDiskPath(diskPathFile)
 		failOnErr(*mode, err)
-		// erasure.destroy(*failMode, *failNum)
+		erasure.destroy(*failMode, *failNum)
 		err = erasure.read(*file, *savePath)
 		failOnErr(*mode, err)
 	case "encode":
@@ -389,9 +370,9 @@ func main() {
 		failOnErr(*mode, err)
 		err = erasure.readDiskPath(diskPathFile)
 		failOnErr(*mode, err)
-		fi, err := erasure.encode(*file)
+		_, err := erasure.encode(*file)
 		failOnErr(*mode, err)
-		err = erasure.updateFileLists(fi)
+		err = erasure.writeConfig()
 		failOnErr(*mode, err)
 	case "update":
 		//update an old file according to a new file
@@ -440,7 +421,6 @@ func (e *Erasure) encode(filename string) (*FileInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	fi.metaInfo = &fileInfo
 	//we allocate the buffer actually the same size of the file
 	// fmt.Println(fileInfo)
 	size := fileInfo.Size()
@@ -495,7 +475,7 @@ func (e *Erasure) encode(filename string) (*FileInfo, error) {
 	rand.Seed(time.Now().UnixNano())
 	rand.Shuffle(len(shuff), func(i, j int) { shuff[i], shuff[j] = shuff[j], shuff[i] })
 	fi.distribution = shuff
-	e.fileLists = append(e.fileLists, fi)
+	e.fileMap[filename] = fi
 	//we save the data and parity to the mounted data point of each disk
 	//we adopt the methods of Minio, which first create a folder with the same name as the file,
 	//and store each part of the file in the folder with name like "D_X" or "P_X".
@@ -543,9 +523,9 @@ func (e *Erasure) encode(filename string) (*FileInfo, error) {
 //read file on the system and return byte stream, include recovering
 func (e *Erasure) read(filename string, savepath string) error {
 	//1. we find if it is recorded on the conf
-	fi, err := e.readFileMeta(filename)
-	if err != nil {
-		return err
+	fi, ok := e.fileMap[filename]
+	if !ok {
+		return ErrFileNotFound
 	}
 	g := new(errgroup.Group)
 	survivalParity := []int{}
@@ -587,82 +567,6 @@ func (e *Erasure) read(filename string, savepath string) error {
 		return err
 	}
 
-	if len(survivalData) == e.k {
-		//no need for reconstructing
-		dataBytes := make([][]byte, e.k)
-		for _, ind := range survivalData {
-			ind := ind
-			g.Go(func() error {
-				filepath := e.diskInfos[ind].diskPath + "/" + filename + "/D_" + fmt.Sprintf("%d", fi.distribution[ind])
-				f, err := os.Open(filepath)
-				if err != nil {
-					return err
-				}
-				defer f.Close()
-				blockByte := (int(fi.fileSize) + e.k - 1) / e.k
-				dataBytes[fi.distribution[ind]] = make([]byte, blockByte)
-				f.Read(dataBytes[fi.distribution[ind]])
-				f.Sync()
-				if err != nil {
-					return err
-				}
-				return nil
-			})
-		}
-		if err := g.Wait(); err != nil {
-			return err
-		}
-		f, err := os.OpenFile(savepath, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0666)
-		if err != nil {
-			return err
-		}
-		defer f.Close()
-		err = e.enc.Join(f, dataBytes, int(fi.fileSize))
-		if err != nil {
-			return err
-		}
-		//checksum
-		f.Seek(0, 0)
-		h := sha256.New()
-		if _, err := io.Copy(h, f); err != nil {
-			return nil
-		}
-		hashSum := fmt.Sprintf("%x", h.Sum(nil))
-		if strings.Compare(hashSum, fi.hash) != 0 {
-			return ErrFileIncompleted
-		}
-		log.Printf("%s successfully read (Joined)!", filename)
-		//then encoding file in background
-		if len(survivalParity) == e.m {
-			return nil
-		}
-
-		log.Println("Start encoding in background...")
-		// we make the missing parity nil
-		totalBytes := make([][]byte, e.k+e.m)
-		copy(totalBytes[:e.k], dataBytes)
-		for _, ind := range survivalParity {
-			ind := ind
-			g.Go(func() error {
-				filepath := e.diskInfos[ind].diskPath + "/" + filename + "/D_" + fmt.Sprintf("%d", fi.distribution[ind])
-				f, err := os.Open(filepath)
-				if err != nil {
-					return err
-				}
-				defer f.Close()
-				blockByte := (int(fi.fileSize) + e.k - 1) / e.k
-				totalBytes[fi.distribution[ind]] = make([]byte, blockByte)
-				f.Read(totalBytes[fi.distribution[ind]])
-				f.Sync()
-				if err != nil {
-					return err
-				}
-				return nil
-			})
-		}
-		//encoding
-		return nil
-	}
 	if len(survivalData)+len(survivalParity) < e.k {
 		return ErrSurvivalNotEnoughForDecoding
 	}
@@ -707,13 +611,7 @@ func (e *Erasure) read(filename string, savepath string) error {
 	if err != nil {
 		return err
 	}
-	// g.Go(func() error {
-	// 	err = ReconstructParity(parityBytes)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	return nil
-	// })
+
 	f, err := os.OpenFile(savepath, os.O_CREATE|os.O_RDWR, 0666)
 	if err != nil {
 		return err
@@ -734,16 +632,15 @@ func (e *Erasure) read(filename string, savepath string) error {
 		return ErrFileIncompleted
 	}
 	log.Printf("%s successfully read (Decoded)!", filename)
-	//wait for completion of back-end parity reconstruction
-	// if err := g.Wait(); err != nil {
-	// 	return err
-	// }
 	return nil
 }
 
 //simulate disk failure or bitrot
 func (e *Erasure) destroy(mode string, failNum int) {
 	if mode == "diskFail" {
+		if failNum == 0 {
+			return
+		}
 		//we randomly picked up failNum disks and mark as unavailable
 		shuff := make([]int, len(e.diskInfos))
 		for i := 0; i < len(e.diskInfos); i++ {
@@ -765,19 +662,21 @@ func (e *Erasure) destroy(mode string, failNum int) {
 func (e *Erasure) update(filename string) error {
 	//two ways are available, one is RWM, other one is RCW
 	//we minimize the parity computation and transferring overhead as much as possible
-
+	oldFi, ok := e.fileMap[filename]
+	if !ok {
+		return ErrFileNotFound
+	}
 	//read new file
 	f, err := os.Open(filename)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
-	newFi := &FileInfo{}
+	newFi := &FileInfo{fileName: filename}
 	fileInfo, err := f.Stat()
 	if err != nil {
 		return err
 	}
-	newFi.metaInfo = &fileInfo
 	//we allocate the buffer actually the same size of the file
 	// fmt.Println(fileInfo)
 	size := fileInfo.Size()
@@ -796,8 +695,8 @@ func (e *Erasure) update(filename string) error {
 		} else if err != nil {
 			return err
 		}
-		e.updateFileLists(newFi)
-		return nil
+		e.removeFile(filename)
+		return e.writeConfig()
 	}
 	h := sha256.New()
 	f.Seek(0, 0)
@@ -806,10 +705,6 @@ func (e *Erasure) update(filename string) error {
 	}
 	newFi.hash = fmt.Sprintf("%x", h.Sum(nil))
 
-	oldFi, err := e.readFileMeta(filename)
-	if err != nil {
-		return err
-	}
 	//we split the data, and create empty parity
 	newShards, err := e.enc.Split(data)
 	if err != nil {
@@ -848,7 +743,13 @@ func (e *Erasure) update(filename string) error {
 	if err != nil {
 		return err
 	}
+	//if a block is updated, we replace it, otherwise remain intact
+	//and all parity is bound to update
 
 	//write into config
+	err = e.writeConfig()
+	if err != nil {
+		return err
+	}
 	return nil
 }

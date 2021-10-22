@@ -4,3 +4,4 @@ test*.file
 .vscode/
 tmp/
 file.save
+garbageCode.go
