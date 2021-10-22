@@ -83,7 +83,7 @@ var ErrDataDirExist = errors.New("data directory already exists")
 var ErrTooFewDisks = errors.New("too few disks, i.e., k+m < N")
 var ErrNotInitialized = errors.New("system not initialized, please initialize with `-mode init` first")
 var ErrFileNotFound = errors.New("file not found")
-var ErrSurvialNotEnoughForDecoding = errors.New("the failed parity number exceeds fault tolerance, data renders unrecoverable")
+var ErrSurvivalNotEnoughForDecoding = errors.New("the failed parity number exceeds fault tolerance, data renders unrecoverable")
 var ErrFileIncompleted = errors.New("file hash check fails, file renders incompleted")
 var ErrFailModeNotRecognized = errors.New("the fail mode is not recognizable, please specify in \"diskFail\" or \"bitRot\"")
 
@@ -245,7 +245,7 @@ func (e *Erasure) updateFileLists(fi *FileInfo) error {
 		if strings.Contains(line, fi.fileName) {
 			//update the next few lines
 			pos += int64(len(line))
-			rep := fmt.Sprintf("%d\t%s\n%v\n", fi.fileSize, fi.hash, fi.distribution)
+			rep := fmt.Sprintf("%d\n%s\n%v\n", fi.fileSize, fi.hash, fi.distribution)
 			cf.WriteAt([]byte(rep), pos)
 			log.Printf("%s successfully updated(replaced)", fi.fileName)
 			return nil
@@ -254,7 +254,7 @@ func (e *Erasure) updateFileLists(fi *FileInfo) error {
 
 	}
 	//append
-	rep := fmt.Sprintf("%s\t%d\n%s\n%v\n", fi.fileName, fi.fileSize, fi.hash, fi.distribution)
+	rep := fmt.Sprintf("%s\n%d\n%s\n%v\n", fi.fileName, fi.fileSize, fi.hash, fi.distribution)
 	cf.WriteAt([]byte(rep), pos)
 	log.Printf("%s successfully updated(appended)", fi.fileName)
 	cf.Sync()
@@ -269,7 +269,6 @@ func (e *Erasure) readFileMeta(filename string) (*FileInfo, error) {
 	}
 	defer cf.Close()
 	bfReader := bufio.NewReader(cf)
-	pos := int64(0)
 	for {
 		line, err := bfReader.ReadString('\n')
 
@@ -281,10 +280,15 @@ func (e *Erasure) readFileMeta(filename string) (*FileInfo, error) {
 		if strings.Contains(line, filename) {
 			fi := &FileInfo{}
 			fi.fileName = filename
-			ss := strings.Split(strings.TrimSuffix(line, "\n"), "\t")
-			fi.fileSize, _ = strconv.ParseInt(ss[1], 10, 64)
-			//read next line
 			line, err := bfReader.ReadString('\n')
+			if err == io.EOF {
+				break
+			} else if err != nil {
+				return nil, err
+			}
+			fi.fileSize, _ = strconv.ParseInt(strings.TrimSuffix(line, "\n"), 10, 64)
+			//read next line
+			line, err = bfReader.ReadString('\n')
 			if err == io.EOF {
 				break
 			} else if err != nil {
@@ -307,7 +311,6 @@ func (e *Erasure) readFileMeta(filename string) (*FileInfo, error) {
 			}
 			return fi, nil
 		}
-		pos += int64(len(line))
 
 	}
 	return nil, ErrFileNotFound
@@ -456,11 +459,22 @@ func (e *Erasure) encode(filename string) (*FileInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = e.enc.Join(data, shards, int(size))
-	if err != nil {
-		return nil, err
-	}
-
+	// test, err := os.OpenFile("testJoin.txt", os.O_CREATE|os.O_RDWR, 0666)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// defer test.Close()
+	// err = e.enc.Join(test, shards, int(size))
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// if _, err := io.Copy(h, test); err != nil {
+	// 	return nil, err
+	// }
+	// hashTest := fmt.Sprintf("%x", h.Sum(nil))
+	// if strings.Compare(hashStr, hashTest) == 0 {
+	// 	fmt.Println("ok")
+	// }
 	//encode the data
 	err = e.enc.Encode(shards)
 	if err != nil {
@@ -588,6 +602,7 @@ func (e *Erasure) read(filename string, savepath string) error {
 				blockByte := (int(fi.fileSize) + e.k - 1) / e.k
 				dataBytes[fi.distribution[ind]] = make([]byte, blockByte)
 				f.Read(dataBytes[fi.distribution[ind]])
+				f.Sync()
 				if err != nil {
 					return err
 				}
@@ -597,13 +612,12 @@ func (e *Erasure) read(filename string, savepath string) error {
 		if err := g.Wait(); err != nil {
 			return err
 		}
-		f, err := os.OpenFile(savepath, os.O_CREATE|os.O_RDWR, 0666)
+		f, err := os.OpenFile(savepath, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0666)
 		if err != nil {
 			return err
 		}
 		defer f.Close()
-
-		err = e.enc.Join(os.Stdout, dataBytes, int(fi.fileSize))
+		err = e.enc.Join(f, dataBytes, int(fi.fileSize))
 		if err != nil {
 			return err
 		}
@@ -619,10 +633,38 @@ func (e *Erasure) read(filename string, savepath string) error {
 		}
 		log.Printf("%s successfully read (Joined)!", filename)
 		//then encoding file in background
+		if len(survivalParity) == e.m {
+			return nil
+		}
+
+		log.Println("Start encoding in background...")
+		// we make the missing parity nil
+		totalBytes := make([][]byte, e.k+e.m)
+		copy(totalBytes[:e.k], dataBytes)
+		for _, ind := range survivalParity {
+			ind := ind
+			g.Go(func() error {
+				filepath := e.diskInfos[ind].diskPath + "/" + filename + "/D_" + fmt.Sprintf("%d", fi.distribution[ind])
+				f, err := os.Open(filepath)
+				if err != nil {
+					return err
+				}
+				defer f.Close()
+				blockByte := (int(fi.fileSize) + e.k - 1) / e.k
+				totalBytes[fi.distribution[ind]] = make([]byte, blockByte)
+				f.Read(totalBytes[fi.distribution[ind]])
+				f.Sync()
+				if err != nil {
+					return err
+				}
+				return nil
+			})
+		}
+		//encoding
 		return nil
 	}
 	if len(survivalData)+len(survivalParity) < e.k {
-		return ErrSurvialNotEnoughForDecoding
+		return ErrSurvivalNotEnoughForDecoding
 	}
 	//We need to decode the file using parity
 	totalBytes := make([][]byte, e.k+e.m)
