@@ -49,6 +49,7 @@ type Erasure struct {
 	k          int                  // the number of data blocks in a stripe
 	m          int                  // the number of parity blocks in a stripe
 	enc        reedsolomon.Encoder  // the reedsolomon encoder
+	blockSize  int                  //the block size. default to 4KiB
 	diskInfos  []*DiskInfo          //disk paths
 	configFile string               //configure file
 	fileMap    map[string]*FileInfo //File info lists
@@ -63,12 +64,14 @@ type FileInfo struct {
 }
 
 //the parameter lists
+var blockSize = flag.Int("blockSize", 4096, "the block size in bytes")
 var mode = flag.String("mode", "encode", "the mode of ec system, one of (encode, decode, update, scaling, recover)")
 var k = flag.Int("k", 12, "the number of data shards(<256)")
 var m = flag.Int("m", 4, "the number of parity shards(2-4)")
 var diskPath = flag.String("diskPath", "", "the disks path")
-var file = flag.String("file", "", "the file path")
-var savePath = flag.String("savePath", "file.save", "the local saving path for file")
+var file = flag.String("file", "", "upload: the local file path, download&update: the remote file name")
+var newFile = flag.String("newFile", "", "the updated file path(local path)")
+var savePath = flag.String("savePath", "file.save", "the local saving path(local path) for file")
 var new_k = flag.Int("new_k", 16, "the new number of data shards(<256)")
 var new_m = flag.Int("new_m", 4, "the new number of parity shards(2-4)")
 var recoveredDiskPath = flag.String("recoveredDiskPath", "/tmp/data", "the data path for recovered disk, default to /tmp/data")
@@ -120,8 +123,17 @@ func (e *Erasure) readConfig() error {
 	if err != nil {
 		return ErrNotInitialized
 	}
+	line, _, err = buf.ReadLine()
+	if err != nil {
+		return ErrNotInitialized
+	}
+	bs, err := strconv.ParseInt(string(line), 10, 32)
+	if err != nil {
+		return ErrNotInitialized
+	}
 	e.k = int(k)
 	e.m = int(m)
+	e.blockSize = int(bs)
 	//initialize the ReedSolomon Code
 	e.enc, err = reedsolomon.New(e.k, e.m)
 	if err != nil {
@@ -223,7 +235,7 @@ func (e *Erasure) writeConfig() error {
 	if err != nil {
 		return err
 	}
-	line := fmt.Sprintf("%d %d\n", e.k, e.m)
+	line := fmt.Sprintf("%d %d\n%d\n", e.k, e.m, e.blockSize)
 	_, err = buf.WriteString(line)
 	if err != nil {
 		return err
@@ -343,6 +355,7 @@ func main() {
 		}
 		erasure.k = *k
 		erasure.m = *m
+		erasure.blockSize = *blockSize
 		err = erasure.readDiskPath(diskPathFile)
 		failOnErr(*mode, err)
 		if erasure.k+erasure.m > len(erasure.diskInfos) {
@@ -361,7 +374,7 @@ func main() {
 		failOnErr(*mode, err)
 		err = erasure.readDiskPath(diskPathFile)
 		failOnErr(*mode, err)
-		erasure.destroy(*failMode, *failNum)
+		// erasure.destroy(*failMode, *failNum)
 		err = erasure.read(*file, *savePath)
 		failOnErr(*mode, err)
 	case "encode":
@@ -380,19 +393,24 @@ func main() {
 		failOnErr(*mode, err)
 		err = erasure.readDiskPath(diskPathFile)
 		failOnErr(*mode, err)
-		err = erasure.update(*file)
+		err = erasure.update(*file, *newFile)
 		failOnErr(*mode, err)
-
-	// case "scaling":
-	// 	//scaling the system, ALERT: this is a system-level operation and irreversible
-	// 	e.readConfig()
-	// 	scaling(new_k, new_m)
 	// case "recover":
 	// 	//recover all the blocks of a disk and put the recovered result to new path
 	// 	e.readConfig()
 	// 	recover(*recoveredDiskPath)
-	//case "delete":
+	// case "scaling":
+	// 	//scaling the system, ALERT: this is a system-level operation and irreversible
+	// 	e.readConfig()
+	// 	scaling(new_k, new_m)
 
+	case "delete":
+		err = erasure.readConfig()
+		failOnErr(*mode, err)
+		err = erasure.readDiskPath(diskPathFile)
+		failOnErr(*mode, err)
+		err = erasure.removeFile(*file)
+		failOnErr(*mode, err)
 	default:
 		log.Fatalf("Can't parse the parameters, please check %s!", *mode)
 	}
@@ -572,44 +590,73 @@ func (e *Erasure) read(filename string, savepath string) error {
 	}
 	//We need to decode the file using parity
 	totalBytes := make([][]byte, e.k+e.m)
-	survivalData = append(survivalData, survivalParity...)
-	rand.Seed(time.Now().UnixNano())
-	rand.Shuffle(len(survivalData), func(i, j int) { survivalData[i], survivalData[j] = survivalData[j], survivalData[i] })
-	//for minimizing read overhead, we only choose first k blocks
-	for _, ind := range survivalData[:e.k] {
-		ind := ind
-		g.Go(func() error {
-			var fullpath string
-			if fi.distribution[ind] < e.k {
-				fullpath = e.diskInfos[ind].diskPath + "/" + filename + "/D_" + fmt.Sprintf("%d", fi.distribution[ind])
-			} else {
-				fullpath = e.diskInfos[ind].diskPath + "/" + filename + "/P_" + fmt.Sprintf("%d", fi.distribution[ind])
+	if len(survivalData)+len(survivalParity) == e.k+e.m {
 
-			}
+		//no need for reconstructing
+		for _, ind := range survivalData {
+			ind := ind
+			g.Go(func() error {
+				filepath := e.diskInfos[ind].diskPath + "/" + filename + "/D_" + fmt.Sprintf("%d", fi.distribution[ind])
+				f, err := os.Open(filepath)
+				if err != nil {
+					return err
+				}
+				defer f.Close()
+				blockByte := (int(fi.fileSize) + e.k - 1) / e.k
+				totalBytes[fi.distribution[ind]] = make([]byte, blockByte)
+				f.Read(totalBytes[fi.distribution[ind]])
+				f.Sync()
+				if err != nil {
+					return err
+				}
+				return nil
+			})
+		}
+		if err := g.Wait(); err != nil {
+			return err
+		}
+	} else {
+		survivalData = append(survivalData, survivalParity...)
 
-			f, err := os.Open(fullpath)
-			if err != nil {
-				return err
-			}
-			defer f.Close()
-			blockByte := (int(fi.fileSize) + e.k - 1) / e.k
-			totalBytes[fi.distribution[ind]] = make([]byte, blockByte)
-			_, err = f.Read(totalBytes[fi.distribution[ind]])
-			if err != nil {
-				return err
-			}
+		rand.Seed(time.Now().UnixNano())
+		rand.Shuffle(len(survivalData), func(i, j int) { survivalData[i], survivalData[j] = survivalData[j], survivalData[i] })
+		//for minimizing read overhead, we only choose first k blocks
+		for _, ind := range survivalData[:e.k] {
+			ind := ind
+			g.Go(func() error {
+				var fullpath string
+				if fi.distribution[ind] < e.k {
+					fullpath = e.diskInfos[ind].diskPath + "/" + filename + "/D_" + fmt.Sprintf("%d", fi.distribution[ind])
+				} else {
+					fullpath = e.diskInfos[ind].diskPath + "/" + filename + "/P_" + fmt.Sprintf("%d", fi.distribution[ind])
 
-			return nil
-		})
-	}
-	if err := g.Wait(); err != nil {
-		return err
-	}
-	//reconstructing, we first decode data, once completed
-	//notify the customer, and parity reconstruction, we move it to back-end
-	err = e.enc.Reconstruct(totalBytes)
-	if err != nil {
-		return err
+				}
+
+				f, err := os.Open(fullpath)
+				if err != nil {
+					return err
+				}
+				defer f.Close()
+				blockByte := (int(fi.fileSize) + e.k - 1) / e.k
+				totalBytes[fi.distribution[ind]] = make([]byte, blockByte)
+				_, err = f.Read(totalBytes[fi.distribution[ind]])
+				if err != nil {
+					return err
+				}
+
+				return nil
+			})
+		}
+		if err := g.Wait(); err != nil {
+			return err
+		}
+		//reconstructing, we first decode data, once completed
+		//notify the customer, and parity reconstruction, we move it to back-end
+
+		err = e.enc.Reconstruct(totalBytes)
+		if err != nil {
+			return err
+		}
 	}
 
 	f, err := os.OpenFile(savepath, os.O_CREATE|os.O_RDWR, 0666)
@@ -659,30 +706,29 @@ func (e *Erasure) destroy(mode string, failNum int) {
 }
 
 //update a file according to a new file, the local `filename` will be used to update the file in the cloud with the same name
-func (e *Erasure) update(filename string) error {
+func (e *Erasure) update(oldFile, newFile string) error {
 	//two ways are available, one is RWM, other one is RCW
 	//we minimize the parity computation and transferring overhead as much as possible
-	oldFi, ok := e.fileMap[filename]
+	fi, ok := e.fileMap[oldFile]
 	if !ok {
 		return ErrFileNotFound
 	}
 	//read new file
-	f, err := os.Open(filename)
+	f, err := os.Open(newFile)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
-	newFi := &FileInfo{fileName: filename}
 	fileInfo, err := f.Stat()
 	if err != nil {
 		return err
 	}
 	//we allocate the buffer actually the same size of the file
 	// fmt.Println(fileInfo)
-	size := fileInfo.Size()
-	newFi.fileSize = size
+	oldFileSize := fi.fileSize
+	fi.fileSize = fileInfo.Size()
 	buf := bufio.NewReader(f)
-	data := make([]byte, size)
+	data := make([]byte, fi.fileSize)
 	_, err = buf.Read(data)
 	if err != nil {
 		return err
@@ -690,12 +736,12 @@ func (e *Erasure) update(filename string) error {
 	//if the len of local file is 0, we regard as deleting
 	if len(data) == 0 {
 		log.Println("The input file length is 0, this will lead to removal of present file")
-		if ans, err := consultUserBeforeAction(); !ans {
-			return nil
-		} else if err != nil {
-			return err
-		}
-		e.removeFile(filename)
+		// if ans, err := consultUserBeforeAction(); !ans {
+		// 	return nil
+		// } else if err != nil {
+		// 	return err
+		// }
+		e.removeFile(oldFile)
 		return e.writeConfig()
 	}
 	h := sha256.New()
@@ -703,33 +749,34 @@ func (e *Erasure) update(filename string) error {
 	if _, err := io.Copy(h, f); err != nil {
 		return err
 	}
-	newFi.hash = fmt.Sprintf("%x", h.Sum(nil))
-
+	fi.hash = fmt.Sprintf("%x", h.Sum(nil))
 	//we split the data, and create empty parity
 	newShards, err := e.enc.Split(data)
 	if err != nil {
 		return err
 	}
 	//we read old shards
-	oldShards := make([][]byte, e.k)
+	oldShards := make([][]byte, e.k+e.m)
 	g := new(errgroup.Group)
 	for i, path := range e.diskInfos {
 		i := i
 		path := path
-		if oldFi.distribution[i] > e.k {
-			continue
-		}
 		g.Go(func() error {
-			filepath := path.diskPath + "/" + filename + "/D_" +
-				fmt.Sprintf("%d", oldFi.distribution[i])
-			f, err := os.Open(filepath)
+			var partPath string
+			if fi.distribution[i] < e.k { //data block
+				partPath = path.diskPath + "/" + fi.fileName + "/D_" + fmt.Sprintf("%d", fi.distribution[i])
+			} else {
+				partPath = path.diskPath + "/" + fi.fileName + "/P_" + fmt.Sprintf("%d", fi.distribution[i])
+
+			}
+			f, err := os.Open(partPath)
 			if err != nil {
 				return err
 			}
 			defer f.Close()
-			blockByte := (int(oldFi.fileSize) + e.k - 1) / e.k
-			oldShards[oldFi.distribution[i]] = make([]byte, blockByte)
-			f.Read(oldShards[oldFi.distribution[i]])
+			blockByte := (int(oldFileSize) + e.k - 1) / e.k
+			oldShards[fi.distribution[i]] = make([]byte, blockByte)
+			f.Read(oldShards[fi.distribution[i]])
 			if err != nil {
 				return err
 			}
@@ -739,17 +786,46 @@ func (e *Erasure) update(filename string) error {
 	if err := g.Wait(); err != nil {
 		return err
 	}
-	err = e.enc.Update(oldShards, newShards)
+	err = e.enc.Update(oldShards, newShards[:e.k])
 	if err != nil {
 		return err
 	}
 	//if a block is updated, we replace it, otherwise remain intact
-	//and all parity is bound to update
+	//and all parity blocks are bound to update
+	for i, path := range e.diskInfos {
+		i := i
+		path := path
+		g.Go(func() error {
+			var partPath string
+			if fi.distribution[i] < e.k { //data block
+				partPath = path.diskPath + "/" + fi.fileName + "/D_" + fmt.Sprintf("%d", fi.distribution[i])
+			} else {
+				partPath = path.diskPath + "/" + fi.fileName + "/P_" + fmt.Sprintf("%d", fi.distribution[i])
+
+			}
+			nf, err := os.OpenFile(partPath, os.O_WRONLY|os.O_TRUNC, 0666)
+			if err != nil {
+				return err
+			}
+			defer nf.Close()
+			buf := bufio.NewWriter(nf)
+			_, err = buf.Write(oldShards[fi.distribution[i]])
+			if err != nil {
+				return err
+			}
+			buf.Flush()
+			return nil
+		})
+	}
+	if err := g.Wait(); err != nil {
+		return err
+	}
 
 	//write into config
 	err = e.writeConfig()
 	if err != nil {
 		return err
 	}
+	log.Println("Successfully updated.")
 	return nil
 }
