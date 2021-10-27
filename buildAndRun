@@ -1,0 +1,4 @@
+#!/bin/bash
+go build -o grasure erasure-*.go main.go
+#./grasure -mode init -k 12 -m 4 -blockSize 4096
+./grasure -mode encode -file LICENSE -override

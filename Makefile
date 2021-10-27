@@ -12,7 +12,7 @@ BINARY_UNIX=$(BINARY_NAME)_unix
 
 all:    build 
 build:
-	go build -o $(BINARY_NAME) -v main.go utils.go
+	go build -o $(BINARY_NAME) -v main.go erasure-encode.go
 test: 
 	go test -v ./...
 clean:
@@ -20,7 +20,7 @@ clean:
 	rm -f $(BINARY_NAME)
 	rm -f $(BINARY_UNIX)
 run:
-	go build -o $(BINARY_NAMEs) -v ./...
+	go build -o $(BINARY_NAMEs) -v main.go erasure-encode.go
 	./$(BINARY_NAME)
 deps:
         # go get github.com/markbates/goth
