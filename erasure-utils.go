@@ -2,10 +2,15 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"log"
+	"math/rand"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
+	"time"
 )
 
 //consult user to avoid maloperation
@@ -49,6 +54,14 @@ func PathExist(path string) (bool, error) {
 	return false, err
 }
 
+//ceilFrac return a/b
+func ceilFrac(a, b int64) int64 {
+	if b == 0 {
+		return 0
+	}
+	return (a + b - 1) / b
+}
+
 func min(args ...int) int {
 	if len(args) == 0 {
 		return 0x7fffffff
@@ -73,4 +86,22 @@ func max(args ...int) int {
 		}
 	}
 	return ret
+}
+
+func genRandomArr(n int) []int {
+	shuff := make([]int, n)
+	for i := 0; i < n; i++ {
+		shuff[i] = i
+	}
+	rand.Seed(time.Now().UnixNano())
+	rand.Shuffle(len(shuff), func(i, j int) { shuff[i], shuff[j] = shuff[j], shuff[i] })
+	return shuff
+}
+
+func monitorCancel(cancel context.CancelFunc) {
+	fmt.Println("Press ctrl + s to halt the system")
+	channel := make(chan os.Signal)
+	signal.Notify(channel, syscall.SIGINT, syscall.SIGTERM, syscall.SIGKILL)
+	<-channel
+	cancel()
 }
