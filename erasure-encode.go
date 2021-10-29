@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+
+	"golang.org/x/sync/errgroup"
 ) //split and encode a file into parity blocks concurrently
 func (e *Erasure) EncodeFile(ctx context.Context, filename string) (*FileInfo, error) {
 	f, err := os.Open(filename)
@@ -30,11 +32,11 @@ func (e *Erasure) EncodeFile(ctx context.Context, filename string) (*FileInfo, e
 	}
 	//we allocate the buffer actually the same size of the file
 	// fmt.Println(fileInfo)
-	size := fileInfo.Size()
-	fi.fileSize = size
+	fileSize := fileInfo.Size()
+	fi.fileSize = fileSize
+	data := make([]byte, fileSize)
 	//for blocks...
-	size = e.stripedFileSize(size)
-	data := make([]byte, size)
+
 	buf := bufio.NewReader(f)
 	_, err = buf.Read(data)
 	if err != nil {
@@ -45,57 +47,79 @@ func (e *Erasure) EncodeFile(ctx context.Context, filename string) (*FileInfo, e
 	}
 	//encode the data
 	stripeSize := e.dataStripeSize()
-	stripeNum := ceilFrac(size, stripeSize)
-	for i := 0; i < int(stripeNum); i++ {
-		stripedData := data[i*int(stripeSize) : (i+1)*int(stripeSize)]
+	stripeNum := ceilFrac(fileSize, stripeSize)
+	fi.distribution = make([][]int, stripeNum)
+	//we split file into stripes and randomlu distribute the blocks to various disks
+	//and for stripes of the same disk, we concatenate all blocks to create the sole file
+	//for accelerating, we start multiple go routine
+	partData := make([][]byte, len(e.diskInfos))
 
-		shards, err := e.EncodeData(ctx, stripedData)
+	for size := int64(0); size < fileSize; size += stripeSize {
+		stripeData := make([]byte, stripeSize)
+		if size+stripeSize > fileSize {
+			copy(stripeData, data[size:])
+		} else {
+			copy(stripeData, data[size:size+stripeSize])
+		}
+
+		encodeData, err := e.EncodeData(stripeData)
+		if err != nil {
+			return nil, err
+		}
 		//verify the data
-		ok, err := e.enc.Verify(shards)
+		ok, err := e.enc.Verify(encodeData)
 		if !ok || err != nil {
 			return nil, err
 		}
-		//we save the encoded shards to dst
-		//Before tht, we shuffle the data and paritys
-		numDisks := len(e.diskInfos)
-		fi.distribution = genRandomArr(numDisks)
-		var folderPath, partPath string
-		for i, path := range e.diskInfos {
-			folderPath = path.diskPath + "/" + filename
-			//first we create a folder
-			if *override {
+		//generate random distrinution for data and parity
+		randDist := genRandomArr(e.k + e.m)
+		fi.distribution[size/stripeSize] = randDist
+		for i := range e.diskInfos {
+			partData[i] = append(partData[i], encodeData[randDist[i]]...)
+		}
+	}
+	erg := new(errgroup.Group)
+	for i := range e.diskInfos {
+		i := i
+		//we have to make sure the dist is appended to fi.distribution in order
+		erg.Go(func() error {
+			folderPath := e.diskInfos[i].diskPath + "/" + filename
+			//if override is specified, we override previous data
+			if override {
 
 				if err := os.RemoveAll(folderPath); err != nil {
-					return nil, err
+					return err
 				}
 
 			}
+
 			if err := os.Mkdir(folderPath, 0666); err != nil {
-				return nil, ErrDataDirExist
+				return ErrDataDirExist
 			}
 			//We decide the part name according to whether it belongs to data or parity
-			if shuff[i] < e.k { //data block
-				partPath = folderPath + "/D_" + fmt.Sprintf("%d", shuff[i])
-			} else {
-				partPath = folderPath + "/P_" + fmt.Sprintf("%d", shuff[i])
-
-			}
+			partPath := folderPath + "/BLOB"
 			//Create the file and write in the parted data
 			nf, err := os.OpenFile(partPath, os.O_WRONLY|os.O_CREATE, 0666)
 			if err != nil {
-				return nil, err
+				return err
 			}
 			defer nf.Close()
 			buf := bufio.NewWriter(nf)
-			_, err = buf.Write(shards[shuff[i]])
+			_, err = buf.Write(partData[i])
 			if err != nil {
-				return nil, err
+				return err
 			}
+			nf.Sync()
 			buf.Flush()
-
-		}
+			return nil
+		})
 
 	}
+
+	if err := erg.Wait(); err != nil {
+		return nil, err
+	}
+
 	//record the file meta
 	e.fileMap[filename] = fi
 
@@ -103,7 +127,7 @@ func (e *Erasure) EncodeFile(ctx context.Context, filename string) (*FileInfo, e
 }
 
 //split and encode data
-func (e *Erasure) EncodeData(ctx context.Context, data []byte) ([][]byte, error) {
+func (e *Erasure) EncodeData(data []byte) ([][]byte, error) {
 	if len(data) == 0 {
 		return make([][]byte, e.k+e.m), nil
 	}

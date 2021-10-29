@@ -99,9 +99,8 @@ func genRandomArr(n int) []int {
 }
 
 func monitorCancel(cancel context.CancelFunc) {
-	fmt.Println("Press ctrl + s to halt the system")
-	channel := make(chan os.Signal)
-	signal.Notify(channel, syscall.SIGINT, syscall.SIGTERM, syscall.SIGKILL)
+	channel := make(chan os.Signal, 2)
+	signal.Notify(channel, syscall.SIGINT, syscall.SIGTERM)
 	<-channel
 	cancel()
 }

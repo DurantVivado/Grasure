@@ -37,34 +37,34 @@ func (e *Erasure) readDiskPath() error {
 }
 
 //initiate the erasure-coded system
-func (e *Erasure) init() {
-	fmt.Println("Warning: you are intializing a new erasure-coded system, which means the previous data will also be reset.\n Are you sure to proceed?[Y]es, or [N]o:")
+func (e *Erasure) initHDR() {
+	fmt.Println("Warning: you are intializing a new erasure-coded system, which means the previous data will also be reset.")
 	if ans, err := consultUserBeforeAction(); !ans {
 		return
 	} else if err != nil {
-		failOnErr(*mode, err)
+		failOnErr(mode, err)
 	}
-	e.k = *k
-	e.m = *m
+	e.k = k
+	e.m = m
 	if e.k <= 0 || e.m <= 0 {
-		failOnErr(*mode, reedsolomon.ErrInvShardNum)
+		failOnErr(mode, reedsolomon.ErrInvShardNum)
 	}
 	//The reedsolomon library only implements GF(2^8) and will be improved later
 	if e.k+e.m > 256 {
-		failOnErr(*mode, reedsolomon.ErrMaxShardNum)
+		failOnErr(mode, reedsolomon.ErrMaxShardNum)
 	}
-	e.blockSize = *blockSize
+	e.blockSize = blockSize
 	err = e.readDiskPath()
-	failOnErr(*mode, err)
+	failOnErr(mode, err)
 	if e.k+e.m > len(e.diskInfos) {
-		failOnErr(*mode, ErrTooFewDisks)
+		failOnErr(mode, ErrTooFewDisks)
 	}
 	//we persit meta info info in hard drives
 	err = e.writeConfig()
-	failOnErr(*mode, err)
+	failOnErr(mode, err)
 	//delete the data blocks under all diskPath
 	err = e.reset()
-	failOnErr(*mode, err)
+	failOnErr(mode, err)
 	fmt.Println("System init!")
 }
 
@@ -111,7 +111,7 @@ func (e *Erasure) readConfig() error {
 	}
 	e.k = int(k)
 	e.m = int(m)
-	e.blockSize = int(bs)
+	e.blockSize = bs
 	//initialize the ReedSolomon Code
 	e.enc, err = reedsolomon.New(e.k, e.m)
 	if err != nil {
@@ -119,6 +119,7 @@ func (e *Erasure) readConfig() error {
 	}
 	//next is the file lists //read all file meta
 	for {
+		//read the file name
 		line, err := buf.ReadString('\n')
 		if err == io.EOF {
 			break
@@ -127,6 +128,7 @@ func (e *Erasure) readConfig() error {
 		}
 		fi := &FileInfo{}
 		fi.fileName = strings.TrimSuffix(line, "\n")
+		//read the file size
 		line, err = buf.ReadString('\n')
 		if err == io.EOF {
 			return fmt.Errorf("%s 's meta data fileSize is incompleted, please check", fi.fileName)
@@ -134,7 +136,7 @@ func (e *Erasure) readConfig() error {
 			return err
 		}
 		fi.fileSize, _ = strconv.ParseInt(strings.TrimSuffix(line, "\n"), 10, 64)
-		//read next line
+		//read file hash
 		line, err = buf.ReadString('\n')
 		if err == io.EOF {
 			return fmt.Errorf("%s 's meta data hash is incompleted, please check", fi.fileName)
@@ -142,23 +144,35 @@ func (e *Erasure) readConfig() error {
 			return err
 		}
 		fi.hash = strings.TrimSuffix(line, "\n")
-		line, err = buf.ReadString('\n')
-		if err == io.EOF {
-			return fmt.Errorf("%s 's meta data distribution is incompleted, please check", fi.fileName)
-		} else if err != nil {
-			return err
-		}
-		line = strings.Trim(line, "[]\n")
-		for _, s := range strings.Split(line, " ") {
-			num, err := strconv.Atoi(s)
-			if err != nil {
+
+		//read the block distribution
+		for {
+			line, err = buf.ReadString('\n')
+			if err == io.EOF {
+				break
+			} else if err != nil {
 				return err
 			}
-			fi.distribution = append(fi.distribution, num)
+			if line[0] != '[' {
+				break
+			}
+			line = strings.Trim(line, "[]\n")
+
+			var stripeDist []int
+			for _, s := range strings.Split(line, " ") {
+				num, err := strconv.Atoi(s)
+				if err != nil {
+					return err
+				}
+				stripeDist = append(stripeDist, num)
+			}
+			fi.distribution = append(fi.distribution, stripeDist)
+
 		}
 		e.fileMap[fi.fileName] = fi
 
 	}
+
 	return nil
 }
 
@@ -185,8 +199,12 @@ func (e *Erasure) writeConfig() error {
 	}
 	//when fileMap is changed, we update the fileList
 	for _, v := range e.fileMap {
-		line := fmt.Sprintf("%s\n%d\n%s\n%v\n", v.fileName, v.fileSize, v.hash, v.distribution)
+		line := fmt.Sprintf("%s\n%d\n%s\n", v.fileName, v.fileSize, v.hash)
 		buf.WriteString(line)
+		for _, v := range v.distribution {
+			tmp := fmt.Sprintf("%v\n", v)
+			buf.WriteString(tmp)
+		}
 	}
 	buf.Flush()
 	f.Sync()

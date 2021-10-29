@@ -41,25 +41,65 @@ type FileInfo struct {
 	fileName string //file name
 	fileSize int64  //file size
 	// metaInfo     *os.FileInfo //system-level file info
-	hash         string //hash value (SHA256 by default)
-	distribution []int  //distribution represents the block replacement respect to disks
+	hash         string  //hash value (SHA256 by default)
+	distribution [][]int //distribution represents the block replacement for specific file, in stripeno x diskno manner
 }
 
+//global CLI parameters
+var (
+	blockSize         int64
+	mode              string
+	k                 int
+	m                 int
+	filePath          string
+	savePath          string
+	newFilePath       string
+	new_k             int
+	new_m             int
+	recoveredDiskPath string
+	failMode          string
+	failNum           int
+	override          bool
+)
+
 //the parameter lists
-var blockSize = flag.Int("blockSize", 4096, "the block size in bytes")
-var mode = flag.String("mode", "encode", "the mode of ec system, one of (encode, decode, update, scaling, recover)")
-var k = flag.Int("k", 12, "the number of data shards(<256)")
-var m = flag.Int("m", 4, "the number of parity shards(2-4)")
-var diskPath = flag.String("diskPath", "", "the disks path")
-var file = flag.String("file", "", "upload: the local file path, download&update: the remote file name")
-var newFile = flag.String("newFile", "", "the updated file path(local path)")
-var savePath = flag.String("savePath", "file.save", "the local saving path(local path) for file")
-var new_k = flag.Int("new_k", 16, "the new number of data shards(<256)")
-var new_m = flag.Int("new_m", 4, "the new number of parity shards(2-4)")
-var recoveredDiskPath = flag.String("recoveredDiskPath", "/tmp/data", "the data path for recovered disk, default to /tmp/data")
-var failMode = flag.String("failMode", "diskFail", "simulate diskFail or bitRot mode")
-var failNum = flag.Int("failNum", 0, "simulate multiple disk failure, provides the fail number of disks")
-var override = flag.Bool("override", false, "whether to override former files or directories")
+func flag_init() {
+	flag.Int64Var(&blockSize, "bs", 4096, "the block size in bytes")
+	flag.Int64Var(&blockSize, "blockSize", 4096, "the block size in bytes")
+
+	flag.StringVar(&mode, "md", "encode", "the mode of ec system, one of (encode, decode, update, scaling, recover)")
+	flag.StringVar(&mode, "mode", "encode", "the mode of ec system, one of (encode, decode, update, scaling, recover)")
+
+	flag.IntVar(&k, "k", 12, "the number of data shards(<256)")
+	flag.IntVar(&k, "dataNum", 12, "the number of data shards(<256)")
+
+	flag.IntVar(&m, "m", 4, "the number of parity shards(2-4)")
+	flag.IntVar(&m, "parityNum", 4, "the number of parity shards(2-4)")
+
+	flag.StringVar(&filePath, "f", "", "upload: the local file path, download&update: the remote file name")
+	flag.StringVar(&filePath, "filePath", "", "upload: the local file path, download&update: the remote file name")
+
+	flag.StringVar(&savePath, "sp", "file.save", "the local saving path(local path)")
+	flag.StringVar(&savePath, "savePath", "file.save", "the local saving path(local path)")
+
+	flag.IntVar(&new_k, "new_k", 32, "the new number of data shards(<256)")
+	flag.IntVar(&new_k, "newDataNum", 32, "the new number of data shards(<256)")
+
+	flag.IntVar(&new_m, "new_m", 4, "the new number of parity shards(2-4)")
+	flag.IntVar(&new_m, "newParityNum", 4, "the new number of parity shards(2-4)")
+
+	flag.StringVar(&recoveredDiskPath, "rDP", "/tmp/data", "the data path for recovered disk, default to /tmp/data")
+	flag.StringVar(&recoveredDiskPath, "recoverDiskPath", "/tmp/data", "the data path for recovered disk, default to /tmp/data")
+
+	flag.BoolVar(&override, "o", false, "whether to override former files or directories")
+	flag.BoolVar(&override, "override", false, "whether to override former files or directories")
+
+	flag.StringVar(&failMode, "fmd", "diskFail", "simulate [diskFail] or [bitRot] mode")
+	flag.StringVar(&failMode, "failMode", "diskFail", "simulate [diskFail] or [bitRot] mode")
+
+	flag.IntVar(&failNum, "fn", 0, "simulate multiple disk failure, provides the fail number of disks")
+	flag.IntVar(&failNum, "failNum", 0, "simulate multiple disk failure, provides the fail number of disks")
+}
 
 var err error
 

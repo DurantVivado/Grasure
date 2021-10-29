@@ -5,3 +5,4 @@ test*.file
 tmp/
 file.save
 garbageCode.go
+test/
