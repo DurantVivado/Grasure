@@ -2,11 +2,17 @@ package main
 
 //read file on the system and return byte stream, include recovering
 func (e *Erasure) read(filename string, savepath string) error {
+
 	// fi, ok := e.fileMap[filename]
 	// if !ok {
 	// 	return ErrFileNotFound
 	// }
 	// g := new(errgroup.Group)
+	//since the file is striped, we'd better reuinte the file
+	//for every stripe, we dismiss the parity and read the data
+	//finally check the hash for integrity, if one blob is lost,
+	//we reconstruct it
+
 	// survivalParity := []int{}
 	// survivalData := []int{}
 	// var mu sync.Mutex

@@ -52,6 +52,7 @@ func (e *Erasure) EncodeFile(ctx context.Context, filename string) (*FileInfo, e
 	//we split file into stripes and randomlu distribute the blocks to various disks
 	//and for stripes of the same disk, we concatenate all blocks to create the sole file
 	//for accelerating, we start multiple go routine
+	//The last stripe will be refilled with zeros
 	partData := make([][]byte, len(e.diskInfos))
 
 	for size := int64(0); size < fileSize; size += stripeSize {
@@ -79,6 +80,7 @@ func (e *Erasure) EncodeFile(ctx context.Context, filename string) (*FileInfo, e
 		}
 	}
 	erg := new(errgroup.Group)
+	//save the blob
 	for i := range e.diskInfos {
 		i := i
 		//we have to make sure the dist is appended to fi.distribution in order
@@ -92,7 +94,7 @@ func (e *Erasure) EncodeFile(ctx context.Context, filename string) (*FileInfo, e
 				}
 
 			}
-
+			//the blob
 			if err := os.Mkdir(folderPath, 0666); err != nil {
 				return ErrDataDirExist
 			}
@@ -111,6 +113,27 @@ func (e *Erasure) EncodeFile(ctx context.Context, filename string) (*FileInfo, e
 			}
 			nf.Sync()
 			buf.Flush()
+			metaPath := folderPath + "/META"
+			//Create the file and write in the hash
+			cf, err := os.OpenFile(metaPath, os.O_WRONLY|os.O_CREATE, 0666)
+			if err != nil {
+				return err
+			}
+			defer cf.Close()
+			h := sha256.New()
+			if _, err := io.Copy(h, cf); err != nil {
+				return err
+			}
+			hashStr = fmt.Sprintf("%x", h.Sum(nil))
+			nf.Seek(0, 0)
+			buf = bufio.NewWriter(cf)
+			_, err = buf.Write([]byte(hashStr))
+			if err != nil {
+				return err
+			}
+			nf.Sync()
+			buf.Flush()
+
 			return nil
 		})
 
