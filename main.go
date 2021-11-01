@@ -65,6 +65,8 @@ func main() {
 		failOnErr(mode, err)
 		err = erasure.removeFile(filePath)
 		failOnErr(mode, err)
+		err = erasure.writeConfig()
+		failOnErr(mode, err)
 	default:
 		log.Fatalf("Can't parse the parameters, please check %s!", mode)
 	}

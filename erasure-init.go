@@ -4,7 +4,9 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"log"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -199,7 +201,7 @@ func (e *Erasure) writeConfig() error {
 	}
 	//when fileMap is changed, we update the fileList
 	for _, v := range e.fileMap {
-		line := fmt.Sprintf("%s\n%d\n%s\n", v.fileName, v.fileSize, v.hash)
+		line := fmt.Sprintf("%s\n%d\n%s\n", filepath.Base(v.fileName), v.fileSize, v.hash)
 		buf.WriteString(line)
 		for _, v := range v.distribution {
 			tmp := fmt.Sprintf("%v\n", v)
@@ -208,6 +210,12 @@ func (e *Erasure) writeConfig() error {
 	}
 	buf.Flush()
 	f.Sync()
+	return nil
+}
+
+//reconstruct the config file if possible
+func (e *Erasure) rebuildConfig() error {
+	//we read file meta in the disk path and try to rebuild the config file
 	return nil
 }
 
@@ -266,5 +274,81 @@ func (e *Erasure) removeFile(filename string) error {
 		return err
 	}
 	delete(e.fileMap, filename)
+	log.Printf("file %s successfully deleted.", filename)
+	return nil
+}
+
+//check integrity
+func (e *Erasure) checkIntegrity() error {
+	//we scan the file in the conf and check hash
+	for i := range e.diskFilePath {
+
+	}
+	return nil
+}
+
+//check file blocks integrity
+func (e *Erasure) checkFileIntegrity(filename string) error {
+	//we scan the file in the conf and check hash
+	for i := range e.diskInfos {
+		i := i
+		//we have to make sure the dist is appended to fi.distribution in order
+		erg.Go(func() error {
+			folderPath := e.diskInfos[i].diskPath + "/" + baseFileName
+			//if override is specified, we override previous data
+			if override {
+				if err := os.RemoveAll(folderPath); err != nil {
+					return err
+				}
+			}
+			if err := os.Mkdir(folderPath, 0666); err != nil {
+				return ErrDataDirExist
+			}
+			// We decide the part name according to whether it belongs to data or parity
+			partPath := folderPath + "/BLOB"
+			//Create the file and write in the parted data
+			nf, err := os.OpenFile(partPath, os.O_RDWR|os.O_CREATE, 0666)
+			if err != nil {
+				return err
+			}
+			defer nf.Close()
+			buf := bufio.NewWriter(nf)
+			_, err = buf.Write(partData[i])
+			if err != nil {
+				return err
+			}
+			nf.Sync()
+			buf.Flush()
+			//for meta information:
+			//we store:1. which blocks are in this part and 2. hashstr for checking integrity
+			metaPath := folderPath + "/META"
+			//Create the file and write in the hash
+			cf, err := os.OpenFile(metaPath, os.O_WRONLY|os.O_CREATE, 0666)
+			if err != nil {
+				return err
+			}
+			defer cf.Close()
+			h := sha256.New()
+			nf.Seek(0, 0)
+			if _, err := io.Copy(h, nf); err != nil {
+				return err
+			}
+			hashStr = fmt.Sprintf("%x\n%v\n", h.Sum(nil), partBlock[i])
+			buf = bufio.NewWriter(cf)
+			_, err = buf.Write([]byte(hashStr))
+			if err != nil {
+				return err
+			}
+			cf.Sync()
+			buf.Flush()
+
+			return nil
+		})
+
+	}
+
+	if err := erg.Wait(); err != nil {
+		return nil, err
+	}
 	return nil
 }

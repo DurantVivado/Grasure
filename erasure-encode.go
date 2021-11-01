@@ -6,11 +6,18 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"io"
+	"log"
 	"os"
+	"path/filepath"
 
 	"golang.org/x/sync/errgroup"
 ) //split and encode a file into parity blocks concurrently
 func (e *Erasure) EncodeFile(ctx context.Context, filename string) (*FileInfo, error) {
+	baseFileName := filepath.Base(filename)
+	if _, ok := e.fileMap[baseFileName]; ok {
+		log.Fatalf("the file %s has already been in HDR file system, you should update instead of encoding", baseFileName)
+		return nil, nil
+	}
 	f, err := os.Open(filename)
 	if err != nil {
 		return nil, err
@@ -25,7 +32,7 @@ func (e *Erasure) EncodeFile(ctx context.Context, filename string) (*FileInfo, e
 	f.Seek(0, 0)
 	fi := &FileInfo{}
 	fi.hash = hashStr
-	fi.fileName = filename
+	fi.fileName = baseFileName
 	fileInfo, err := f.Stat()
 	if err != nil {
 		return nil, err
@@ -54,7 +61,7 @@ func (e *Erasure) EncodeFile(ctx context.Context, filename string) (*FileInfo, e
 	//for accelerating, we start multiple go routine
 	//The last stripe will be refilled with zeros
 	partData := make([][]byte, len(e.diskInfos))
-
+	partBlock := make([][]int, len(e.diskInfos))
 	for size := int64(0); size < fileSize; size += stripeSize {
 		stripeData := make([]byte, stripeSize)
 		if size+stripeSize > fileSize {
@@ -77,6 +84,7 @@ func (e *Erasure) EncodeFile(ctx context.Context, filename string) (*FileInfo, e
 		fi.distribution[size/stripeSize] = randDist
 		for i := range e.diskInfos {
 			partData[i] = append(partData[i], encodeData[randDist[i]]...)
+			partBlock[i] = append(partBlock[i], randDist[i])
 		}
 	}
 	erg := new(errgroup.Group)
@@ -85,23 +93,20 @@ func (e *Erasure) EncodeFile(ctx context.Context, filename string) (*FileInfo, e
 		i := i
 		//we have to make sure the dist is appended to fi.distribution in order
 		erg.Go(func() error {
-			folderPath := e.diskInfos[i].diskPath + "/" + filename
+			folderPath := e.diskInfos[i].diskPath + "/" + baseFileName
 			//if override is specified, we override previous data
 			if override {
-
 				if err := os.RemoveAll(folderPath); err != nil {
 					return err
 				}
-
 			}
-			//the blob
 			if err := os.Mkdir(folderPath, 0666); err != nil {
 				return ErrDataDirExist
 			}
-			//We decide the part name according to whether it belongs to data or parity
+			// We decide the part name according to whether it belongs to data or parity
 			partPath := folderPath + "/BLOB"
 			//Create the file and write in the parted data
-			nf, err := os.OpenFile(partPath, os.O_WRONLY|os.O_CREATE, 0666)
+			nf, err := os.OpenFile(partPath, os.O_RDWR|os.O_CREATE, 0666)
 			if err != nil {
 				return err
 			}
@@ -113,6 +118,8 @@ func (e *Erasure) EncodeFile(ctx context.Context, filename string) (*FileInfo, e
 			}
 			nf.Sync()
 			buf.Flush()
+			//for meta information:
+			//we store:1. which blocks are in this part and 2. hashstr for checking integrity
 			metaPath := folderPath + "/META"
 			//Create the file and write in the hash
 			cf, err := os.OpenFile(metaPath, os.O_WRONLY|os.O_CREATE, 0666)
@@ -121,17 +128,17 @@ func (e *Erasure) EncodeFile(ctx context.Context, filename string) (*FileInfo, e
 			}
 			defer cf.Close()
 			h := sha256.New()
-			if _, err := io.Copy(h, cf); err != nil {
+			nf.Seek(0, 0)
+			if _, err := io.Copy(h, nf); err != nil {
 				return err
 			}
-			hashStr = fmt.Sprintf("%x", h.Sum(nil))
-			nf.Seek(0, 0)
+			hashStr = fmt.Sprintf("%x\n%v\n", h.Sum(nil), partBlock[i])
 			buf = bufio.NewWriter(cf)
 			_, err = buf.Write([]byte(hashStr))
 			if err != nil {
 				return err
 			}
-			nf.Sync()
+			cf.Sync()
 			buf.Flush()
 
 			return nil
@@ -145,7 +152,7 @@ func (e *Erasure) EncodeFile(ctx context.Context, filename string) (*FileInfo, e
 
 	//record the file meta
 	e.fileMap[filename] = fi
-
+	log.Println(baseFileName, " successfully encoded.")
 	return fi, nil
 }
 
