@@ -1,6 +1,8 @@
 package main
 
-import "errors"
+import (
+	"errors"
+)
 
 //Error definitions
 var ErrConfFileNotExist = errors.New("the conf file not exist")

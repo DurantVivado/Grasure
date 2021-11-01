@@ -1,9 +1,5 @@
 package main
 
-import (
-	"golang.org/x/sync/errgroup"
-)
-
 //read file on the system and return byte stream, include recovering
 func (e *Erasure) read(filename string, savepath string) error {
 
@@ -11,7 +7,13 @@ func (e *Erasure) read(filename string, savepath string) error {
 	if !ok {
 		return ErrFileNotFound
 	}
-	g := new(errgroup.Group)
+
+	parts, err := e.readBlocks(filename)
+	if err == nil {
+		//w could just read the data
+	} else {
+		//wehave to reconstruct
+	}
 	//since the file is striped, we'd better reuinte the file
 	//for every stripe, we dismiss the parity and read the data
 	//finally check the hash for integrity, if one blob is lost,

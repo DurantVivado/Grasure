@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"crypto/sha256"
 	"fmt"
 	"io"
 	"log"
@@ -278,77 +279,82 @@ func (e *Erasure) removeFile(filename string) error {
 	return nil
 }
 
-//check integrity
-func (e *Erasure) checkIntegrity() error {
-	//we scan the file in the conf and check hash
-	for i := range e.diskFilePath {
-
-	}
-	return nil
-}
-
 //check file blocks integrity
-func (e *Erasure) checkFileIntegrity(filename string) error {
+func (e *Erasure) readBlocks(filename string) ([][]byte, error) {
 	//we scan the file in the conf and check hash
+	erg := new(errgroup.Group)
+	data := make([][]byte, len(e.diskInfos))
 	for i := range e.diskInfos {
 		i := i
 		//we have to make sure the dist is appended to fi.distribution in order
 		erg.Go(func() error {
-			folderPath := e.diskInfos[i].diskPath + "/" + baseFileName
-			//if override is specified, we override previous data
-			if override {
-				if err := os.RemoveAll(folderPath); err != nil {
-					return err
-				}
+			folderPath := e.diskInfos[i].diskPath + "/" + filename
+			if ok, err := PathExist(folderPath); !ok {
+				return fmt.Errorf("error: %s doesn't exist!", folderPath)
+			} else if err != nil {
+				return err
 			}
-			if err := os.Mkdir(folderPath, 0666); err != nil {
-				return ErrDataDirExist
-			}
+
 			// We decide the part name according to whether it belongs to data or parity
 			partPath := folderPath + "/BLOB"
-			//Create the file and write in the parted data
-			nf, err := os.OpenFile(partPath, os.O_RDWR|os.O_CREATE, 0666)
-			if err != nil {
+			if ok, err := PathExist(partPath); !ok {
+				return fmt.Errorf("error: %s doesn't exist!", partPath)
+			} else if err != nil {
 				return err
 			}
-			defer nf.Close()
-			buf := bufio.NewWriter(nf)
-			_, err = buf.Write(partData[i])
-			if err != nil {
-				return err
-			}
-			nf.Sync()
-			buf.Flush()
-			//for meta information:
-			//we store:1. which blocks are in this part and 2. hashstr for checking integrity
-			metaPath := folderPath + "/META"
-			//Create the file and write in the hash
-			cf, err := os.OpenFile(metaPath, os.O_WRONLY|os.O_CREATE, 0666)
-			if err != nil {
-				return err
-			}
-			defer cf.Close()
-			h := sha256.New()
-			nf.Seek(0, 0)
-			if _, err := io.Copy(h, nf); err != nil {
-				return err
-			}
-			hashStr = fmt.Sprintf("%x\n%v\n", h.Sum(nil), partBlock[i])
-			buf = bufio.NewWriter(cf)
-			_, err = buf.Write([]byte(hashStr))
-			if err != nil {
-				return err
-			}
-			cf.Sync()
-			buf.Flush()
 
+			//read the file and check the hashstr
+			rf, err := os.Open(partPath)
+			if err != nil {
+				return err
+			}
+			defer rf.Close()
+			buf := bufio.NewReader(rf)
+			st, err := os.Stat(partPath)
+			if err != nil {
+				return err
+			}
+			part := make([]byte, st.Size())
+			_, err = buf.Read(part)
+			if err != nil {
+				return err
+			}
+			rf.Seek(0, 0)
+			h := sha256.New()
+			if _, err := io.Copy(h, rf); err != nil {
+				return err
+			}
+
+			hashStr := fmt.Sprintf("%x", h.Sum(nil))
+			metaPath := folderPath + "/META"
+			if ok, err := PathExist(metaPath); !ok {
+				return fmt.Errorf("error: %s doesn't exist!", partPath)
+			} else if err != nil {
+				return err
+			}
+			//read the file and check the hashstr
+			mf, err := os.Open(metaPath)
+			if err != nil {
+				return err
+			}
+			defer mf.Close()
+			buf = bufio.NewReader(mf)
+			truehash, err := buf.ReadString('\n')
+			truehash = strings.TrimSuffix(truehash, "\n")
+			if err != nil {
+				return nil
+			}
+			if strings.Compare(hashStr, truehash) != 0 {
+				return ErrFileIncompleted
+			}
 			return nil
 		})
 
 	}
 
 	if err := erg.Wait(); err != nil {
-		return nil, err
+		//we do not stop when encountered with error, however we try to recover it
+		log.Println(err)
 	}
-	return nil
+	return data, nil
 }
