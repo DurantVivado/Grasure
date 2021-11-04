@@ -151,11 +151,6 @@ func (e *Erasure) readConfig() error {
 		//read the block distribution
 		for {
 			line, err = buf.ReadString('\n')
-			if err == io.EOF {
-				break
-			} else if err != nil {
-				return err
-			}
 			if line[0] != '[' {
 				break
 			}
@@ -170,6 +165,11 @@ func (e *Erasure) readConfig() error {
 				stripeDist = append(stripeDist, num)
 			}
 			fi.distribution = append(fi.distribution, stripeDist)
+			if err == io.EOF {
+				break
+			} else if err != nil {
+				return err
+			}
 
 		}
 		e.fileMap[fi.fileName] = fi
@@ -283,14 +283,14 @@ func (e *Erasure) removeFile(filename string) error {
 func (e *Erasure) readBlocks(filename string) ([][]byte, error) {
 	//we scan the file in the conf and check hash
 	erg := new(errgroup.Group)
-	data := make([][]byte, len(e.diskInfos))
+	data := make([][]byte, e.k+e.m)
 	for i := range e.diskInfos {
 		i := i
 		//we have to make sure the dist is appended to fi.distribution in order
 		erg.Go(func() error {
 			folderPath := e.diskInfos[i].diskPath + "/" + filename
 			if ok, err := PathExist(folderPath); !ok {
-				return fmt.Errorf("error: %s doesn't exist!", folderPath)
+				return fmt.Errorf("error: %s doesn't exist", folderPath)
 			} else if err != nil {
 				return err
 			}
@@ -298,7 +298,7 @@ func (e *Erasure) readBlocks(filename string) ([][]byte, error) {
 			// We decide the part name according to whether it belongs to data or parity
 			partPath := folderPath + "/BLOB"
 			if ok, err := PathExist(partPath); !ok {
-				return fmt.Errorf("error: %s doesn't exist!", partPath)
+				return fmt.Errorf("error: %s doesn't exist", partPath)
 			} else if err != nil {
 				return err
 			}
@@ -319,6 +319,7 @@ func (e *Erasure) readBlocks(filename string) ([][]byte, error) {
 			if err != nil {
 				return err
 			}
+			data[i] = part
 			rf.Seek(0, 0)
 			h := sha256.New()
 			if _, err := io.Copy(h, rf); err != nil {
@@ -328,7 +329,7 @@ func (e *Erasure) readBlocks(filename string) ([][]byte, error) {
 			hashStr := fmt.Sprintf("%x", h.Sum(nil))
 			metaPath := folderPath + "/META"
 			if ok, err := PathExist(metaPath); !ok {
-				return fmt.Errorf("error: %s doesn't exist!", partPath)
+				return fmt.Errorf("error: %s doesn't exist", partPath)
 			} else if err != nil {
 				return err
 			}

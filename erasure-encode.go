@@ -14,7 +14,7 @@ import (
 ) //split and encode a file into parity blocks concurrently
 func (e *Erasure) EncodeFile(ctx context.Context, filename string) (*FileInfo, error) {
 	baseFileName := filepath.Base(filename)
-	if _, ok := e.fileMap[baseFileName]; ok {
+	if _, ok := e.fileMap[baseFileName]; ok && !override {
 		log.Fatalf("the file %s has already been in HDR file system, you should update instead of encoding", baseFileName)
 		return nil, nil
 	}
@@ -92,7 +92,7 @@ func (e *Erasure) EncodeFile(ctx context.Context, filename string) (*FileInfo, e
 	for i := range e.diskInfos {
 		i := i
 		//we have to make sure the dist is appended to fi.distribution in order
-		erg.Go(func() error {
+		func() error {
 			folderPath := e.diskInfos[i].diskPath + "/" + baseFileName
 			//if override is specified, we override previous data
 			if override {
@@ -116,6 +116,13 @@ func (e *Erasure) EncodeFile(ctx context.Context, filename string) (*FileInfo, e
 			if err != nil {
 				return err
 			}
+			h := sha256.New()
+			nf.Seek(0, 0)
+			if _, err := io.Copy(h, nf); err != nil {
+				return err
+			}
+			hashStr = fmt.Sprintf("%x\n%v\n", h.Sum(nil), partBlock[i])
+
 			nf.Sync()
 			buf.Flush()
 			//for meta information:
@@ -127,14 +134,8 @@ func (e *Erasure) EncodeFile(ctx context.Context, filename string) (*FileInfo, e
 				return err
 			}
 			defer cf.Close()
-			h := sha256.New()
-			nf.Seek(0, 0)
-			if _, err := io.Copy(h, nf); err != nil {
-				return err
-			}
-			hashStr = fmt.Sprintf("%x\n%v\n", h.Sum(nil), partBlock[i])
 			buf = bufio.NewWriter(cf)
-			_, err = buf.Write([]byte(hashStr))
+			_, err = buf.WriteString(hashStr)
 			if err != nil {
 				return err
 			}
@@ -142,7 +143,7 @@ func (e *Erasure) EncodeFile(ctx context.Context, filename string) (*FileInfo, e
 			buf.Flush()
 
 			return nil
-		})
+		}()
 
 	}
 
@@ -151,7 +152,7 @@ func (e *Erasure) EncodeFile(ctx context.Context, filename string) (*FileInfo, e
 	}
 
 	//record the file meta
-	e.fileMap[filename] = fi
+	e.fileMap[baseFileName] = fi
 	log.Println(baseFileName, " successfully encoded.")
 	return fi, nil
 }

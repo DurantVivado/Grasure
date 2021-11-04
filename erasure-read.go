@@ -1,20 +1,68 @@
 package main
 
+import (
+	"bufio"
+	"crypto/sha256"
+	"fmt"
+	"io"
+	"log"
+	"os"
+	"strings"
+)
+
 //read file on the system and return byte stream, include recovering
 func (e *Erasure) read(filename string, savepath string) error {
 
-	// fi, ok := e.fileMap[filename]
-	// if !ok {
-	// 	return ErrFileNotFound
-	// }
+	fi, ok := e.fileMap[filename]
+	if !ok {
+		return ErrFileNotFound
+	}
 
-	// parts, err := e.readBlocks(filename)
-	// if err == nil {
-	// 	//w could just read the data
-	// 	//reunite the data according to distribution
-	// } else {
-	// 	//we have to reconstruct
-	// }
+	parts, err := e.readBlocks(filename)
+	if err == nil {
+		//w could just read the data
+		//reunite the data according to distribution
+		allData := make([]byte, fi.fileSize)
+		for i := range fi.distribution {
+			for k := 0; k < e.k; k++ {
+				for j, it := range fi.distribution[i] {
+					if it == k {
+						if (i+1)*int(e.blockSize) >= int(fi.fileSize) {
+							allData = append(allData, parts[j][i*int(e.blockSize):int(fi.fileSize)-1]...)
+							break
+						}
+						allData = append(allData,
+							parts[j][i*int(e.blockSize):(i+1)*int(e.blockSize)]...)
+					}
+				}
+			}
+		}
+		//write the data to certain path
+		f, err := os.OpenFile(savepath, os.O_CREATE|os.O_RDWR, 0666)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+		buf := bufio.NewWriter(f)
+		_, err = buf.Write(allData)
+		if err != nil {
+			return nil
+		}
+		f.Seek(0, 0)
+		h := sha256.New()
+		if _, err := io.Copy(h, f); err != nil {
+			return nil
+		}
+		hashSum := fmt.Sprintf("%x", h.Sum(nil))
+		if strings.Compare(hashSum, fi.hash) != 0 {
+			return ErrFileIncompleted
+		}
+		log.Printf("%s successfully read (Normal)!", filename)
+
+	} else {
+		//we have to reconstruct
+	}
+	return nil
 	//since the file is striped, we'd better reuinte the file
 	//for every stripe, we dismiss the parity and read the data
 	//finally check the hash for integrity, if one blob is lost,

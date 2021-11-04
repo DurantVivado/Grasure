@@ -1,4 +1,4 @@
 #!/bin/bash
 go build -o grasure erasure-*.go main.go
 # ./grasure -md init -k 12 -m 4 -bs 4096
-./grasure -md encode -f LICENSE -o
+# ./grasure -md encode -f LICENSE -o
