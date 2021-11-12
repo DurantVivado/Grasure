@@ -6,3 +6,5 @@ tmp/
 file.save
 garbageCode.go
 test/
+cmd/
+output/
