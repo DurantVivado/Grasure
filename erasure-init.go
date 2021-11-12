@@ -117,6 +117,7 @@ func (e *Erasure) readConfig() error {
 	e.blockSize = bs
 	//initialize the ReedSolomon Code
 	e.enc, err = reedsolomon.New(e.k, e.m)
+	//e.sEnc, err = reedsolomon.NewStreamC(e.k, e.m, conReads, conWrites)
 	if err != nil {
 		return err
 	}
@@ -151,7 +152,7 @@ func (e *Erasure) readConfig() error {
 		//read the block distribution
 		for {
 			line, err = buf.ReadString('\n')
-			if line[0] != '[' {
+			if len(line) == 0 || line[0] != '[' {
 				break
 			}
 			line = strings.Trim(line, "[]\n")

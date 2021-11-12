@@ -27,15 +27,16 @@ type DiskInfo struct {
 }
 
 type Erasure struct {
-	k            int                  // the number of data blocks in a stripe
-	m            int                  // the number of parity blocks in a stripe
-	enc          reedsolomon.Encoder  // the reedsolomon encoder
-	blockSize    int64                //the block size. default to 4KiB
-	diskInfos    []*DiskInfo          //disk paths
-	configFile   string               //configure file
-	fileMap      map[string]*FileInfo //File info lists
-	rwmu         sync.RWMutex         //read write mutex
-	diskFilePath string               //the path of file recording all disks path
+	k            int                       // the number of data blocks in a stripe
+	m            int                       // the number of parity blocks in a stripe
+	sEnc         reedsolomon.StreamEncoder // the reedsolomon streaming encoder, for large files
+	enc          reedsolomon.Encoder       // the reedsolomon encoder, for small files
+	blockSize    int64                     // the block size. default to 4KiB
+	diskInfos    []*DiskInfo               // disk paths
+	configFile   string                    // configure file
+	fileMap      map[string]*FileInfo      // File info lists
+	rwmu         sync.RWMutex              // read write mutex
+	diskFilePath string                    // the path of file recording all disks path
 }
 type FileInfo struct {
 	fileName string //file name
@@ -60,9 +61,11 @@ var (
 	failMode          string
 	failNum           int
 	override          bool
+	conWrites         bool
+	conReads          bool
 )
 
-//the parameter lists
+//the parameter lists, with fullname or abbreviation
 func flag_init() {
 	flag.Int64Var(&blockSize, "bs", 4096, "the block size in bytes")
 	flag.Int64Var(&blockSize, "blockSize", 4096, "the block size in bytes")
@@ -91,8 +94,14 @@ func flag_init() {
 	flag.StringVar(&recoveredDiskPath, "rDP", "/tmp/data", "the data path for recovered disk, default to /tmp/data")
 	flag.StringVar(&recoveredDiskPath, "recoverDiskPath", "/tmp/data", "the data path for recovered disk, default to /tmp/data")
 
-	flag.BoolVar(&override, "o", false, "whether to override former files or directories")
-	flag.BoolVar(&override, "override", false, "whether to override former files or directories")
+	flag.BoolVar(&override, "o", false, "whether to override former files or directories, default to false")
+	flag.BoolVar(&override, "override", false, "whether to override former files or directories, default to false")
+
+	flag.BoolVar(&override, "cw", true, "whether to enable concurrent write, default is false")
+	flag.BoolVar(&override, "conWrites", true, "whether to enable concurrent write, default is false")
+
+	flag.BoolVar(&override, "cr", true, "whether to enable concurrent read, default is false")
+	flag.BoolVar(&override, "conReads", true, "whether to enable concurrent read, default is false")
 
 	flag.StringVar(&failMode, "fmd", "diskFail", "simulate [diskFail] or [bitRot] mode")
 	flag.StringVar(&failMode, "failMode", "diskFail", "simulate [diskFail] or [bitRot] mode")
