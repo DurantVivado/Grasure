@@ -11,6 +11,7 @@ import (
 	"context"
 	"flag"
 	"log"
+	"time"
 )
 
 func main() {
@@ -20,6 +21,7 @@ func main() {
 	//We read the config file
 	ctx, cancel := context.WithCancel(context.Background())
 	go monitorCancel(cancel)
+	start := time.Now()
 	switch mode {
 	case "init":
 		erasure.initHDR()
@@ -29,9 +31,10 @@ func main() {
 		failOnErr(mode, err)
 		err = erasure.readDiskPath()
 		failOnErr(mode, err)
-		// erasure.destroy(failMode, failNum)
-		err = erasure.read(filePath, savePath)
+		erasure.destroy(failMode, failNum)
+		err = erasure.readFile(filePath, savePath)
 		failOnErr(mode, err)
+
 	case "encode":
 		//We are entering the encoding mode, and for brevity,we only encode one filePath
 		err = erasure.readConfig()
@@ -71,5 +74,5 @@ func main() {
 		log.Fatalf("Can't parse the parameters, please check %s!", mode)
 	}
 	//It functions as a testbed, so currently I won't use goroutines.
-
+	log.Printf("%s consumes %d ms", mode, time.Since(start).Milliseconds())
 }

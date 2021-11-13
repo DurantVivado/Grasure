@@ -37,6 +37,7 @@ type Erasure struct {
 	fileMap      map[string]*FileInfo      // File info lists
 	rwmu         sync.RWMutex              // read write mutex
 	diskFilePath string                    // the path of file recording all disks path
+	p            sync.Pool                 //Go builtin object pool
 }
 type FileInfo struct {
 	fileName string //file name
@@ -118,3 +119,8 @@ var erasure = Erasure{
 	fileMap:      make(map[string]*FileInfo),
 	diskFilePath: ".hdr.disks.path",
 }
+
+//constant variables
+const (
+	maxGoroutines = 10240
+)

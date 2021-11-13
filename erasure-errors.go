@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 )
 
 //Error definitions
@@ -14,6 +15,15 @@ var ErrFileNotFound = errors.New("file not found")
 var ErrSurvivalNotEnoughForDecoding = errors.New("the failed block number exceeds fault tolerance, data renders unrecoverable")
 var ErrFileIncompleted = errors.New("file hash check fails, file renders incompleted")
 var ErrFailModeNotRecognized = errors.New("the fail mode is not recognizable, please specify in \"diskFail\" or \"bitRot\"")
+
+type DiskError struct {
+	diskPath string
+	cause    string
+}
+
+func (e *DiskError) Error() string {
+	return fmt.Sprintf("disk %s is not available %s", e.diskPath, e.cause)
+}
 
 // errUnexpected - unexpected error, requires manual intervention.
 var errUnexpected = StorageErr("unexpected error, please report this issue at https://github.com/minio/minio/issues")

@@ -88,10 +88,12 @@ func (e *Erasure) EncodeFile(ctx context.Context, filename string) (*FileInfo, e
 	if err := erg.Wait(); err != nil {
 		return nil, err
 	}
-
+	//we are setting stripenum goroutines
+	offset := int64(0)
+	data := make([]byte, stripeSize)
 	for {
-		data := make([]byte, e.dataStripeSize())
 		bytes, err := f.Read(data)
+		offset += stripeSize
 		if err != nil && err != io.EOF {
 			return nil, err
 		}
@@ -102,6 +104,7 @@ func (e *Erasure) EncodeFile(ctx context.Context, filename string) (*FileInfo, e
 		}
 		//generate random distrinution for data and parity
 		randDist := genRandomArr(e.k + e.m)
+
 		fi.distribution[stripeno] = randDist
 		stripeno++
 		for i := range e.diskInfos {
@@ -126,7 +129,6 @@ func (e *Erasure) EncodeFile(ctx context.Context, filename string) (*FileInfo, e
 				// 	return err
 				// }
 				// hashStr = fmt.Sprintf("%x\n%v\n", h.Sum(nil), partBlock[i])
-
 				// nf.Sync()
 				// buf.Flush()
 				// //for meta information:

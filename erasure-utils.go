@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"os"
 	"os/signal"
+	"runtime"
 	"strings"
 	"syscall"
 	"time"
@@ -103,4 +104,8 @@ func monitorCancel(cancel context.CancelFunc) {
 	signal.Notify(channel, syscall.SIGINT, syscall.SIGTERM)
 	<-channel
 	cancel()
+}
+
+func goroutineNum() int {
+	return runtime.NumGoroutine()
 }

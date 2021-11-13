@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"crypto/sha256"
 	"fmt"
 	"io"
 	"log"
@@ -122,43 +121,48 @@ func (e *Erasure) readConfig() error {
 		return err
 	}
 	//next is the file lists //read all file meta
+	var str string
 	for {
 		//read the file name
-		line, err := buf.ReadString('\n')
+		if len(str) == 0 {
+			//if str is not empty, we retain previous file name
+			str, err = buf.ReadString('\n')
+
+		}
 		if err == io.EOF {
 			break
 		} else if err != nil {
 			return err
 		}
 		fi := &FileInfo{}
-		fi.fileName = strings.TrimSuffix(line, "\n")
+		fi.fileName = strings.TrimSuffix(str, "\n")
 		//read the file size
-		line, err = buf.ReadString('\n')
+		str, err = buf.ReadString('\n')
 		if err == io.EOF {
 			return fmt.Errorf("%s 's meta data fileSize is incompleted, please check", fi.fileName)
 		} else if err != nil {
 			return err
 		}
-		fi.fileSize, _ = strconv.ParseInt(strings.TrimSuffix(line, "\n"), 10, 64)
+		fi.fileSize, _ = strconv.ParseInt(strings.TrimSuffix(str, "\n"), 10, 64)
 		//read file hash
-		line, err = buf.ReadString('\n')
+		str, err = buf.ReadString('\n')
 		if err == io.EOF {
 			return fmt.Errorf("%s 's meta data hash is incompleted, please check", fi.fileName)
 		} else if err != nil {
 			return err
 		}
-		fi.hash = strings.TrimSuffix(line, "\n")
+		fi.hash = strings.TrimSuffix(str, "\n")
 
 		//read the block distribution
 		for {
-			line, err = buf.ReadString('\n')
-			if len(line) == 0 || line[0] != '[' {
+			str, err = buf.ReadString('\n')
+			if len(str) == 0 || str[0] != '[' {
 				break
 			}
-			line = strings.Trim(line, "[]\n")
+			str = strings.Trim(str, "[]\n")
 
 			var stripeDist []int
-			for _, s := range strings.Split(line, " ") {
+			for _, s := range strings.Split(str, " ") {
 				num, err := strconv.Atoi(s)
 				if err != nil {
 					return err
@@ -289,7 +293,7 @@ func (e *Erasure) readBlocks(filename string) ([][]byte, error) {
 		i := i
 		//we have to make sure the dist is appended to fi.distribution in order
 		erg.Go(func() error {
-			folderPath := e.diskInfos[i].diskPath + "/" + filename
+			folderPath := filepath.Join(e.diskInfos[i].diskPath, filename)
 			if ok, err := PathExist(folderPath); !ok {
 				return fmt.Errorf("error: %s doesn't exist", folderPath)
 			} else if err != nil {
@@ -297,7 +301,7 @@ func (e *Erasure) readBlocks(filename string) ([][]byte, error) {
 			}
 
 			// We decide the part name according to whether it belongs to data or parity
-			partPath := folderPath + "/BLOB"
+			partPath := filepath.Join(folderPath, "BLOB")
 			if ok, err := PathExist(partPath); !ok {
 				return fmt.Errorf("error: %s doesn't exist", partPath)
 			} else if err != nil {
@@ -321,34 +325,33 @@ func (e *Erasure) readBlocks(filename string) ([][]byte, error) {
 				return err
 			}
 			data[i] = part
-			rf.Seek(0, 0)
-			h := sha256.New()
-			if _, err := io.Copy(h, rf); err != nil {
-				return err
-			}
-
-			hashStr := fmt.Sprintf("%x", h.Sum(nil))
-			metaPath := folderPath + "/META"
-			if ok, err := PathExist(metaPath); !ok {
-				return fmt.Errorf("error: %s doesn't exist", partPath)
-			} else if err != nil {
-				return err
-			}
-			//read the file and check the hashstr
-			mf, err := os.Open(metaPath)
-			if err != nil {
-				return err
-			}
-			defer mf.Close()
-			buf = bufio.NewReader(mf)
-			truehash, err := buf.ReadString('\n')
-			truehash = strings.TrimSuffix(truehash, "\n")
-			if err != nil {
-				return nil
-			}
-			if strings.Compare(hashStr, truehash) != 0 {
-				return ErrFileIncompleted
-			}
+			// // rf.Seek(0, 0)
+			// h := sha256.New()
+			// if _, err := io.Copy(h, rf); err != nil {
+			// 	return err
+			// }
+			// hashStr := fmt.Sprintf("%x", h.Sum(nil))
+			// metaPath := folderPath + "/META"
+			// if ok, err := PathExist(metaPath); !ok {
+			// 	return fmt.Errorf("error: %s doesn't exist", partPath)
+			// } else if err != nil {
+			// 	return err
+			// }
+			// //read the file and check the hashstr
+			// mf, err := os.Open(metaPath)
+			// if err != nil {
+			// 	return err
+			// }
+			// defer mf.Close()
+			// buf = bufio.NewReader(mf)
+			// truehash, err := buf.ReadString('\n')
+			// truehash = strings.TrimSuffix(truehash, "\n")
+			// if err != nil {
+			// 	return nil
+			// }
+			// if strings.Compare(hashStr, truehash) != 0 {
+			// 	return ErrFileIncompleted
+			// }
 			return nil
 		})
 

@@ -1,205 +1,160 @@
 package main
 
 import (
-	"bufio"
-	"crypto/sha256"
 	"fmt"
 	"io"
 	"log"
 	"os"
-	"strings"
+	"path/filepath"
+	"sync/atomic"
+
+	"golang.org/x/sync/errgroup"
 )
 
-//read file on the system and return byte stream, include recovering
-func (e *Erasure) read(filename string, savepath string) error {
+//read inputData and return as the io.Reader
+func openInput(dataShards, parShards int, fname string) (r []io.Reader, size int64, err error) {
+	// Create shards and load the data.
+	shards := make([]io.Reader, dataShards+parShards)
+	for i := range shards {
+		infn := fmt.Sprintf("%s.%d", fname, i)
+		fmt.Println("Opening", infn)
+		f, err := os.Open(infn)
+		if err != nil {
+			fmt.Println("Error reading file", err)
+			shards[i] = nil
+			continue
+		} else {
+			shards[i] = f
+		}
+		stat, err := f.Stat()
+		if err != nil {
+			return nil, 0, err
+		}
+		if stat.Size() > 0 {
+			size = stat.Size()
+		} else {
+			shards[i] = nil
+		}
+	}
+	return shards, size, nil
+}
 
-	fi, ok := e.fileMap[filename]
+//read file on the system and return byte stream, include recovering
+func (e *Erasure) readFile(filename string, savepath string) error {
+
+	baseFileName := filepath.Base(filename)
+	fi, ok := e.fileMap[baseFileName]
 	if !ok {
 		return ErrFileNotFound
 	}
 
-	parts, err := e.readBlocks(filename)
-	if err == nil {
-		//w could just read the data
-		//reunite the data according to distribution
-		allData := make([]byte, fi.fileSize)
-		for i := range fi.distribution {
-			for k := 0; k < e.k; k++ {
-				for j, it := range fi.distribution[i] {
-					if it == k {
-						if (i+1)*int(e.blockSize) >= int(fi.fileSize) {
-							allData = append(allData, parts[j][i*int(e.blockSize):int(fi.fileSize)-1]...)
-							break
-						}
-						allData = append(allData,
-							parts[j][i*int(e.blockSize):(i+1)*int(e.blockSize)]...)
-					}
-				}
+	fileSize := fi.fileSize
+	stripeSize := e.dataStripeSize()
+	_ = ceilFrac(fileSize, stripeSize)
+	dist := fi.distribution
+	//first we detect the number of alive disks
+	alive := int32(0)
+	ifs := make([]*os.File, e.k+e.m)
+	erg := new(errgroup.Group)
+	for i, disk := range e.diskInfos {
+		i := i
+		disk := disk
+		erg.Go(func() error {
+			folderPath := filepath.Join(disk.diskPath, baseFileName)
+			blobPath := filepath.Join(folderPath, "BLOB")
+			if !disk.available {
+				return &DiskError{disk.diskPath, " avilable flag unset"}
 			}
+			ifs[i], err = os.Open(blobPath)
+			if err != nil {
+				disk.available = false
+				return err
+			}
+			disk.available = true
+			atomic.AddInt32(&alive, 1)
+			return nil
+		})
+	}
+	if err := erg.Wait(); err != nil {
+		log.Printf("read failed %s:", err.Error())
+	}
+	if int(alive) < e.k {
+		//the disk renders inrecoverable
+		return ErrTooFewDisks
+	}
+	if int(alive) == e.k+e.m {
+		log.Println("start reading blocks")
+	} else {
+		log.Println("start reconstructing blocks")
+	}
+	//for local save path
+	sf, err := os.OpenFile(savepath, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0666)
+	if err != nil {
+		return err
+	}
+	defer sf.Close()
+
+	//Since the file is striped, we have to reconstruct each stripe
+	//for each stripe we rejoin the data
+
+	for offset := int64(0); offset < fileSize; offset += stripeSize {
+		g := new(errgroup.Group)
+		stripeData := make([][]byte, e.k+e.m)
+		//read all blocks in parallel
+		for i, disk := range e.diskInfos {
+			i := i
+			disk := disk
+			g.Go(func() error {
+				if !disk.available {
+					stripeData[dist[offset/stripeSize][i]] = nil
+					return nil
+				}
+				tempBuf := make([]byte, blockSize)
+				_, err := ifs[i].Read(tempBuf)
+				if err != nil && err != io.EOF {
+					return err
+				}
+				stripeData[dist[offset/stripeSize][i]] = tempBuf
+				//then write it to sf
+				return nil
+			})
 		}
-		//write the data to certain path
-		f, err := os.OpenFile(savepath, os.O_CREATE|os.O_RDWR, 0666)
+		if err := g.Wait(); err != nil {
+			return err
+		}
+		//reconstruct
+		ok, err := e.enc.Verify(stripeData)
 		if err != nil {
 			return err
 		}
-		defer f.Close()
-		buf := bufio.NewWriter(f)
-		_, err = buf.Write(allData)
-		if err != nil {
-			return nil
-		}
-		f.Seek(0, 0)
-		h := sha256.New()
-		if _, err := io.Copy(h, f); err != nil {
-			return nil
-		}
-		hashSum := fmt.Sprintf("%x", h.Sum(nil))
-		if strings.Compare(hashSum, fi.hash) != 0 {
-			return ErrFileIncompleted
-		}
-		log.Printf("%s successfully read (Normal)!", filename)
+		if !ok {
+			err = e.enc.Reconstruct(stripeData)
+			if err != nil {
+				fmt.Println("Reconstruct failed -", err)
+				return err
+			}
 
-	} else {
-		//we have to reconstruct
+		}
+		//join and Write
+		for i := 0; i < e.k; i++ {
+			if offset+int64(i+1)*blockSize < fileSize {
+				_, err := sf.Write(stripeData[i])
+				if err != nil {
+					return err
+				}
+			} else { //if remainder is less than one-block length
+				leftLen := (fileSize - offset) % blockSize
+				_, err := sf.Write(stripeData[i][:leftLen])
+				if err != nil {
+					return err
+				}
+				break
+			}
+			sf.Sync()
+		}
 	}
-	return nil
-	//since the file is striped, we'd better reuinte the file
-	//for every stripe, we dismiss the parity and read the data
-	//finally check the hash for integrity, if one blob is lost,
-	//we reconstruct it
 
-	// survivalParity := []int{}
-	// survivalData := []int{}
-	// var mu sync.Mutex
-	//first we check whether the remaining parts are enough for decoding
-	// for i, path := range e.diskInfos {
-	// 	basePath := path.diskPath
-	// 	i := i
-	// 	if !path.available {
-	// 		continue
-	// 	}
-	// 	g.Go(func() error {
-	// 		var fullPath string
-	// 		if fi.distribution[i] < e.k {
-	// 			fullPath = basePath + "/" + filename + "/D_" + fmt.Sprintf("%d", fi.distribution[i])
-	// 		} else {
+	log.Printf("%s successfully read !", filename)
 
-	// 			fullPath = basePath + "/" + filename + "/P_" + fmt.Sprintf("%d", fi.distribution[i])
-	// 		}
-	// 		ex, err := PathExist(fullPath)
-	// 		if err != nil {
-	// 			return fmt.Errorf("%s fail with error: %s", fullPath, err.Error())
-	// 		}
-	// 		if ex {
-	// 			if fi.distribution[i] < e.k {
-	// 				// log.Println(fullPath)
-	// 				survivalData = append(survivalData, i)
-	// 			} else {
-	// 				// log.Println(fullPath)
-	// 				survivalParity = append(survivalParity, i)
-	// 			}
-	// 		}
-	// 		return nil
-	// 	})
-
-	// }
-	// if err := g.Wait(); err != nil {
-	// 	return err
-	// }
-
-	// if len(survivalData)+len(survivalParity) < e.k {
-	// 	return ErrSurvivalNotEnoughForDecoding
-	// }
-	// //We need to decode the file using parity
-	// totalBytes := make([][]byte, e.k+e.m)
-	// if len(survivalData)+len(survivalParity) == e.k+e.m {
-
-	// 	//no need for reconstructing
-	// 	for _, ind := range survivalData {
-	// 		ind := ind
-	// 		g.Go(func() error {
-	// 			filepath := e.diskInfos[ind].diskPath + "/" + filename + "/D_" + fmt.Sprintf("%d", fi.distribution[ind])
-	// 			f, err := os.Open(filepath)
-	// 			if err != nil {
-	// 				return err
-	// 			}
-	// 			defer f.Close()
-	// 			blockByte := (int(fi.fileSize) + e.k - 1) / e.k
-	// 			totalBytes[fi.distribution[ind]] = make([]byte, blockByte)
-	// 			f.Read(totalBytes[fi.distribution[ind]])
-	// 			f.Sync()
-	// 			if err != nil {
-	// 				return err
-	// 			}
-	// 			return nil
-	// 		})
-	// 	}
-	// 	if err := g.Wait(); err != nil {
-	// 		return err
-	// 	}
-	// } else {
-	// 	survivalData = append(survivalData, survivalParity...)
-
-	// 	rand.Seed(time.Now().UnixNano())
-	// 	rand.Shuffle(len(survivalData), func(i, j int) { survivalData[i], survivalData[j] = survivalData[j], survivalData[i] })
-	// 	//for minimizing read overhead, we only choose first k blocks
-	// 	for _, ind := range survivalData[:e.k] {
-	// 		ind := ind
-	// 		g.Go(func() error {
-	// 			var fullpath string
-	// 			if fi.distribution[ind] < e.k {
-	// 				fullpath = e.diskInfos[ind].diskPath + "/" + filename + "/D_" + fmt.Sprintf("%d", fi.distribution[ind])
-	// 			} else {
-	// 				fullpath = e.diskInfos[ind].diskPath + "/" + filename + "/P_" + fmt.Sprintf("%d", fi.distribution[ind])
-
-	// 			}
-
-	// 			f, err := os.Open(fullpath)
-	// 			if err != nil {
-	// 				return err
-	// 			}
-	// 			defer f.Close()
-	// 			blockByte := (int(fi.fileSize) + e.k - 1) / e.k
-	// 			totalBytes[fi.distribution[ind]] = make([]byte, blockByte)
-	// 			_, err = f.Read(totalBytes[fi.distribution[ind]])
-	// 			if err != nil {
-	// 				return err
-	// 			}
-
-	// 			return nil
-	// 		})
-	// 	}
-	// 	if err := g.Wait(); err != nil {
-	// 		return err
-	// 	}
-	// 	//reconstructing, we first decode data, once completed
-	// 	//notify the customer, and parity reconstruction, we move it to back-end
-
-	// 	err = e.enc.Reconstruct(totalBytes)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// }
-
-	// f, err := os.OpenFile(savepath, os.O_CREATE|os.O_RDWR, 0666)
-	// if err != nil {
-	// 	return err
-	// }
-	// defer f.Close()
-	// err = e.enc.Join(f, totalBytes, int(fi.fileSize))
-	// if err != nil {
-	// 	return err
-	// }
-	// //checksum
-	// f.Seek(0, 0)
-	// h := sha256.New()
-	// if _, err := io.Copy(h, f); err != nil {
-	// 	return nil
-	// }
-	// hashSum := fmt.Sprintf("%x", h.Sum(nil))
-	// if strings.Compare(hashSum, fi.hash) != 0 {
-	// 	return ErrFileIncompleted
-	// }
-	// log.Printf("%s successfully read (Decoded)!", filename)
 	return nil
 }
