@@ -55,11 +55,13 @@ func PathExist(path string) (bool, error) {
 	return false, err
 }
 
-//ceilFrac return a/b
-func ceilFrac(a, b int64) int64 {
-	if b == 0 {
-		return 0
-	}
+//ceilFrac return (a+b-1)/b
+func ceilFracInt(a, b int) int {
+	return (a + b - 1) / b
+}
+
+//ceilFrac return (a+b-1)/b
+func ceilFracInt64(a, b int64) int64 {
 	return (a + b - 1) / b
 }
 
@@ -89,6 +91,7 @@ func max(args ...int) int {
 	return ret
 }
 
+//each stripe randomized distribution
 func genRandomArr(n int) []int {
 	shuff := make([]int, n)
 	for i := 0; i < n; i++ {
@@ -99,6 +102,22 @@ func genRandomArr(n int) []int {
 	return shuff
 }
 
+//classical robin-round style
+//e.g.
+//1 2 3 4 5
+//5 1 2 3 4
+//4 5 1 2 3
+//...
+func rightRotateLayout(row, col int) [][]int {
+	arr2D := make([][]int, row)
+	for i := 0; i < row; i++ {
+		arr2D[i] = make([]int, col)
+		for j := 0; j < col; j++ {
+			arr2D[i][j] = (j - i + col) % col
+		}
+	}
+	return arr2D
+}
 func monitorCancel(cancel context.CancelFunc) {
 	channel := make(chan os.Signal, 2)
 	signal.Notify(channel, syscall.SIGINT, syscall.SIGTERM)

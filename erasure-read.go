@@ -50,7 +50,7 @@ func (e *Erasure) readFile(filename string, savepath string) error {
 
 	fileSize := fi.fileSize
 	stripeSize := e.dataStripeSize()
-	_ = ceilFrac(fileSize, stripeSize)
+	stripeNum := ceilFracInt64(fileSize, stripeSize)
 	dist := fi.distribution
 	//first we detect the number of alive disks
 	alive := int32(0)
@@ -96,64 +96,79 @@ func (e *Erasure) readFile(filename string, savepath string) error {
 
 	//Since the file is striped, we have to reconstruct each stripe
 	//for each stripe we rejoin the data
-
+	numGoroutine := stripeNum
+	if numGoroutine > maxGoroutines {
+		numGoroutine = maxGoroutines
+	}
+	// seqChan := make([]chan struct{}, numGoroutine)
+	eg := new(errgroup.Group)
 	for offset := int64(0); offset < fileSize; offset += stripeSize {
-		g := new(errgroup.Group)
-		stripeData := make([][]byte, e.k+e.m)
-		//read all blocks in parallel
-		for i, disk := range e.diskInfos {
-			i := i
-			disk := disk
-			g.Go(func() error {
-				if !disk.available {
-					stripeData[dist[offset/stripeSize][i]] = nil
+		offset := offset
+		eg.Go(func() error {
+
+			g := new(errgroup.Group)
+			stripeData := make([][]byte, e.k+e.m)
+			//read all blocks in parallel
+			for i, disk := range e.diskInfos {
+				i := i
+				disk := disk
+				g.Go(func() error {
+					if !disk.available {
+						stripeData[dist[offset/stripeSize][i]] = nil
+						return nil
+					}
+					tempBuf := make([]byte, blockSize)
+					_, err := ifs[i].Read(tempBuf)
+					if err != nil && err != io.EOF {
+						return err
+					}
+					stripeData[dist[offset/stripeSize][i]] = tempBuf
+					//then write it to sf
 					return nil
-				}
-				tempBuf := make([]byte, blockSize)
-				_, err := ifs[i].Read(tempBuf)
-				if err != nil && err != io.EOF {
-					return err
-				}
-				stripeData[dist[offset/stripeSize][i]] = tempBuf
-				//then write it to sf
-				return nil
-			})
-		}
-		if err := g.Wait(); err != nil {
-			return err
-		}
-		//reconstruct
-		ok, err := e.enc.Verify(stripeData)
-		if err != nil {
-			return err
-		}
-		if !ok {
-			err = e.enc.Reconstruct(stripeData)
-			if err != nil {
-				fmt.Println("Reconstruct failed -", err)
+				})
+			}
+			if err := g.Wait(); err != nil {
 				return err
 			}
-
-		}
-		//join and Write
-		for i := 0; i < e.k; i++ {
-			if offset+int64(i+1)*blockSize < fileSize {
-				_, err := sf.Write(stripeData[i])
-				if err != nil {
-					return err
-				}
-			} else { //if remainder is less than one-block length
-				leftLen := (fileSize - offset) % blockSize
-				_, err := sf.Write(stripeData[i][:leftLen])
-				if err != nil {
-					return err
-				}
-				break
+			//reconstruct
+			ok, err := e.enc.Verify(stripeData)
+			if err != nil {
+				return err
 			}
-			sf.Sync()
-		}
-	}
+			if !ok {
+				err = e.enc.Reconstruct(stripeData)
+				if err != nil {
+					return err
+				}
 
+			}
+			//join and Write
+			// if offset > stripeSize {
+			// 	<-seqChan[offset/stripeSize-1]
+			// }
+			for i := 0; i < e.k; i++ {
+				if offset+int64(i+1)*blockSize < fileSize {
+					_, err := sf.Write(stripeData[i])
+					if err != nil {
+						return err
+					}
+				} else { //if remainder is less than one-block length
+					leftLen := (fileSize - offset) % blockSize
+					_, err := sf.Write(stripeData[i][:leftLen])
+					if err != nil {
+						return err
+					}
+					break
+				}
+				sf.Sync()
+			}
+			// seqChan[offset/stripeSize] <- struct{}{}
+			return nil
+		})
+	}
+	if err := eg.Wait(); err != nil {
+		return nil
+	}
 	log.Printf("%s successfully read !", filename)
 
 	return nil

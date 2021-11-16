@@ -29,15 +29,18 @@ type DiskInfo struct {
 type Erasure struct {
 	k            int                       // the number of data blocks in a stripe
 	m            int                       // the number of parity blocks in a stripe
+	conStripes   int                       //how many stripes are allowed to encode/decode concurrently
 	sEnc         reedsolomon.StreamEncoder // the reedsolomon streaming encoder, for large files
 	enc          reedsolomon.Encoder       // the reedsolomon encoder, for small files
 	blockSize    int64                     // the block size. default to 4KiB
+	stripeSize   int64                     //the stripe size, equal to (k+m)*bs
 	diskInfos    []*DiskInfo               // disk paths
 	configFile   string                    // configure file
 	fileMap      map[string]*FileInfo      // File info lists
 	rwmu         sync.RWMutex              // read write mutex
 	diskFilePath string                    // the path of file recording all disks path
-	p            sync.Pool                 //Go builtin object pool
+	blobPool     sync.Pool                 // memory pool for conStripes stripes access
+	errgroupPool sync.Pool                 //errgroup pool
 }
 type FileInfo struct {
 	fileName string //file name
@@ -64,6 +67,7 @@ var (
 	override          bool
 	conWrites         bool
 	conReads          bool
+	conStripes        int
 )
 
 //the parameter lists, with fullname or abbreviation
@@ -109,16 +113,21 @@ func flag_init() {
 
 	flag.IntVar(&failNum, "fn", 0, "simulate multiple disk failure, provides the fail number of disks")
 	flag.IntVar(&failNum, "failNum", 0, "simulate multiple disk failure, provides the fail number of disks")
+
+	flag.IntVar(&conStripes, "cs", 100, "how many stripes are allowed to encode/decode concurrently")
+	flag.IntVar(&conStripes, "conStripes", 100, "how many stripes are allowed to encode/decode concurrently")
 }
 
-var err error
-
-//global variables
-var erasure = Erasure{
-	configFile:   ".hdr.sys",
-	fileMap:      make(map[string]*FileInfo),
-	diskFilePath: ".hdr.disks.path",
-}
+//global system-level variables
+var (
+	wg      sync.WaitGroup
+	err     error
+	erasure = Erasure{
+		configFile:   ".hdr.sys",
+		fileMap:      make(map[string]*FileInfo),
+		diskFilePath: ".hdr.disks.path",
+	}
+)
 
 //constant variables
 const (

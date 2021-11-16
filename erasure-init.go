@@ -114,8 +114,20 @@ func (e *Erasure) readConfig() error {
 	e.k = int(k)
 	e.m = int(m)
 	e.blockSize = bs
+	e.conStripes = conStripes
 	//initialize the ReedSolomon Code
 	e.enc, err = reedsolomon.New(e.k, e.m)
+	e.stripeSize = int64(e.k+e.m) * blockSize
+	e.blobPool.New = func() interface{} {
+		out := make([][]byte, conStripes)
+		for i := range out {
+			out[i] = make([]byte, e.stripeSize)
+		}
+		return &out
+	}
+	e.errgroupPool.New = func() interface{} {
+		return &errgroup.Group{}
+	}
 	//e.sEnc, err = reedsolomon.NewStreamC(e.k, e.m, conReads, conWrites)
 	if err != nil {
 		return err
