@@ -161,7 +161,7 @@ func (e *Erasure) readFile(filename string, savepath string) error {
 				}
 				//join and write to output file
 				for i := 0; i < e.k; i++ {
-					writeOffset := int64(stripeCnt)*e.dataStripeSize + int64(i)*blockSize
+					writeOffset := int64(stripeCnt+s)*e.dataStripeSize + int64(i)*blockSize
 					fmt.Println("i:", i, "writeOffset", writeOffset+e.blockSize, "at stripe", subCnt)
 					if writeOffset+blockSize < fileSize {
 						_, err := sf.WriteAt(splitData[i], writeOffset)
@@ -170,6 +170,7 @@ func (e *Erasure) readFile(filename string, savepath string) error {
 						}
 					} else { //if remainder is less than one-block length
 						leftLen := fileSize - writeOffset
+						fmt.Println("i:", i, "leftLen", leftLen, "at stripe", subCnt)
 						_, err := sf.WriteAt(splitData[i][:leftLen], writeOffset)
 						if err != nil {
 							return err

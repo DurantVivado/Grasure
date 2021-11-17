@@ -98,7 +98,7 @@ func (e *Erasure) EncodeFile(ctx context.Context, filename string) (*FileInfo, e
 		for s := 0; s < nextStripe; s++ {
 			s := s
 			offset := int64(blob*e.conStripes+s) * e.allStripeSize
-			func() error {
+			eg.Go(func() error {
 				_, err := f.ReadAt(blobBuf[s], offset)
 				if err != nil && err != io.EOF {
 					return err
@@ -136,7 +136,7 @@ func (e *Erasure) EncodeFile(ctx context.Context, filename string) (*FileInfo, e
 					return err
 				}
 				return nil
-			}()
+			})
 		}
 		if err := eg.Wait(); err != nil {
 			return nil, err
