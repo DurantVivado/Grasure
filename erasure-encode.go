@@ -37,19 +37,18 @@ func (e *Erasure) EncodeFile(ctx context.Context, filename string) (*FileInfo, e
 	if err != nil {
 		return nil, err
 	}
-	//we allocate the buffer actually the same size of the file
-	// fmt.Println(fileInfo)
+
 	fileSize := fileInfo.Size()
 	fi.fileSize = fileSize
 	//how much data read in a batch is worth discussion
 	//for blocks...
 
 	//encode the data
-	stripeNum := int(ceilFracInt64(fileSize, e.stripeSize))
+	stripeNum := int(ceilFracInt64(fileSize, e.dataStripeSize))
 	fi.distribution = make([][]int, stripeNum)
-	//we split file into stripes and randomlu distribute the blocks to various disks
+	//we split file into stripes and randomly distribute the blocks to various disks
 	//and for stripes of the same disk, we concatenate all blocks to create the sole file
-	//for accelerating, we start multiple go routine
+	//for accelerating, we start multiple goroutines
 	//The last stripe will be refilled with zeros
 	// partBlock := make([][]int, len(e.diskInfos))
 	// buf := bufio.NewReader(f)
@@ -74,7 +73,7 @@ func (e *Erasure) EncodeFile(ctx context.Context, filename string) (*FileInfo, e
 			// We decide the part name according to whether it belongs to data or parity
 			partPath := filepath.Join(folderPath, "BLOB")
 			//Create the file and write in the parted data
-			of[i], err = os.OpenFile(partPath, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0754)
+			of[i], err = os.OpenFile(partPath, os.O_RDWR|os.O_CREATE, 0754)
 			if err != nil {
 				return err
 			}
@@ -94,53 +93,55 @@ func (e *Erasure) EncodeFile(ctx context.Context, filename string) (*FileInfo, e
 		} else {
 			nextStripe = e.conStripes
 		}
-		wg.Add(nextStripe)
+		eg := e.errgroupPool.Get().(*errgroup.Group)
 		blobBuf := *e.blobPool.Get().(*[][]byte)
 		for s := 0; s < nextStripe; s++ {
 			s := s
-			offset := (int64(blob*e.conStripes+s) * e.stripeSize)
-			go func(offset int64) {
-				defer wg.Done()
+			offset := int64(blob*e.conStripes+s) * e.allStripeSize
+			func() error {
 				_, err := f.ReadAt(blobBuf[s], offset)
 				if err != nil && err != io.EOF {
-					log.Fatal(err)
+					return err
 				}
 				//split and encode the data
 				encodeData, err := e.EncodeData(blobBuf[s])
 				if err != nil {
-					log.Fatal(err)
+					return err
 				}
 				//generate random distrinution for data and parity
-				randDist := genRandomArr(e.k + e.m)
+				// randDist := genRandomArr(e.k + e.m)
+				randDist := getSeqArr(e.k + e.m)
 
 				fi.distribution[stripeCnt+s] = randDist
 				//for i := range e.diskInfos {
 				//	partBlock[i] = append(partBlock[i], randDist[i])
 				//}
 
-				erg := *e.errgroupPool.Get().(*errgroup.Group)
-				defer e.errgroupPool.Put(&erg)
+				erg := e.errgroupPool.Get().(*errgroup.Group)
+				defer e.errgroupPool.Put(erg)
 				//save the blob
 				for i := range e.diskInfos {
 					i := i
 					j := randDist[i]
-					//we have to make sure the dist is appended to fi.distribution in order
 					erg.Go(func() error {
-						_, err = of[i].Write(encodeData[j])
+						_, err := of[i].WriteAt(encodeData[j], int64(stripeCnt)*e.blockSize)
 						if err != nil {
 							return err
 						}
-						of[i].Sync()
 						return nil
 					})
 
 				}
 				if err := erg.Wait(); err != nil {
-					return
+					return err
 				}
-			}(offset)
+				return nil
+			}()
 		}
-		wg.Wait() //wait goroutines to finsih
+		if err := eg.Wait(); err != nil {
+			return nil, err
+		}
+		e.errgroupPool.Put(eg)
 		e.blobPool.Put(&blobBuf)
 		stripeCnt += nextStripe
 
@@ -149,9 +150,43 @@ func (e *Erasure) EncodeFile(ctx context.Context, filename string) (*FileInfo, e
 		of[i].Close()
 	}
 
+	// ifs := make([]*os.File, e.k+e.m)
+	// temp := make([][]byte, e.k+e.m)
+	// for i, disk := range e.diskInfos {
+	// 	i := i
+	// 	disk := disk
+	// 	erg.Go(func() error {
+	// 		folderPath := filepath.Join(disk.diskPath, baseFileName)
+	// 		blobPath := filepath.Join(folderPath, "BLOB")
+	// 		if !disk.available {
+	// 			return &DiskError{disk.diskPath, " avilable flag set flase"}
+	// 		}
+	// 		ifs[i], err = os.Open(blobPath)
+	// 		if err != nil {
+	// 			disk.available = false
+	// 			return err
+	// 		}
+	// 		defer ifs[i].Close()
+	// 		st, _ := ifs[i].Stat()         //
+	// 		sz := st.Size()                //
+	// 		temp[i] = make([]byte, sz)     //
+	// 		n, err := ifs[i].Read(temp[i]) //
+	// 		fmt.Println("read", n, "bytes")
+
+	// 		if err != nil {
+	// 			return err
+	// 		}
+	// 		disk.available = true
+	// 		return nil
+	// 	})
+
+	// }
+	// if err := erg.Wait(); err != nil {
+	// 	panic(err)
+	// }
 	//record the file meta
 	e.fileMap[baseFileName] = fi
-	log.Println(baseFileName, " successfully encoded.")
+	log.Println(baseFileName, " successfully encoded. encoding size ", e.stripedFileSize(fileSize), "bytes")
 	return fi, nil
 }
 
@@ -170,16 +205,6 @@ func (e *Erasure) EncodeData(data []byte) ([][]byte, error) {
 	return encoded, nil
 }
 
-//allStripe contains both data and parity blocks
-func (e *Erasure) allStripeSize() int64 {
-	return e.blockSize * int64(e.k+e.m)
-}
-
-//dataStripe contains only data
-func (e *Erasure) dataStripeSize() int64 {
-	return e.blockSize * int64(e.k)
-}
-
 //return final erasure size from original size,
 //Every block spans all the data disks and split into shards
 //the shardSize is the same except for the last one
@@ -187,10 +212,7 @@ func (e *Erasure) stripedFileSize(totalLen int64) int64 {
 	if totalLen <= 0 {
 		return 0
 	}
-	dataStripeSize := e.dataStripeSize()
-	numBlocks := totalLen / dataStripeSize
-	lastStripeSize := totalLen % dataStripeSize
-	lastBlockSize := ceilFracInt64(lastStripeSize, e.blockSize)
-	return numBlocks*e.blockSize + lastBlockSize
+	numStripe := totalLen / e.dataStripeSize
+	return numStripe * int64(e.k+e.m) * e.blockSize
 
 }

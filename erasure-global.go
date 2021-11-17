@@ -27,24 +27,26 @@ type DiskInfo struct {
 }
 
 type Erasure struct {
-	k            int                       // the number of data blocks in a stripe
-	m            int                       // the number of parity blocks in a stripe
-	conStripes   int                       //how many stripes are allowed to encode/decode concurrently
-	sEnc         reedsolomon.StreamEncoder // the reedsolomon streaming encoder, for large files
-	enc          reedsolomon.Encoder       // the reedsolomon encoder, for small files
-	blockSize    int64                     // the block size. default to 4KiB
-	stripeSize   int64                     //the stripe size, equal to (k+m)*bs
-	diskInfos    []*DiskInfo               // disk paths
-	configFile   string                    // configure file
-	fileMap      map[string]*FileInfo      // File info lists
-	rwmu         sync.RWMutex              // read write mutex
-	diskFilePath string                    // the path of file recording all disks path
-	blobPool     sync.Pool                 // memory pool for conStripes stripes access
-	errgroupPool sync.Pool                 //errgroup pool
+	k              int                       // the number of data blocks in a stripe
+	m              int                       // the number of parity blocks in a stripe
+	conStripes     int                       //how many stripes are allowed to encode/decode concurrently
+	sEnc           reedsolomon.StreamEncoder // the reedsolomon streaming encoder, for streaming access
+	enc            reedsolomon.Encoder       // the reedsolomon encoder, for block access
+	blockSize      int64                     // the block size. default to 4KiB
+	dataStripeSize int64                     //the data stripe size, equal to k*bs
+	allStripeSize  int64                     //the data plus parity stripe size, equal to (k+m)*bs
+	diskInfos      []*DiskInfo               // disk paths
+	configFile     string                    // configure file
+	fileMap        map[string]*FileInfo      // File info lists
+	diskFilePath   string                    // the path of file recording all disks path
+	blobPool       sync.Pool                 // memory pool for conStripes stripes access
+	errgroupPool   sync.Pool                 //errgroup pool
+	blockPool      sync.Pool                 //the pool for block-size access
 }
 type FileInfo struct {
-	fileName string //file name
-	fileSize int64  //file size
+	fileName  string //file name
+	fileSize  int64  //file size
+	available bool   //file available
 	// metaInfo     *os.FileInfo //system-level file info
 	hash         string  //hash value (SHA256 by default)
 	distribution [][]int //distribution represents the block replacement for specific file, in stripeno x diskno manner

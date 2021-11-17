@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"sync/atomic"
 
+	"github.com/klauspost/reedsolomon"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -49,10 +50,10 @@ func (e *Erasure) readFile(filename string, savepath string) error {
 	}
 
 	fileSize := fi.fileSize
-	stripeSize := e.dataStripeSize()
-	stripeNum := ceilFracInt64(fileSize, stripeSize)
+	stripeNum := int(ceilFracInt64(fileSize, e.dataStripeSize))
 	dist := fi.distribution
-	//first we detect the number of alive disks
+	//first we check the number of alive disks
+	// to judge if any part need reconstruction
 	alive := int32(0)
 	ifs := make([]*os.File, e.k+e.m)
 	erg := new(errgroup.Group)
@@ -63,13 +64,14 @@ func (e *Erasure) readFile(filename string, savepath string) error {
 			folderPath := filepath.Join(disk.diskPath, baseFileName)
 			blobPath := filepath.Join(folderPath, "BLOB")
 			if !disk.available {
-				return &DiskError{disk.diskPath, " avilable flag unset"}
+				return &DiskError{disk.diskPath, " avilable flag set flase"}
 			}
 			ifs[i], err = os.Open(blobPath)
 			if err != nil {
 				disk.available = false
 				return err
 			}
+
 			disk.available = true
 			atomic.AddInt32(&alive, 1)
 			return nil
@@ -78,6 +80,11 @@ func (e *Erasure) readFile(filename string, savepath string) error {
 	if err := erg.Wait(); err != nil {
 		log.Printf("read failed %s:", err.Error())
 	}
+	defer func() {
+		for i := 0; i < e.k+e.m; i++ {
+			ifs[i].Close()
+		}
+	}()
 	if int(alive) < e.k {
 		//the disk renders inrecoverable
 		return ErrTooFewDisks
@@ -88,7 +95,7 @@ func (e *Erasure) readFile(filename string, savepath string) error {
 		log.Println("start reconstructing blocks")
 	}
 	//for local save path
-	sf, err := os.OpenFile(savepath, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0666)
+	sf, err := os.OpenFile(savepath, os.O_CREATE|os.O_RDWR, 0666)
 	if err != nil {
 		return err
 	}
@@ -96,80 +103,112 @@ func (e *Erasure) readFile(filename string, savepath string) error {
 
 	//Since the file is striped, we have to reconstruct each stripe
 	//for each stripe we rejoin the data
-	numGoroutine := stripeNum
-	if numGoroutine > maxGoroutines {
-		numGoroutine = maxGoroutines
-	}
-	// seqChan := make([]chan struct{}, numGoroutine)
-	eg := new(errgroup.Group)
-	for offset := int64(0); offset < fileSize; offset += stripeSize {
-		offset := offset
-		eg.Go(func() error {
-
-			g := new(errgroup.Group)
-			stripeData := make([][]byte, e.k+e.m)
-			//read all blocks in parallel
-			for i, disk := range e.diskInfos {
-				i := i
-				disk := disk
-				g.Go(func() error {
-					if !disk.available {
-						stripeData[dist[offset/stripeSize][i]] = nil
+	numBlob := ceilFracInt(stripeNum, e.conStripes)
+	stripeCnt := 0
+	nextStripe := 0
+	for blob := 0; blob < numBlob; blob++ {
+		if stripeCnt+e.conStripes > stripeNum {
+			nextStripe = stripeNum - stripeCnt
+		} else {
+			nextStripe = e.conStripes
+		}
+		eg := e.errgroupPool.Get().(*errgroup.Group)
+		blobBuf := *e.blobPool.Get().(*[][]byte)
+		for s := 0; s < nextStripe; s++ {
+			s := s
+			subCnt := blob*e.conStripes + s
+			// offset := int64(subCnt) * e.allStripeSize
+			eg.Go(func() error {
+				erg := e.errgroupPool.Get().(*errgroup.Group)
+				defer e.errgroupPool.Put(erg)
+				//read all blocks in parallel
+				for i, disk := range e.diskInfos {
+					i := i
+					disk := disk
+					block := dist[subCnt][i]
+					erg.Go(func() error {
+						if !disk.available {
+							return nil
+						}
+						_, err := ifs[i].ReadAt(blobBuf[s][int64(block)*e.blockSize:int64(block+1)*e.blockSize],
+							int64(stripeCnt)*e.blockSize)
+						// fmt.Println("Read ", n, " bytes at", i, ", block ", block)
+						if err != nil && err != io.EOF {
+							return err
+						}
 						return nil
-					}
-					tempBuf := make([]byte, blockSize)
-					_, err := ifs[i].Read(tempBuf)
-					if err != nil && err != io.EOF {
-						return err
-					}
-					stripeData[dist[offset/stripeSize][i]] = tempBuf
-					//then write it to sf
-					return nil
-				})
-			}
-			if err := g.Wait(); err != nil {
-				return err
-			}
-			//reconstruct
-			ok, err := e.enc.Verify(stripeData)
-			if err != nil {
-				return err
-			}
-			if !ok {
-				err = e.enc.Reconstruct(stripeData)
+					})
+				}
+				if err := erg.Wait(); err != nil {
+					return err
+				}
+				//Split the blob into k+m parts
+				splitData, err := e.SplitStripe(blobBuf[s])
 				if err != nil {
 					return err
 				}
-
-			}
-			//join and Write
-			// if offset > stripeSize {
-			// 	<-seqChan[offset/stripeSize-1]
-			// }
-			for i := 0; i < e.k; i++ {
-				if offset+int64(i+1)*blockSize < fileSize {
-					_, err := sf.Write(stripeData[i])
-					if err != nil {
-						return err
-					}
-				} else { //if remainder is less than one-block length
-					leftLen := (fileSize - offset) % blockSize
-					_, err := sf.Write(stripeData[i][:leftLen])
-					if err != nil {
-						return err
-					}
-					break
+				//verify and reconstruct
+				ok, err := e.enc.Verify(splitData)
+				if err != nil {
+					return err
 				}
-				sf.Sync()
-			}
-			// seqChan[offset/stripeSize] <- struct{}{}
-			return nil
-		})
-	}
-	if err := eg.Wait(); err != nil {
-		return nil
+				if !ok {
+					// fmt.Println("reconstruct data of stripe:", subCnt)
+					err = e.enc.Reconstruct(splitData)
+					if err != nil {
+						return err
+					}
+				}
+				//join and write to output file
+				for i := 0; i < e.k; i++ {
+					writeOffset := int64(stripeCnt)*e.dataStripeSize + int64(i)*blockSize
+					fmt.Println("i:", i, "writeOffset", writeOffset+e.blockSize, "at stripe", subCnt)
+					if writeOffset+blockSize < fileSize {
+						_, err := sf.WriteAt(splitData[i], writeOffset)
+						if err != nil {
+							return err
+						}
+					} else { //if remainder is less than one-block length
+						leftLen := fileSize - writeOffset
+						_, err := sf.WriteAt(splitData[i][:leftLen], writeOffset)
+						if err != nil {
+							return err
+						}
+						break
+					}
+					sf.Sync()
+				}
+
+				return err
+			})
+
+		}
+		e.blobPool.Put(&blobBuf)
+		if err := eg.Wait(); err != nil {
+			return err
+		}
+		e.errgroupPool.Put(eg)
+		stripeCnt += nextStripe
+
 	}
 	log.Printf("%s successfully read !", filename)
 
 	return nil
+}
+
+func (e *Erasure) SplitStripe(data []byte) ([][]byte, error) {
+	if len(data) == 0 {
+		return nil, reedsolomon.ErrShortData
+	}
+	// Calculate number of bytes per data shard.
+	perShard := ceilFracInt(len(data), e.k+e.m)
+
+	// Split into equal-length shards.
+	dst := make([][]byte, e.k+e.m)
+	i := 0
+	for ; i < len(dst) && len(data) >= perShard; i++ {
+		dst[i], data = data[:perShard:perShard], data[perShard:]
+	}
+
+	return dst, nil
 }

@@ -16,7 +16,7 @@ import (
 
 //consult user to avoid maloperation
 func consultUserBeforeAction() (bool, error) {
-	log.Println("If you are sure to proceed, type: [Y]es otherwise [N]o.")
+	log.Println("If you are sure to proceed, type:\n [Y]es or [N]o.")
 
 	inputReader := bufio.NewReader(os.Stdin)
 	for {
@@ -102,6 +102,15 @@ func genRandomArr(n int) []int {
 	return shuff
 }
 
+//get arr of default sequence
+func getSeqArr(n int) []int {
+	out := make([]int, n)
+	for i := 0; i < n; i++ {
+		out[i] = i
+	}
+	return out
+}
+
 //classical robin-round style
 //e.g.
 //1 2 3 4 5
@@ -118,6 +127,7 @@ func rightRotateLayout(row, col int) [][]int {
 	}
 	return arr2D
 }
+
 func monitorCancel(cancel context.CancelFunc) {
 	channel := make(chan os.Signal, 2)
 	signal.Notify(channel, syscall.SIGINT, syscall.SIGTERM)
@@ -127,4 +137,13 @@ func monitorCancel(cancel context.CancelFunc) {
 
 func goroutineNum() int {
 	return runtime.NumGoroutine()
+}
+
+//make an 2D byte slice
+func makeArr2D(row, col int) [][]byte {
+	out := make([][]byte, row)
+	for i := range out {
+		out[i] = make([]byte, col)
+	}
+	return out
 }

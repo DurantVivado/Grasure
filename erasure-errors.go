@@ -22,7 +22,7 @@ type DiskError struct {
 }
 
 func (e *DiskError) Error() string {
-	return fmt.Sprintf("disk %s is not available %s", e.diskPath, e.cause)
+	return fmt.Sprintf("disk %s is not available for %s", e.diskPath, e.cause)
 }
 
 // errUnexpected - unexpected error, requires manual intervention.
