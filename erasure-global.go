@@ -39,7 +39,8 @@ type Erasure struct {
 	configFile     string                    // configure file
 	fileMap        map[string]*FileInfo      // File info lists
 	diskFilePath   string                    // the path of file recording all disks path
-	blobPool       sync.Pool                 // memory pool for conStripes stripes access
+	dataBlobPool   sync.Pool                 // memory pool for conStripes data  access
+	allBlobPool    sync.Pool                 // memory pool for conStripes stripe access
 	errgroupPool   sync.Pool                 //errgroup pool
 	blockPool      sync.Pool                 //the pool for block-size access
 }

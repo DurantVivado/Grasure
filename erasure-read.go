@@ -95,7 +95,7 @@ func (e *Erasure) readFile(filename string, savepath string) error {
 		log.Println("start reconstructing blocks")
 	}
 	//for local save path
-	sf, err := os.OpenFile(savepath, os.O_CREATE|os.O_RDWR, 0666)
+	sf, err := os.OpenFile(savepath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0666)
 	if err != nil {
 		return err
 	}
@@ -106,6 +106,14 @@ func (e *Erasure) readFile(filename string, savepath string) error {
 	numBlob := ceilFracInt(stripeNum, e.conStripes)
 	stripeCnt := 0
 	nextStripe := 0
+	//allocate stripe-size pool if and only if needed
+	e.allBlobPool.New = func() interface{} {
+		out := make([][]byte, conStripes)
+		for i := range out {
+			out[i] = make([]byte, e.allStripeSize)
+		}
+		return &out
+	}
 	for blob := 0; blob < numBlob; blob++ {
 		if stripeCnt+e.conStripes > stripeNum {
 			nextStripe = stripeNum - stripeCnt
@@ -113,7 +121,7 @@ func (e *Erasure) readFile(filename string, savepath string) error {
 			nextStripe = e.conStripes
 		}
 		eg := e.errgroupPool.Get().(*errgroup.Group)
-		blobBuf := *e.blobPool.Get().(*[][]byte)
+		blobBuf := *e.allBlobPool.Get().(*[][]byte)
 		for s := 0; s < nextStripe; s++ {
 			s := s
 			subCnt := blob*e.conStripes + s
@@ -131,7 +139,7 @@ func (e *Erasure) readFile(filename string, savepath string) error {
 							return nil
 						}
 						_, err := ifs[i].ReadAt(blobBuf[s][int64(block)*e.blockSize:int64(block+1)*e.blockSize],
-							int64(stripeCnt)*e.blockSize)
+							int64(stripeCnt+s)*e.blockSize)
 						// fmt.Println("Read ", n, " bytes at", i, ", block ", block)
 						if err != nil && err != io.EOF {
 							return err
@@ -153,7 +161,7 @@ func (e *Erasure) readFile(filename string, savepath string) error {
 					return err
 				}
 				if !ok {
-					// fmt.Println("reconstruct data of stripe:", subCnt)
+					fmt.Println("reconstruct data of stripe:", subCnt)
 					err = e.enc.Reconstruct(splitData)
 					if err != nil {
 						return err
@@ -162,7 +170,7 @@ func (e *Erasure) readFile(filename string, savepath string) error {
 				//join and write to output file
 				for i := 0; i < e.k; i++ {
 					writeOffset := int64(stripeCnt+s)*e.dataStripeSize + int64(i)*blockSize
-					fmt.Println("i:", i, "writeOffset", writeOffset+e.blockSize, "at stripe", subCnt)
+					// fmt.Println("i:", i, "writeOffset", writeOffset+e.blockSize, "at stripe", subCnt)
 					if writeOffset+blockSize < fileSize {
 						_, err := sf.WriteAt(splitData[i], writeOffset)
 						if err != nil {
@@ -170,7 +178,7 @@ func (e *Erasure) readFile(filename string, savepath string) error {
 						}
 					} else { //if remainder is less than one-block length
 						leftLen := fileSize - writeOffset
-						fmt.Println("i:", i, "leftLen", leftLen, "at stripe", subCnt)
+						// fmt.Println("i:", i, "leftLen", leftLen, "at stripe", subCnt)
 						_, err := sf.WriteAt(splitData[i][:leftLen], writeOffset)
 						if err != nil {
 							return err
@@ -184,7 +192,7 @@ func (e *Erasure) readFile(filename string, savepath string) error {
 			})
 
 		}
-		e.blobPool.Put(&blobBuf)
+		e.allBlobPool.Put(&blobBuf)
 		if err := eg.Wait(); err != nil {
 			return err
 		}
@@ -193,7 +201,6 @@ func (e *Erasure) readFile(filename string, savepath string) error {
 
 	}
 	log.Printf("%s successfully read !", filename)
-
 	return nil
 }
 

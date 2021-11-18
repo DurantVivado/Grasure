@@ -3,7 +3,9 @@ package main
 import (
 	"bufio"
 	"context"
+	"crypto/sha256"
 	"fmt"
+	"io"
 	"log"
 	"math/rand"
 	"os"
@@ -146,4 +148,44 @@ func makeArr2D(row, col int) [][]byte {
 		out[i] = make([]byte, col)
 	}
 	return out
+}
+
+//check if two file are completely same
+//warning: use io.copy
+func checkFileIfSame(dst, src string) (bool, error) {
+	if ok, err := PathExist(dst); err != nil || !ok {
+		return false, err
+	}
+	if ok, err := PathExist(src); err != nil || !ok {
+		return false, err
+	}
+	fdst, err := os.Open(dst)
+	if err != nil {
+		return false, err
+	}
+	defer fdst.Close()
+	fsrc, err := os.Open(src)
+	if err != nil {
+		return false, err
+	}
+	defer fsrc.Close()
+	hashDst, err := hashStr(fdst)
+	if err != nil {
+		return false, err
+	}
+	hashSrc, err := hashStr(fsrc)
+	if err != nil {
+		return false, err
+	}
+	return hashDst == hashSrc, nil
+}
+
+//retain hashstr
+func hashStr(f *os.File) (string, error) {
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return "", err
+	}
+	out := fmt.Sprintf("%x", h.Sum(nil))
+	return out, nil
 }
