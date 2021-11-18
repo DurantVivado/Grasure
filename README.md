@@ -8,7 +8,7 @@ Godoc: -
 We decide to base Grasure on Go-fuse for a native FUSE filesystem.
 
 ## Project Architecture:
-- `main.go` contains the entering func, for each run, we could operate among "encode", "read", "update", "scaling", "delete", ...
+- `main.go` contains the main func. For each run,  operate among "encode", "read", "update", "scaling", "delete", ...
 
 - `erasure-global.go` contains the system-level interfaces and global structs and variables
 
@@ -26,3 +26,40 @@ import:
 [reedsolomon library](https://github.com/klauspost/reedsolomon)
 
 ---
+## Usage
+0. build the project:
+```
+go build -o grasure erasure-*.go main.go
+```
+1. new a file named `.hdr.disks.path`, type the path of your local disks, e.g.,
+```
+/home/server1/data/data1
+/home/server1/data/data2
+/home/server1/data/data3
+/home/server1/data/data4
+/home/server1/data/data5
+/home/server1/data/data6
+/home/server1/data/data7
+/home/server1/data/data8
+/home/server1/data/data9
+/home/server1/data/data10
+/home/server1/data/data11
+/home/server1/data/data12
+/home/server1/data/data13
+/home/server1/data/data14
+/home/server1/data/data15
+/home/server1/data/data16
+```
+2. init the system, you should explictly attach the number of data and parity shards as well as blocksize.
+```
+./grasure -md init -k 12 -m 4 -bs 4096
+```
+3. encode one example file, and try to decode it.
+```./grasure -md encode -f {source file path} -conStripes 100 -o
+./grasure -md read -f {source file basename} -conStripes 100 -sp {destination file path} 
+```
+here `conStripes` denotes how many stripes are allowed to operate concurrently, default value is 100. 
+`sp` means save path.
+4. check the hash string to see encode/decode is correct.
+`sha256sum {source file path}`
+`sha256sum destination file path`

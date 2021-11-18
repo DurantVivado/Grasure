@@ -195,7 +195,7 @@ func (e *Erasure) readConfig() error {
 //write the erasure parameters into config files
 func (e *Erasure) writeConfig() error {
 
-	f, err := os.OpenFile(e.configFile, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0754)
+	f, err := os.OpenFile(e.configFile, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
 	if err != nil {
 		return err
 	}
