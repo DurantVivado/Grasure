@@ -1,5 +1,5 @@
 # Grasure
----
+
 Simplified Erasure Coding Architecture in Go
 Implementing most popular erasured-based filesystem operations, it's readily used and integrated into other filesystems. 
 Project home: https://github.com/DurantVivado/Grasure
@@ -25,13 +25,13 @@ We decide to base Grasure on Go-fuse for a native FUSE filesystem.
 import:
 [reedsolomon library](https://github.com/klauspost/reedsolomon)
 
----
+
 ## Usage
 0. build the project:
 ```
 go build -o grasure erasure-*.go main.go
 ```
-1. new a file named `.hdr.disks.path`, type the path of your local disks, e.g.,
+1. new a file named `.hdr.disks.path` in project root, type the path of your local disks, e.g.,
 ```
 /home/server1/data/data1
 /home/server1/data/data2
@@ -50,7 +50,7 @@ go build -o grasure erasure-*.go main.go
 /home/server1/data/data15
 /home/server1/data/data16
 ```
-2. init the system, you should explictly attach the number of data and parity shards as well as blocksize.
+2. initialize the system, you should explictly attach the number of data and parity shards as well as blocksize (in bytes), remember k+m must NOT be bigger than 256.
 ```
 ./grasure -md init -k 12 -m 4 -bs 4096
 ```
@@ -61,5 +61,10 @@ go build -o grasure erasure-*.go main.go
 here `conStripes` denotes how many stripes are allowed to operate concurrently, default value is 100. 
 `sp` means save path.
 4. check the hash string to see encode/decode is correct.
-`sha256sum {source file path}`
-`sha256sum destination file path`
+
+```
+sha256sum {source file path}
+```
+```
+sha256sum {destination file path}
+```
