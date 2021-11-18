@@ -1,8 +1,0 @@
-#!/bin/bash
-go build -o grasure erasure-*.go main.go
-# init the system
-./grasure -md init -k 12 -m 4 -bs 4096
-
-# A loopback system
-# ./grasure -md encode -f test/LICENSE.new -conStripes 100 -o
-# ./grasure -md read -f LICENSE.new -conStripes 100 -sp output/LICENSE.new.decode
