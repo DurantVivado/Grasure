@@ -55,7 +55,8 @@ go build -o grasure erasure-*.go main.go
 ./grasure -md init -k 12 -m 4 -bs 4096
 ```
 3. encode one examplar file.
-```./grasure -md encode -f {source file path} -conStripes 100 -o
+```
+./grasure -md encode -f {source file path} -conStripes 100 -o
 ```
 
 4. decode(read) the examplar file.
