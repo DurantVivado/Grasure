@@ -81,7 +81,7 @@ sha256sum {destination file path}
 |dataNum(k)|the number of data shards|12|
 |parityNum(m)|the number of parity shards(fault tolerance)|4|
 |filePath(f)|upload: the local file path, download&update: the remote file basename||
-|savePath|file.save", "the local saving path(local path)|file.save|
+|savePath|the local save path (local path)|file.save|
 |newDataNum(new_k)|the new number of data shards|32|
 |newParityNum(new_m)|the new number of parity shards|8|
 |recoveredDiskPath(rDP)|the data path for recovered disk, default to /tmp/restore| /tmp/restore|
