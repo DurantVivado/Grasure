@@ -56,13 +56,15 @@ go build -o grasure erasure-*.go main.go
 ```
 3. encode one examplar file.
 ```./grasure -md encode -f {source file path} -conStripes 100 -o
+```
 
 4. decode(read) the examplar file.
 ./grasure -md read -f {source file basename} -conStripes 100 -sp {destination file path} 
-```
+
 here `conStripes` denotes how many stripes are allowed to operate concurrently, default value is 100. 
 `sp` means save path.
-4. check the hash string to see encode/decode is correct.
+
+5. check the hash string to see encode/decode is correct.
 
 ```
 sha256sum {source file path}
