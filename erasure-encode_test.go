@@ -1,3 +1,5 @@
+// This test unit tests the encoding and decoding efficiency
+//
 package main
 
 import (

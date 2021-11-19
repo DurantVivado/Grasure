@@ -67,7 +67,8 @@ func (e *Erasure) initHDR() {
 	//delete the data blocks under all diskPath
 	err = e.reset()
 	failOnErr(mode, err)
-	fmt.Println("System init!")
+	fmt.Printf("System init!\n Erasure parameters: dataShards:%d, parityShards:%d,blocksize:%d\n",
+		k, m, blockSize)
 }
 
 //read the config info in config file

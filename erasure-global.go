@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+
 	"sync"
 
 	"github.com/klauspost/reedsolomon"

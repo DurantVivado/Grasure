@@ -42,7 +42,6 @@ func openInput(dataShards, parShards int, fname string) (r []io.Reader, size int
 
 //read file on the system and return byte stream, include recovering
 func (e *Erasure) readFile(filename string, savepath string) error {
-
 	baseFileName := filepath.Base(filename)
 	fi, ok := e.fileMap[baseFileName]
 	if !ok {
@@ -57,6 +56,7 @@ func (e *Erasure) readFile(filename string, savepath string) error {
 	alive := int32(0)
 	ifs := make([]*os.File, e.k+e.m)
 	erg := new(errgroup.Group)
+	diskFailList := make(map[int]bool)
 	for i, disk := range e.diskInfos {
 		i := i
 		disk := disk
@@ -64,6 +64,7 @@ func (e *Erasure) readFile(filename string, savepath string) error {
 			folderPath := filepath.Join(disk.diskPath, baseFileName)
 			blobPath := filepath.Join(folderPath, "BLOB")
 			if !disk.available {
+				diskFailList[i] = true
 				return &DiskError{disk.diskPath, " avilable flag set flase"}
 			}
 			ifs[i], err = os.Open(blobPath)
@@ -126,7 +127,7 @@ func (e *Erasure) readFile(filename string, savepath string) error {
 			s := s
 			subCnt := blob*e.conStripes + s
 			// offset := int64(subCnt) * e.allStripeSize
-			eg.Go(func() error {
+			func() error {
 				erg := e.errgroupPool.Get().(*errgroup.Group)
 				defer e.errgroupPool.Put(erg)
 				//read all blocks in parallel
@@ -136,6 +137,9 @@ func (e *Erasure) readFile(filename string, savepath string) error {
 					block := dist[subCnt][i]
 					erg.Go(func() error {
 						if !disk.available {
+							return nil
+						}
+						if ifs[i] == nil {
 							return nil
 						}
 						_, err := ifs[i].ReadAt(blobBuf[s][int64(block)*e.blockSize:int64(block+1)*e.blockSize],
@@ -161,35 +165,41 @@ func (e *Erasure) readFile(filename string, savepath string) error {
 					return err
 				}
 				if !ok {
-					fmt.Println("reconstruct data of stripe:", subCnt)
-					err = e.enc.Reconstruct(splitData)
+					// fmt.Println("reconstruct data of stripe:", subCnt)
+					err = e.enc.ReconstructWithList(splitData, &diskFailList, &(fi.distribution[stripeCnt+s]), false)
 					if err != nil {
 						return err
 					}
 				}
 				//join and write to output file
+
 				for i := 0; i < e.k; i++ {
+					i := i
 					writeOffset := int64(stripeCnt+s)*e.dataStripeSize + int64(i)*blockSize
-					// fmt.Println("i:", i, "writeOffset", writeOffset+e.blockSize, "at stripe", subCnt)
-					if writeOffset+blockSize < fileSize {
-						_, err := sf.WriteAt(splitData[i], writeOffset)
-						if err != nil {
-							return err
-						}
-					} else { //if remainder is less than one-block length
+					if fileSize-writeOffset <= blockSize {
 						leftLen := fileSize - writeOffset
-						// fmt.Println("i:", i, "leftLen", leftLen, "at stripe", subCnt)
 						_, err := sf.WriteAt(splitData[i][:leftLen], writeOffset)
 						if err != nil {
 							return err
 						}
 						break
 					}
-					sf.Sync()
-				}
+					erg.Go(func() error {
+						// fmt.Println("i:", i, "writeOffset", writeOffset+e.blockSize, "at stripe", subCnt)
+						_, err := sf.WriteAt(splitData[i], writeOffset)
+						if err != nil {
+							return err
+						}
+						// sf.Sync()
+						return nil
+					})
 
+				}
+				if err := erg.Wait(); err != nil {
+					return err
+				}
 				return err
-			})
+			}()
 
 		}
 		e.allBlobPool.Put(&blobBuf)

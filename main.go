@@ -74,5 +74,5 @@ func main() {
 		log.Fatalf("Can't parse the parameters, please check %s!", mode)
 	}
 	//It functions as a testbed, so currently I won't use goroutines.
-	log.Printf("%s consumes %d ms", mode, time.Since(start).Milliseconds())
+	log.Printf("%s consumes %.3f s", mode, time.Since(start).Seconds())
 }
