@@ -5,7 +5,7 @@ go build -o grasure erasure-*.go main.go
 
 # A loopback system
 ./grasure -md encode -f test/Goprogramming.pdf -conStripes 100 -o
-./grasure -md read -f Goprogramming.pdf -fn 3 -conStripes 100 -sp output/Goprogramming.pdf
+./grasure -md read -f Goprogramming.pdf -fn 0 -conStripes 100 -sp output/Goprogramming.pdf
 srchash=(`sha256sum test/Goprogramming.pdf|tr ' ' ' '`)
 dsthash=(`sha256sum output/Goprogramming.pdf|tr ' ' ' '`)
 echo $srchash

@@ -54,8 +54,10 @@ go build -o grasure erasure-*.go main.go
 ```
 ./grasure -md init -k 12 -m 4 -bs 4096
 ```
-3. encode one example file, and try to decode it.
+3. encode one examplar file.
 ```./grasure -md encode -f {source file path} -conStripes 100 -o
+
+4. decode(read) the examplar file.
 ./grasure -md read -f {source file basename} -conStripes 100 -sp {destination file path} 
 ```
 here `conStripes` denotes how many stripes are allowed to operate concurrently, default value is 100. 
@@ -68,3 +70,25 @@ sha256sum {source file path}
 ```
 sha256sum {destination file path}
 ```
+
+
+## CLI parameters
+
+|parameter(alias)|description|default|
+|--|--|--|
+|blockSize(bs)|the block size in bytes|4096|
+|mode(md)|the mode of ec system, one of (encode, decode, update, scaling, recover)||
+|dataNum(k)|the number of data shards|12|
+|parityNum(m)|the number of parity shards(fault tolerance)|4|
+|filePath(f)|upload: the local file path, download&update: the remote file name||
+|savePath|file.save", "the local saving path(local path)|file.save|
+|newDataNum(new_k)|the new number of data shards|32|
+|newParityNum(new_m)|the new number of parity shards|8|
+|recoveredDiskPath(rDP)|the data path for recovered disk, default to /tmp/restore| /tmp/restore|
+|override(o)|whether to override former files or directories, default to false|false|
+|conWrites(cw)|whether to enable concurrent write, default is false|false|
+|conReads(cr)|whether to enable concurrent read, default is false|false|
+|failMode(fmd)|simulate [diskFail] or [bitRot] mode"|diskFail|
+|failNum(fn)|simulate multiple disk failure, provides the fail number of disks|0|
+|conStripes(cs)|how many stripes are allowed to encode/decode concurrently|100|
+

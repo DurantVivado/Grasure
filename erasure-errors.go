@@ -9,7 +9,7 @@ import (
 var ErrConfFileNotExist = errors.New("the conf file not exist")
 var ErrEmptyData = errors.New("the file to encode is empty")
 var ErrDataDirExist = errors.New("data directory already exists")
-var ErrTooFewDisks = errors.New("too few disks, i.e., k+m < N")
+var ErrTooFewDisks = errors.New("too few survival disks, i.e., k+m < N")
 var ErrNotInitialized = errors.New("system not initialized, please initialize with `-mode init` first")
 var ErrFileNotFound = errors.New("file not found")
 var ErrSurvivalNotEnoughForDecoding = errors.New("the failed block number exceeds fault tolerance, data renders unrecoverable")
@@ -22,7 +22,7 @@ type DiskError struct {
 }
 
 func (e *DiskError) Error() string {
-	return fmt.Sprintf("disk %s is not available for %s", e.diskPath, e.cause)
+	return fmt.Sprintf("disk %s is not available for :%s", e.diskPath, e.cause)
 }
 
 // errUnexpected - unexpected error, requires manual intervention.

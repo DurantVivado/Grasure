@@ -65,7 +65,7 @@ func (e *Erasure) readFile(filename string, savepath string) error {
 			blobPath := filepath.Join(folderPath, "BLOB")
 			if !disk.available {
 				diskFailList[i] = true
-				return &DiskError{disk.diskPath, " avilable flag set flase"}
+				return &DiskError{disk.diskPath, " available flag set false"}
 			}
 			ifs[i], err = os.Open(blobPath)
 			if err != nil {

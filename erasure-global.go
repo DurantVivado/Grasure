@@ -97,8 +97,8 @@ func flag_init() {
 	flag.IntVar(&new_k, "new_k", 32, "the new number of data shards(<256)")
 	flag.IntVar(&new_k, "newDataNum", 32, "the new number of data shards(<256)")
 
-	flag.IntVar(&new_m, "new_m", 4, "the new number of parity shards(2-4)")
-	flag.IntVar(&new_m, "newParityNum", 4, "the new number of parity shards(2-4)")
+	flag.IntVar(&new_m, "new_m", 8, "the new number of parity shards(2-4)")
+	flag.IntVar(&new_m, "newParityNum", 8, "the new number of parity shards(2-4)")
 
 	flag.StringVar(&recoveredDiskPath, "rDP", "/tmp/data", "the data path for recovered disk, default to /tmp/data")
 	flag.StringVar(&recoveredDiskPath, "recoverDiskPath", "/tmp/data", "the data path for recovered disk, default to /tmp/data")
@@ -106,11 +106,11 @@ func flag_init() {
 	flag.BoolVar(&override, "o", false, "whether to override former files or directories, default to false")
 	flag.BoolVar(&override, "override", false, "whether to override former files or directories, default to false")
 
-	flag.BoolVar(&override, "cw", true, "whether to enable concurrent write, default is false")
-	flag.BoolVar(&override, "conWrites", true, "whether to enable concurrent write, default is false")
+	flag.BoolVar(&conWrites, "cw", true, "whether to enable concurrent write, default is false")
+	flag.BoolVar(&conWrites, "conWrites", true, "whether to enable concurrent write, default is false")
 
-	flag.BoolVar(&override, "cr", true, "whether to enable concurrent read, default is false")
-	flag.BoolVar(&override, "conReads", true, "whether to enable concurrent read, default is false")
+	flag.BoolVar(&conReads, "cr", true, "whether to enable concurrent read, default is false")
+	flag.BoolVar(&conReads, "conReads", true, "whether to enable concurrent read, default is false")
 
 	flag.StringVar(&failMode, "fmd", "diskFail", "simulate [diskFail] or [bitRot] mode")
 	flag.StringVar(&failMode, "failMode", "diskFail", "simulate [diskFail] or [bitRot] mode")
