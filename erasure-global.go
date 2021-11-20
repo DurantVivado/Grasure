@@ -5,7 +5,7 @@ import (
 
 	"sync"
 
-	"github.com/klauspost/reedsolomon"
+	"github.com/DurantVivado/reedsolomon"
 )
 
 type CustomerAPI interface {

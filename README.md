@@ -95,3 +95,7 @@ sha256sum {destination file path}
 |failNum(fn)|simulate multiple disk failure, provides the fail number of disks|0|
 |conStripes(cs)|how many stripes are allowed to encode/decode concurrently|100|
 
+## Performance
+
+
+## Contributions

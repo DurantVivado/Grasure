@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/klauspost/reedsolomon"
+	"github.com/DurantVivado/reedsolomon"
 	"golang.org/x/sync/errgroup"
 )
 

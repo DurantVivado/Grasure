@@ -8,16 +8,14 @@ import (
 	"testing"
 )
 
-type fileEncodeTest struct {
-	k, m         int
-	blockSize    int
-	fileSize     int64
-	distribution []int
-}
-
 //randomly generate file of different size and encode them into HDR system
 const KiB = 1024
 const MiB = 1048576
+
+type fileUnit struct {
+	fileSize int64
+	fileHash string
+}
 
 var erasureEncodeDecodeTests = []struct {
 	dataBlocks, parityBlocks   int
