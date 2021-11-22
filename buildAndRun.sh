@@ -1,13 +1,14 @@
 #!/bin/bash
+file=file.128
 go build -o grasure erasure-*.go main.go
 # init the system
-# ./grasure -md init -k 12 -m 4 -bs 4096
+./grasure -md init -k 2 -m 2 -bs 4096
 
 # A loopback system
-./grasure -md encode -f test/Goprogramming.pdf -conStripes 100 -o
-./grasure -md read -f Goprogramming.pdf -fn 0 -conStripes 100 -sp output/Goprogramming.pdf
-srchash=(`sha256sum test/Goprogramming.pdf|tr ' ' ' '`)
-dsthash=(`sha256sum output/Goprogramming.pdf|tr ' ' ' '`)
+./grasure -md encode -f test/$file -conStripes 100 -o
+./grasure -md read -f $file -fn 0 -conStripes 100 -sp output/$file
+srchash=(`sha256sum test/$file|tr ' ' ' '`)
+dsthash=(`sha256sum output/$file|tr ' ' ' '`)
 echo $srchash
 echo $dsthash
 if [ $srchash == $dsthash ];then 

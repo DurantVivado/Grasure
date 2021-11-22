@@ -189,3 +189,14 @@ func hashStr(f *os.File) (string, error) {
 	out := fmt.Sprintf("%x", h.Sum(nil))
 	return out, nil
 }
+
+//fillRandom
+func fillRandom(p []byte) {
+	for i := 0; i < len(p); i += 7 {
+		val := rand.Int63()
+		for j := 0; i+j < len(p) && j < 7; j++ {
+			p[i+j] = byte(val)
+			val >>= 8
+		}
+	}
+}

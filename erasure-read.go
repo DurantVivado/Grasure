@@ -210,7 +210,7 @@ func (e *Erasure) readFile(filename string, savepath string) error {
 		stripeCnt += nextStripe
 
 	}
-	log.Printf("%s successfully read !", filename)
+	log.Printf("reading %s!", filename)
 	return nil
 }
 

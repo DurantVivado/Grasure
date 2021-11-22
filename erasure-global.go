@@ -135,5 +135,6 @@ var (
 
 //constant variables
 const (
+	tempFile      = "./test/file.temp"
 	maxGoroutines = 10240
 )

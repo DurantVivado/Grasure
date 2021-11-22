@@ -3,97 +3,93 @@
 package main
 
 import (
-	"crypto/rand"
-	"io"
+	"context"
+	"os"
 	"testing"
 )
 
 //randomly generate file of different size and encode them into HDR system
-const KiB = 1024
-const MiB = 1048576
+const (
+	KiB = 1 << 10
+	MiB = 1 << 20
+	GiB = 1 << 30
+	TiB = 1 << 40
+)
 
-type fileUnit struct {
-	fileSize int64
-	fileHash string
+var dataShards = []int{
+	2, 4, 6, 8, 10, 12, 14, 16, 18, 20,
+}
+var parityShards = []int{
+	1, 2, 3, 4,
 }
 
-var erasureEncodeDecodeTests = []struct {
-	dataBlocks, parityBlocks   int
-	blockSize                  int64
-	missingData, missingParity int
-	reconstructParity          bool
-	shouldFail                 bool
-}{
-	//Block size set to 4KiB
-	{dataBlocks: 2, parityBlocks: 2, blockSize: 4 * KiB, missingData: 0, missingParity: 0, reconstructParity: true, shouldFail: false},
-	{dataBlocks: 3, parityBlocks: 3, blockSize: 4 * KiB, missingData: 1, missingParity: 0, reconstructParity: true, shouldFail: false},
-	{dataBlocks: 4, parityBlocks: 4, blockSize: 4 * KiB, missingData: 2, missingParity: 0, reconstructParity: false, shouldFail: false},
-	{dataBlocks: 5, parityBlocks: 5, blockSize: 4 * KiB, missingData: 0, missingParity: 1, reconstructParity: true, shouldFail: false},
-	{dataBlocks: 6, parityBlocks: 6, blockSize: 4 * KiB, missingData: 0, missingParity: 2, reconstructParity: true, shouldFail: false},
-	{dataBlocks: 7, parityBlocks: 7, blockSize: 4 * KiB, missingData: 1, missingParity: 1, reconstructParity: false, shouldFail: false},
-	{dataBlocks: 8, parityBlocks: 8, blockSize: 4 * KiB, missingData: 3, missingParity: 2, reconstructParity: false, shouldFail: false},
-	{dataBlocks: 2, parityBlocks: 2, blockSize: 4 * KiB, missingData: 2, missingParity: 1, reconstructParity: true, shouldFail: true},
-	{dataBlocks: 4, parityBlocks: 2, blockSize: 4 * KiB, missingData: 2, missingParity: 2, reconstructParity: false, shouldFail: true},
-	{dataBlocks: 8, parityBlocks: 4, blockSize: 4 * KiB, missingData: 2, missingParity: 2, reconstructParity: false, shouldFail: false},
-	//Block size set to 128KiB
-	{dataBlocks: 2, parityBlocks: 2, blockSize: 128 * KiB, missingData: 0, missingParity: 0, reconstructParity: true, shouldFail: false},
-	{dataBlocks: 3, parityBlocks: 3, blockSize: 128 * KiB, missingData: 1, missingParity: 0, reconstructParity: true, shouldFail: false},
-	{dataBlocks: 4, parityBlocks: 4, blockSize: 128 * KiB, missingData: 2, missingParity: 0, reconstructParity: false, shouldFail: false},
-	{dataBlocks: 5, parityBlocks: 5, blockSize: 128 * KiB, missingData: 0, missingParity: 1, reconstructParity: true, shouldFail: false},
-	{dataBlocks: 6, parityBlocks: 6, blockSize: 128 * KiB, missingData: 0, missingParity: 2, reconstructParity: true, shouldFail: false},
-	{dataBlocks: 7, parityBlocks: 7, blockSize: 128 * KiB, missingData: 1, missingParity: 1, reconstructParity: false, shouldFail: false},
-	{dataBlocks: 8, parityBlocks: 8, blockSize: 128 * KiB, missingData: 3, missingParity: 2, reconstructParity: false, shouldFail: false},
-	{dataBlocks: 2, parityBlocks: 2, blockSize: 128 * KiB, missingData: 2, missingParity: 1, reconstructParity: true, shouldFail: true},
-	{dataBlocks: 4, parityBlocks: 2, blockSize: 128 * KiB, missingData: 2, missingParity: 2, reconstructParity: false, shouldFail: true},
-	{dataBlocks: 8, parityBlocks: 4, blockSize: 128 * KiB, missingData: 2, missingParity: 2, reconstructParity: false, shouldFail: false},
-	//Block size set to 256KiB
-	{dataBlocks: 2, parityBlocks: 2, blockSize: 256 * KiB, missingData: 0, missingParity: 0, reconstructParity: true, shouldFail: false},
-	{dataBlocks: 3, parityBlocks: 3, blockSize: 256 * KiB, missingData: 1, missingParity: 0, reconstructParity: true, shouldFail: false},
-	{dataBlocks: 4, parityBlocks: 4, blockSize: 256 * KiB, missingData: 2, missingParity: 0, reconstructParity: false, shouldFail: false},
-	{dataBlocks: 5, parityBlocks: 5, blockSize: 256 * KiB, missingData: 0, missingParity: 1, reconstructParity: true, shouldFail: false},
-	{dataBlocks: 6, parityBlocks: 6, blockSize: 256 * KiB, missingData: 0, missingParity: 2, reconstructParity: true, shouldFail: false},
-	{dataBlocks: 7, parityBlocks: 7, blockSize: 256 * KiB, missingData: 1, missingParity: 1, reconstructParity: false, shouldFail: false},
-	{dataBlocks: 8, parityBlocks: 8, blockSize: 256 * KiB, missingData: 3, missingParity: 2, reconstructParity: false, shouldFail: false},
-	{dataBlocks: 2, parityBlocks: 2, blockSize: 256 * KiB, missingData: 2, missingParity: 1, reconstructParity: true, shouldFail: true},
-	{dataBlocks: 4, parityBlocks: 2, blockSize: 256 * KiB, missingData: 2, missingParity: 2, reconstructParity: false, shouldFail: true},
-	{dataBlocks: 8, parityBlocks: 4, blockSize: 256 * KiB, missingData: 2, missingParity: 2, reconstructParity: false, shouldFail: false},
-
-	//Block size set to 512KiB
-	{dataBlocks: 2, parityBlocks: 2, blockSize: 512 * KiB, missingData: 0, missingParity: 0, reconstructParity: true, shouldFail: false},
-	{dataBlocks: 3, parityBlocks: 3, blockSize: 512 * KiB, missingData: 1, missingParity: 0, reconstructParity: true, shouldFail: false},
-	{dataBlocks: 4, parityBlocks: 4, blockSize: 512 * KiB, missingData: 2, missingParity: 0, reconstructParity: false, shouldFail: false},
-	{dataBlocks: 5, parityBlocks: 5, blockSize: 512 * KiB, missingData: 0, missingParity: 1, reconstructParity: true, shouldFail: false},
-	{dataBlocks: 6, parityBlocks: 6, blockSize: 512 * KiB, missingData: 0, missingParity: 2, reconstructParity: true, shouldFail: false},
-	{dataBlocks: 7, parityBlocks: 7, blockSize: 512 * KiB, missingData: 1, missingParity: 1, reconstructParity: false, shouldFail: false},
-	{dataBlocks: 8, parityBlocks: 8, blockSize: 512 * KiB, missingData: 3, missingParity: 2, reconstructParity: false, shouldFail: false},
-	{dataBlocks: 2, parityBlocks: 2, blockSize: 512 * KiB, missingData: 2, missingParity: 1, reconstructParity: true, shouldFail: true},
-	{dataBlocks: 4, parityBlocks: 2, blockSize: 512 * KiB, missingData: 2, missingParity: 2, reconstructParity: false, shouldFail: true},
-	{dataBlocks: 8, parityBlocks: 4, blockSize: 512 * KiB, missingData: 2, missingParity: 2, reconstructParity: false, shouldFail: false},
-	//Block size set to 1MiB
-	{dataBlocks: 2, parityBlocks: 2, blockSize: MiB, missingData: 0, missingParity: 0, reconstructParity: true, shouldFail: false},
-	{dataBlocks: 3, parityBlocks: 3, blockSize: MiB, missingData: 1, missingParity: 0, reconstructParity: true, shouldFail: false},
-	{dataBlocks: 4, parityBlocks: 4, blockSize: MiB, missingData: 2, missingParity: 0, reconstructParity: false, shouldFail: false},
-	{dataBlocks: 5, parityBlocks: 5, blockSize: MiB, missingData: 0, missingParity: 1, reconstructParity: true, shouldFail: false},
-	{dataBlocks: 6, parityBlocks: 6, blockSize: MiB, missingData: 0, missingParity: 2, reconstructParity: true, shouldFail: false},
-	{dataBlocks: 7, parityBlocks: 7, blockSize: MiB, missingData: 1, missingParity: 1, reconstructParity: false, shouldFail: false},
-	{dataBlocks: 8, parityBlocks: 8, blockSize: MiB, missingData: 3, missingParity: 2, reconstructParity: false, shouldFail: false},
-	{dataBlocks: 2, parityBlocks: 2, blockSize: MiB, missingData: 2, missingParity: 1, reconstructParity: true, shouldFail: true},
-	{dataBlocks: 4, parityBlocks: 2, blockSize: MiB, missingData: 2, missingParity: 2, reconstructParity: false, shouldFail: true},
-	{dataBlocks: 8, parityBlocks: 4, blockSize: MiB, missingData: 2, missingParity: 2, reconstructParity: false, shouldFail: false},
+type encodeTest []struct {
+	dataBlocks   int
+	parityBlocks int
+	diskNum      int
+	blockSize    int64
+	// missingData, missingParity int
+	// reconstructParity          bool
+	// shouldFail                 bool
 }
 
-func TestErasureEncode(t *testing.T) {
-	data := make([]byte, 256)
-	if _, err := io.ReadFull(rand.Reader, data); err != nil {
-		t.Logf("Failed to read random data:%v", err)
-	}
-	//we encode and decode the randomly generated data bytes
-	for i, test := range erasureEncodeDecodeTests {
-		buffer := make([]byte, len(data), 2*len(data))
-		copy(data, buffer)
-		e := Erasure{k: test.dataBlocks, m: test.parityBlocks, blockSize: int(test.blockSize)}
-		//we make random data and encode into parity
-		e.Encode()
+var fileSizes = []int64{
+	128, 256, 512, 1024,
+	128 * KiB, 256 * KiB, 512 * KiB, 1024 * KiB,
+	128 * MiB, 256 * MiB, 512 * MiB, 1024 * MiB,
+}
 
+var bigFilePaths = []string{
+	"./test/file.1G",
+	"./test/file.4G",
+	"./test/file.8G",
+	"./test/file.16G",
+}
+
+func TestEncode4096(t *testing.T) {
+	//we generate temp data and encode it into real storage sytem
+	//after that, all temporary file should be deleted
+	//fileSize:
+	//Group1: 128, 256, 512 ,1024
+	//Group2: 4k, 8k, 16k, 32k, ...,1024K
+	//Group3: 1M, 2M, 4M, 8M, ...,1024M
+	//Group4: 1G, 4G, 8G, 16G
+	//we open file and write data
+	ctx, _ := context.WithCancel(context.Background())
+	testEC := &Erasure{
+		blockSize: 4096,
 	}
+	for _, fileSize := range fileSizes {
+		//system-level paras
+		fileSize := fileSize
+		buf := make([]byte, fileSize)
+		fillRandom(buf)
+		f, err := os.OpenFile(tempFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = f.Write(buf)
+		if err != nil {
+			t.Fatal(err)
+		}
+		f.Close()
+		for _, k := range dataShards {
+			for _, m := range parityShards {
+				testEC.k = k
+				testEC.m = m
+				t.Logf("k:%d,m:%d fails when fileSize is %d, for %s", k, m, fileSize, err.Error())
+
+				_, err := testEC.EncodeFile(ctx, tempFile)
+				if err != nil {
+					t.Errorf("k:%d,m:%d fails when fileSize is %d, for %s", k, m, fileSize, err.Error())
+				}
+			}
+		}
+		f.Close()
+		err = os.Remove(tempFile)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
 }

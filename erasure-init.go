@@ -117,7 +117,13 @@ func (e *Erasure) readConfig() error {
 	e.blockSize = bs
 	e.conStripes = conStripes
 	//initialize the ReedSolomon Code
-	e.enc, err = reedsolomon.New(e.k, e.m)
+	e.enc, err = reedsolomon.New(e.k, e.m,
+		reedsolomon.WithAutoGoroutines(int(e.blockSize)),
+		reedsolomon.WithCauchyMatrix(),
+		reedsolomon.WithConcurrentStreams(true),
+		reedsolomon.WithInversionCache(true),
+		reedsolomon.WithFastOneParityMatrix(),
+	)
 	e.dataStripeSize = int64(e.k) * blockSize
 	e.allStripeSize = int64(e.k+e.m) * blockSize
 
@@ -291,84 +297,4 @@ func (e *Erasure) removeFile(filename string) error {
 	delete(e.fileMap, filename)
 	log.Printf("file %s successfully deleted.", filename)
 	return nil
-}
-
-//check file blocks integrity
-func (e *Erasure) readBlocks(filename string) ([][]byte, error) {
-	//we scan the file in the conf and check hash
-	erg := new(errgroup.Group)
-	data := make([][]byte, e.k+e.m)
-	for i := range e.diskInfos {
-		i := i
-		//we have to make sure the dist is appended to fi.distribution in order
-		erg.Go(func() error {
-			folderPath := filepath.Join(e.diskInfos[i].diskPath, filename)
-			if ok, err := PathExist(folderPath); !ok {
-				return fmt.Errorf("error: %s doesn't exist", folderPath)
-			} else if err != nil {
-				return err
-			}
-
-			// We decide the part name according to whether it belongs to data or parity
-			partPath := filepath.Join(folderPath, "BLOB")
-			if ok, err := PathExist(partPath); !ok {
-				return fmt.Errorf("error: %s doesn't exist", partPath)
-			} else if err != nil {
-				return err
-			}
-
-			//read the file and check the hashstr
-			rf, err := os.Open(partPath)
-			if err != nil {
-				return err
-			}
-			defer rf.Close()
-			buf := bufio.NewReader(rf)
-			st, err := os.Stat(partPath)
-			if err != nil {
-				return err
-			}
-			part := make([]byte, st.Size())
-			_, err = buf.Read(part)
-			if err != nil {
-				return err
-			}
-			data[i] = part
-			// // rf.Seek(0, 0)
-			// h := sha256.New()
-			// if _, err := io.Copy(h, rf); err != nil {
-			// 	return err
-			// }
-			// hashStr := fmt.Sprintf("%x", h.Sum(nil))
-			// metaPath := folderPath + "/META"
-			// if ok, err := PathExist(metaPath); !ok {
-			// 	return fmt.Errorf("error: %s doesn't exist", partPath)
-			// } else if err != nil {
-			// 	return err
-			// }
-			// //read the file and check the hashstr
-			// mf, err := os.Open(metaPath)
-			// if err != nil {
-			// 	return err
-			// }
-			// defer mf.Close()
-			// buf = bufio.NewReader(mf)
-			// truehash, err := buf.ReadString('\n')
-			// truehash = strings.TrimSuffix(truehash, "\n")
-			// if err != nil {
-			// 	return nil
-			// }
-			// if strings.Compare(hashStr, truehash) != 0 {
-			// 	return ErrFileIncompleted
-			// }
-			return nil
-		})
-
-	}
-
-	if err := erg.Wait(); err != nil {
-		//we do not stop when encountered with error, however we try to recover it
-		log.Println(err)
-	}
-	return data, nil
 }

@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/DurantVivado/reedsolomon"
 	"golang.org/x/sync/errgroup"
 ) //split and encode a file into parity blocks concurrently
 

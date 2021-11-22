@@ -19,8 +19,8 @@ func main() {
 	flag_init()
 	flag.Parse()
 	//We read the config file
-	ctx, cancel := context.WithCancel(context.Background())
-	go monitorCancel(cancel)
+	ctx, _ := context.WithCancel(context.Background())
+	// go monitorCancel(cancel)
 	start := time.Now()
 	switch mode {
 	case "init":
