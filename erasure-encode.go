@@ -28,34 +28,33 @@ func (e *Erasure) EncodeFile(ctx context.Context, filename string) (*FileInfo, e
 	}
 	f.Seek(0, 0)
 	fi := &FileInfo{}
-	fi.hash = hashStr
-	fi.fileName = baseFileName
+	fi.Hash = hashStr
+	fi.FileName = baseFileName
 	fileInfo, err := f.Stat()
 	if err != nil {
 		return nil, err
 	}
 
 	fileSize := fileInfo.Size()
-	fi.fileSize = fileSize
+	fi.FileSize = fileSize
 	//how much data read in a batch is worth discussion
 	//for blocks...
 
 	//encode the data
 	stripeNum := int(ceilFracInt64(fileSize, e.dataStripeSize))
-	fi.distribution = make([][]int, stripeNum)
+	fi.Distribution = make([][]int, stripeNum)
 	//we split file into stripes and randomly distribute the blocks to various disks
 	//and for stripes of the same disk, we concatenate all blocks to create the sole file
 	//for accelerating, we start multiple goroutines
 	//The last stripe will be refilled with zeros
-	// partBlock := make([][]int, len(e.diskInfos))
-	// buf := bufio.NewReader(f)
-	of := make([]*os.File, e.k+e.m)
+	diskNum := len(e.diskInfos)
+	of := make([]*os.File, diskNum)
 	//first open relevant file resources
 	erg := new(errgroup.Group)
 	//save the blob
 	for i := range e.diskInfos {
 		i := i
-		//we have to make sure the dist is appended to fi.distribution in order
+		//we have to make sure the dist is appended to fi.Distribution in order
 		erg.Go(func() error {
 			folderPath := filepath.Join(e.diskInfos[i].diskPath, baseFileName)
 			//if override is specified, we override previous data
@@ -92,6 +91,10 @@ func (e *Erasure) EncodeFile(ctx context.Context, filename string) (*FileInfo, e
 		}
 		return &out
 	}
+	// diskToBlocks := make([][]int, diskNum)
+	// for i := range diskToBlocks {
+	// 	diskToBlocks[i] = make([]int, 0)
+	// }
 	for blob := 0; blob < numBlob; blob++ {
 		if stripeCnt+e.conStripes > stripeNum {
 			nextStripe = stripeNum - stripeCnt
@@ -114,19 +117,18 @@ func (e *Erasure) EncodeFile(ctx context.Context, filename string) (*FileInfo, e
 					return err
 				}
 				//generate random distrinution for data and parity
-				randDist := genRandomArr(e.k + e.m)
-				// randDist := getSeqArr(e.k + e.m)
+				randDist := genRandomArr(diskNum, 0)
+				// randDist := getSeqArr(e.K + e.M)
 
-				fi.distribution[stripeCnt+s] = randDist
-
+				fi.Distribution[stripeCnt+s] = randDist[:e.K+e.M]
 				erg := e.errgroupPool.Get().(*errgroup.Group)
 				defer e.errgroupPool.Put(erg)
 				//save the blob
-				for i := range e.diskInfos {
+				for i := 0; i < e.K+e.M; i++ {
 					i := i
-					j := randDist[i]
+					diskId := randDist[i]
 					erg.Go(func() error {
-						_, err := of[i].WriteAt(encodeData[j], int64(stripeCnt+s)*e.blockSize)
+						_, err := of[diskId].WriteAt(encodeData[i], int64(stripeCnt+s)*e.BlockSize)
 						if err != nil {
 							return err
 						}
@@ -151,8 +153,42 @@ func (e *Erasure) EncodeFile(ctx context.Context, filename string) (*FileInfo, e
 	for i := range of {
 		of[i].Close()
 	}
+	// //save diskToBlocks to disk
+	// erg = new(errgroup.Group)
+	// //save the blob
+	// for i := range e.diskInfos {
+	// 	i := i
+	// 	//we have to make sure the dist is appended to fi.Distribution in order
+	// 	erg.Go(func() error {
+	// 		folderPath := filepath.Join(e.diskInfos[i].diskPath, baseFileName)
+	// 		// We decide the part name according to whether it belongs to data or parity
+	// 		partPath := filepath.Join(folderPath, "META")
+	// 		//Create the file and write in the parted data
+	// 		of[i], err = os.OpenFile(partPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
+	// 		if err != nil {
+	// 			return err
+	// 		}
+	// 		dist := fmt.Sprintf("%v\n", diskToBlocks[i])
+	// 		_, err = of[i].WriteString(dist)
+	// 		if err != nil {
+	// 			return err
+	// 		}
+	// 		return nil
+	// 	})
+	// }
+	// if err := erg.Wait(); err != nil {
+	// 	return nil, err
+	// }
+	for i := range of {
+		of[i].Close()
+	}
 	//record the file meta
+	//transform map into array for json marshaling
+
 	e.fileMap[baseFileName] = fi
+	for _, v := range e.fileMap {
+		e.FileMeta = append(e.FileMeta, v)
+	}
 	log.Println(baseFileName, " successfully encoded. encoding size ", e.stripedFileSize(fileSize), "bytes")
 	return fi, nil
 }
@@ -160,7 +196,7 @@ func (e *Erasure) EncodeFile(ctx context.Context, filename string) (*FileInfo, e
 //split and encode data
 func (e *Erasure) EncodeData(data []byte) ([][]byte, error) {
 	if len(data) == 0 {
-		return make([][]byte, e.k+e.m), nil
+		return make([][]byte, e.K+e.M), nil
 	}
 	encoded, err := e.enc.Split(data)
 	if err != nil {
@@ -181,5 +217,42 @@ func (e *Erasure) stripedFileSize(totalLen int64) int64 {
 	}
 	numStripe := ceilFracInt64(totalLen, e.dataStripeSize)
 	return numStripe * e.allStripeSize
+}
 
+//Encode the meta file into the system for each file
+func (e *Erasure) enocdeMeta(fi *FileInfo) error {
+	diskNum := len(e.diskInfos)
+	baseFileName := fi.FileName
+	of := make([]*os.File, diskNum)
+	//first open relevant file resources
+	erg := new(errgroup.Group)
+	//save the blob
+	for i := range e.diskInfos {
+		i := i
+		//we have to make sure the dist is appended to fi.Distribution in order
+		erg.Go(func() error {
+			folderPath := filepath.Join(e.diskInfos[i].diskPath, baseFileName)
+			//if override is specified, we override previous data
+			if override {
+				if err := os.RemoveAll(folderPath); err != nil {
+					return err
+				}
+			}
+			if err := os.Mkdir(folderPath, 0666); err != nil {
+				return ErrDataDirExist
+			}
+			// We decide the part name according to whether it belongs to data or parity
+			partPath := filepath.Join(folderPath, "META")
+			//Create the file and write in the parted data
+			of[i], err = os.OpenFile(partPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
+			if err != nil {
+				return err
+			}
+			return nil
+		})
+	}
+	if err := erg.Wait(); err != nil {
+		return err
+	}
+	return nil
 }

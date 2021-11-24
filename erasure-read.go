@@ -12,34 +12,6 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-//read inputData and return as the io.Reader
-func openInput(dataShards, parShards int, fname string) (r []io.Reader, size int64, err error) {
-	// Create shards and load the data.
-	shards := make([]io.Reader, dataShards+parShards)
-	for i := range shards {
-		infn := fmt.Sprintf("%s.%d", fname, i)
-		fmt.Println("Opening", infn)
-		f, err := os.Open(infn)
-		if err != nil {
-			fmt.Println("Error reading file", err)
-			shards[i] = nil
-			continue
-		} else {
-			shards[i] = f
-		}
-		stat, err := f.Stat()
-		if err != nil {
-			return nil, 0, err
-		}
-		if stat.Size() > 0 {
-			size = stat.Size()
-		} else {
-			shards[i] = nil
-		}
-	}
-	return shards, size, nil
-}
-
 //read file on the system and return byte stream, include recovering
 func (e *Erasure) readFile(filename string, savepath string) error {
 	baseFileName := filepath.Base(filename)
@@ -48,13 +20,19 @@ func (e *Erasure) readFile(filename string, savepath string) error {
 		return ErrFileNotFound
 	}
 
-	fileSize := fi.fileSize
+	fileSize := fi.FileSize
 	stripeNum := int(ceilFracInt64(fileSize, e.dataStripeSize))
-	dist := fi.distribution
+	// fi.Distribution = makeArr2DInt(stripeNum, e.K+e.M)
+	// err := e.readMeta(fi)
+	// if err != nil {
+	// 	return err
+	// }
+	dist := fi.Distribution
 	//first we check the number of alive disks
 	// to judge if any part need reconstruction
 	alive := int32(0)
-	ifs := make([]*os.File, e.k+e.m)
+	diskNum := len(e.diskInfos)
+	ifs := make([]*os.File, diskNum)
 	erg := new(errgroup.Group)
 	diskFailList := make(map[int]bool)
 	for i, disk := range e.diskInfos {
@@ -82,15 +60,17 @@ func (e *Erasure) readFile(filename string, savepath string) error {
 		log.Printf("read failed %s:", err.Error())
 	}
 	defer func() {
-		for i := 0; i < e.k+e.m; i++ {
-			ifs[i].Close()
+		for i := 0; i < diskNum; i++ {
+			if ifs[i] != nil {
+				ifs[i].Close()
+			}
 		}
 	}()
-	if int(alive) < e.k {
+	if int(alive) < e.K {
 		//the disk renders inrecoverable
 		return ErrTooFewDisks
 	}
-	if int(alive) == e.k+e.m {
+	if int(alive) == e.K+e.M {
 		log.Println("start reading blocks")
 	} else {
 		log.Println("start reconstructing blocks")
@@ -125,25 +105,23 @@ func (e *Erasure) readFile(filename string, savepath string) error {
 		blobBuf := *e.allBlobPool.Get().(*[][]byte)
 		for s := 0; s < nextStripe; s++ {
 			s := s
-			subCnt := blob*e.conStripes + s
+			stripeNo := blob*e.conStripes + s
 			// offset := int64(subCnt) * e.allStripeSize
-			func() error {
+			eg.Go(func() error {
 				erg := e.errgroupPool.Get().(*errgroup.Group)
 				defer e.errgroupPool.Put(erg)
 				//read all blocks in parallel
-				for i, disk := range e.diskInfos {
+				for i := 0; i < e.K+e.M; i++ {
 					i := i
-					disk := disk
-					block := dist[subCnt][i]
+					diskId := dist[stripeNo][i]
+					disk := e.diskInfos[diskId]
 					erg.Go(func() error {
 						if !disk.available {
 							return nil
 						}
-						if ifs[i] == nil {
-							return nil
-						}
-						_, err := ifs[i].ReadAt(blobBuf[s][int64(block)*e.blockSize:int64(block+1)*e.blockSize],
-							int64(stripeCnt+s)*e.blockSize)
+						//we also need to know the block's accurate offset with respect to disk
+						_, err := ifs[diskId].ReadAt(blobBuf[s][int64(i)*e.BlockSize:int64(i+1)*e.BlockSize],
+							int64(stripeNo)*e.BlockSize)
 						// fmt.Println("Read ", n, " bytes at", i, ", block ", block)
 						if err != nil && err != io.EOF {
 							return err
@@ -165,17 +143,17 @@ func (e *Erasure) readFile(filename string, savepath string) error {
 					return err
 				}
 				if !ok {
-					// fmt.Println("reconstruct data of stripe:", subCnt)
-					err = e.enc.ReconstructWithList(splitData, &diskFailList, &(fi.distribution[stripeCnt+s]), false)
+					fmt.Println("reconstruct data of stripe:", stripeNo)
+					err = e.enc.ReconstructWithList(splitData, &diskFailList, &(fi.Distribution[stripeNo]), false)
 					if err != nil {
 						return err
 					}
 				}
 				//join and write to output file
 
-				for i := 0; i < e.k; i++ {
+				for i := 0; i < e.K; i++ {
 					i := i
-					writeOffset := int64(stripeCnt+s)*e.dataStripeSize + int64(i)*blockSize
+					writeOffset := int64(stripeNo)*e.dataStripeSize + int64(i)*blockSize
 					if fileSize-writeOffset <= blockSize {
 						leftLen := fileSize - writeOffset
 						_, err := sf.WriteAt(splitData[i][:leftLen], writeOffset)
@@ -185,7 +163,7 @@ func (e *Erasure) readFile(filename string, savepath string) error {
 						break
 					}
 					erg.Go(func() error {
-						// fmt.Println("i:", i, "writeOffset", writeOffset+e.blockSize, "at stripe", subCnt)
+						// fmt.Println("i:", i, "writeOffset", writeOffset+e.BlockSize, "at stripe", subCnt)
 						_, err := sf.WriteAt(splitData[i], writeOffset)
 						if err != nil {
 							return err
@@ -199,7 +177,7 @@ func (e *Erasure) readFile(filename string, savepath string) error {
 					return err
 				}
 				return err
-			}()
+			})
 
 		}
 		e.allBlobPool.Put(&blobBuf)
@@ -219,10 +197,10 @@ func (e *Erasure) SplitStripe(data []byte) ([][]byte, error) {
 		return nil, reedsolomon.ErrShortData
 	}
 	// Calculate number of bytes per data shard.
-	perShard := ceilFracInt(len(data), e.k+e.m)
+	perShard := ceilFracInt(len(data), e.K+e.M)
 
 	// Split into equal-length shards.
-	dst := make([][]byte, e.k+e.m)
+	dst := make([][]byte, e.K+e.M)
 	i := 0
 	for ; i < len(dst) && len(data) >= perShard; i++ {
 		dst[i], data = data[:perShard:perShard], data[perShard:]

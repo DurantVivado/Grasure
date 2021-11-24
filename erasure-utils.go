@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -94,10 +95,10 @@ func max(args ...int) int {
 }
 
 //each stripe randomized distribution
-func genRandomArr(n int) []int {
+func genRandomArr(n, start int) []int {
 	shuff := make([]int, n)
 	for i := 0; i < n; i++ {
-		shuff[i] = i
+		shuff[i] = i + start
 	}
 	rand.Seed(time.Now().UnixNano())
 	rand.Shuffle(len(shuff), func(i, j int) { shuff[i], shuff[j] = shuff[j], shuff[i] })
@@ -142,10 +143,19 @@ func goroutineNum() int {
 }
 
 //make an 2D byte slice
-func makeArr2D(row, col int) [][]byte {
+func makeArr2DByte(row, col int) [][]byte {
 	out := make([][]byte, row)
 	for i := range out {
 		out[i] = make([]byte, col)
+	}
+	return out
+}
+
+//make an 2D int slice
+func makeArr2DInt(row, col int) [][]int {
+	out := make([][]int, row)
+	for i := range out {
+		out[i] = make([]int, col)
 	}
 	return out
 }
@@ -199,4 +209,20 @@ func fillRandom(p []byte) {
 			val >>= 8
 		}
 	}
+}
+
+//string2Slice
+func stringToSlice2D(s string) [][]int {
+	s = strings.Trim(s, "[]\n")
+	strs := strings.Split(s, ",")
+	row := len(strs)
+	out := make([][]int, row)
+	for i := 0; i < row; i++ {
+		sub := strings.Trim(strs[i], "[]\n")
+		for _, num := range strings.Split(sub, ",") {
+			n, _ := strconv.Atoi(num)
+			out[i] = append(out[i], n)
+		}
+	}
+	return out
 }
