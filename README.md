@@ -62,7 +62,9 @@ go build -o grasure erasure-*.go main.go
 ```
 
 4. decode(read) the examplar file.
+```
 ./grasure -md read -f {source file basename} -conStripes 100 -sp {destination file path} 
+```
 
 here `conStripes` denotes how many stripes are allowed to operate concurrently, default value is 100. 
 `sp` means save path.
@@ -77,7 +79,9 @@ sha256sum {destination file path}
 ```
 
 6. update the examplar file.
+```
 ./grasure -md update -f {source file path}
+```
 
 
 ## CLI parameters
