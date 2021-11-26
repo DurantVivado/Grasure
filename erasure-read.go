@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"io"
 	"log"
 	"os"
@@ -144,7 +143,7 @@ func (e *Erasure) readFile(filename string, savepath string) error {
 					return err
 				}
 				if !ok {
-					fmt.Println("reconstruct data of stripe:", stripeNo)
+					// fmt.Println("reconstruct data of stripe:", stripeNo)
 					err = e.enc.ReconstructWithList(splitData, &diskFailList, &(fi.Distribution[stripeNo]), false)
 					if err != nil {
 						return err
