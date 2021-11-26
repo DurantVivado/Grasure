@@ -51,7 +51,7 @@ func main() {
 		failOnErr(mode, err)
 		err = erasure.readDiskPath()
 		failOnErr(mode, err)
-		err = erasure.update(filePath, newFilePath)
+		err = erasure.update(filePath, filePath)
 		failOnErr(mode, err)
 		err = erasure.writeConfig()
 		failOnErr(mode, err)
