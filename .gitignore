@@ -9,3 +9,4 @@ test/
 cmd/
 output/
 grasure
+conf.json

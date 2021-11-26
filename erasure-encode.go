@@ -218,28 +218,25 @@ func (e *Erasure) stripedFileSize(totalLen int64) int64 {
 	return numStripe * e.allStripeSize
 }
 
-//Encode the meta file into the system for each file
-func (e *Erasure) enocdeMeta(fi *FileInfo) error {
+//Encode the config file into the system for serveral parts
+//it's NOT striped and encoded as a whole piece.
+func (e *Erasure) enocdeConfig() error {
 	diskNum := len(e.diskInfos)
-	baseFileName := fi.FileName
 	of := make([]*os.File, diskNum)
 	//first open relevant file resources
 	erg := new(errgroup.Group)
 	//save the blob
+	f, err := os.Open(e.configFile)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
 	for i := range e.diskInfos {
 		i := i
 		//we have to make sure the dist is appended to fi.Distribution in order
 		erg.Go(func() error {
-			folderPath := filepath.Join(e.diskInfos[i].diskPath, baseFileName)
+			folderPath := e.diskInfos[i].diskPath
 			//if override is specified, we override previous data
-			if override {
-				if err := os.RemoveAll(folderPath); err != nil {
-					return err
-				}
-			}
-			if err := os.Mkdir(folderPath, 0666); err != nil {
-				return ErrDataDirExist
-			}
 			// We decide the part name according to whether it belongs to data or parity
 			partPath := filepath.Join(folderPath, "META")
 			//Create the file and write in the parted data

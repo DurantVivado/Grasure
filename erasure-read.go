@@ -106,7 +106,7 @@ func (e *Erasure) readFile(filename string, savepath string) error {
 			s := s
 			stripeNo := stripeCnt + s
 			// offset := int64(subCnt) * e.allStripeSize
-			func() error {
+			eg.Go(func() error {
 				erg := e.errgroupPool.Get().(*errgroup.Group)
 				defer e.errgroupPool.Put(erg)
 				//read all blocks in parallel
@@ -114,7 +114,7 @@ func (e *Erasure) readFile(filename string, savepath string) error {
 					i := i
 					diskId := dist[stripeNo][i]
 					disk := e.diskInfos[diskId]
-					func() error {
+					erg.Go(func() error {
 						if !disk.available {
 							return nil
 						}
@@ -127,7 +127,7 @@ func (e *Erasure) readFile(filename string, savepath string) error {
 							return err
 						}
 						return nil
-					}()
+					})
 				}
 				if err := erg.Wait(); err != nil {
 					return err
@@ -177,7 +177,7 @@ func (e *Erasure) readFile(filename string, savepath string) error {
 					return err
 				}
 				return err
-			}()
+			})
 
 		}
 		e.allBlobPool.Put(&blobBuf)
