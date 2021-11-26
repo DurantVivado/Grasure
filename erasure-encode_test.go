@@ -57,7 +57,7 @@ func TestEncode4096(t *testing.T) {
 	//we open file and write data
 	ctx, _ := context.WithCancel(context.Background())
 	testEC := &Erasure{
-		blockSize: 4096,
+		BlockSize: 4096,
 	}
 	for _, fileSize := range fileSizes {
 		//system-level paras
@@ -75,8 +75,8 @@ func TestEncode4096(t *testing.T) {
 		f.Close()
 		for _, k := range dataShards {
 			for _, m := range parityShards {
-				testEC.k = k
-				testEC.m = m
+				testEC.K = k
+				testEC.M = m
 				t.Logf("k:%d,m:%d fails when fileSize is %d, for %s", k, m, fileSize, err.Error())
 
 				_, err := testEC.EncodeFile(ctx, tempFile)

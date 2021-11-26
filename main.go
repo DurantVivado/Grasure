@@ -29,8 +29,6 @@ func main() {
 		//read a file
 		err = erasure.readConfig()
 		failOnErr(mode, err)
-		err = erasure.readDiskPath()
-		failOnErr(mode, err)
 		erasure.destroy(failMode, failNum)
 		err = erasure.readFile(filePath, savePath)
 		failOnErr(mode, err)
@@ -39,8 +37,7 @@ func main() {
 		//We are entering the encoding mode, and for brevity,we only encode one filePath
 		err = erasure.readConfig()
 		failOnErr(mode, err)
-		err = erasure.readDiskPath()
-		failOnErr(mode, err)
+
 		_, err := erasure.EncodeFile(ctx, filePath)
 		failOnErr(mode, err)
 		err = erasure.writeConfig()
@@ -49,11 +46,7 @@ func main() {
 		//update an old file according to a new file
 		err = erasure.readConfig()
 		failOnErr(mode, err)
-		err = erasure.readDiskPath()
-		failOnErr(mode, err)
 		err = erasure.update(filePath, filePath)
-		failOnErr(mode, err)
-		err = erasure.writeConfig()
 		failOnErr(mode, err)
 	// case "recover":
 	// 	//recover all the blocks of a disk and put the recovered result to new path
@@ -65,8 +58,6 @@ func main() {
 	// 	scaling(new_k, new_m)
 	case "delete":
 		err = erasure.readConfig()
-		failOnErr(mode, err)
-		err = erasure.readDiskPath()
 		failOnErr(mode, err)
 		err = erasure.removeFile(filePath)
 		failOnErr(mode, err)

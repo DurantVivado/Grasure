@@ -5,7 +5,6 @@ Implementing most popular erasured-based filesystem operations, it's readily use
 Project home: https://github.com/DurantVivado/Grasure
 Godoc: -
 
-We decide to base Grasure on Go-fuse for a native FUSE filesystem.
 
 ## Project Architecture:
 - `main.go` contains the main func. For each run,  operate among "encode", "read", "update", "scaling", "delete", ...
@@ -29,11 +28,11 @@ import:
 
 
 ## Usage
-0. build the project:
+0. Build the project:
 ```
 go build -o grasure erasure-*.go main.go
 ```
-1. new a file named `.hdr.disks.path` in project root, type the path of your local disks, e.g.,
+1. New a file named `.hdr.disks.path` in project root, type the path of your local disks, e.g.,
 ```
 /home/server1/data/data1
 /home/server1/data/data2
@@ -52,11 +51,11 @@ go build -o grasure erasure-*.go main.go
 /home/server1/data/data15
 /home/server1/data/data16
 ```
-2. initialize the system, you should explictly attach the number of data and parity shards as well as blocksize (in bytes), remember k+m must NOT be bigger than 256.
+2.Initialise the system, you should explictly attach the number of data(k) and parity shards (m) as well as blocksize (in bytes), remember k+m must NOT be bigger than 256.
 ```
 ./grasure -md init -k 12 -m 4 -bs 4096
 ```
-3. encode one examplar file.
+3. Encode one examplar file.
 ```
 ./grasure -md encode -f {source file path} -conStripes 100 -o
 ```
@@ -68,6 +67,8 @@ go build -o grasure erasure-*.go main.go
 
 here `conStripes` denotes how many stripes are allowed to operate concurrently, default value is 100. 
 `sp` means save path.
+
+use `fn` to simulate the failed number of disks (default is 0), for example, `-fn 2` simluates shutdown of arbitrary two disks. Relax, the data will not be really lost.
 
 5. check the hash string to see encode/decode is correct.
 

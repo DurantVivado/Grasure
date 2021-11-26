@@ -2,13 +2,13 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
-	"strconv"
-	"strings"
 
 	"github.com/DurantVivado/reedsolomon"
 	"golang.org/x/sync/errgroup"
@@ -46,19 +46,19 @@ func (e *Erasure) initHDR() {
 	} else if err != nil {
 		failOnErr(mode, err)
 	}
-	e.k = k
-	e.m = m
-	if e.k <= 0 || e.m <= 0 {
+	e.K = k
+	e.M = m
+	if e.K <= 0 || e.M <= 0 {
 		failOnErr(mode, reedsolomon.ErrInvShardNum)
 	}
 	//The reedsolomon library only implements GF(2^8) and will be improved later
-	if e.k+e.m > 256 {
+	if e.K+e.M > 256 {
 		failOnErr(mode, reedsolomon.ErrMaxShardNum)
 	}
-	e.blockSize = blockSize
+	e.BlockSize = blockSize
 	err = e.readDiskPath()
 	failOnErr(mode, err)
-	if e.k+e.m > len(e.diskInfos) {
+	if e.K+e.M > len(e.diskInfos) {
 		failOnErr(mode, ErrTooFewDisks)
 	}
 	//we persit meta info info in hard drives
@@ -71,130 +71,87 @@ func (e *Erasure) initHDR() {
 		k, m, blockSize)
 }
 
+//disk status
+func (e *Erasure) printDiskStatus() {
+	for i, disk := range e.diskInfos {
+
+		fmt.Printf("DiskId:%d, available:%tn,numBlocks:%d, storage:%d/%d (bytes)\n",
+			i, disk.available, disk.numBlocks, int64(disk.numBlocks)*e.BlockSize, disk.capacity)
+	}
+}
+
 //read the config info in config file
 //Every time read file list in system warm-up
 func (e *Erasure) readConfig() error {
 	if ex, err := PathExist(e.configFile); !ex && err == nil {
+		// we try to recover the config file from the storage system
+		// which renders the last chance to heal
+		err = e.rebuildConfig(e.configFile)
+		if err != nil {
+			return err
+		}
 		return ErrConfFileNotExist
 	} else if err != nil {
 		return err
 	}
-	f, err := os.Open(e.configFile)
+	err = erasure.readDiskPath()
+	if err != nil {
+		return fmt.Errorf("readDiskPath:%s error:%s", e.diskFilePath, err.Error())
+	}
+	data, err := ioutil.ReadFile(e.configFile)
 	if err != nil {
 		return err
 	}
-	defer f.Close()
-
-	buf := bufio.NewReader(f)
-	//recurrently read lines
-	_, _, err = buf.ReadLine() //dismiss the first line
+	err = json.Unmarshal(data, &e)
 	if err != nil {
-		return ErrNotInitialized
+		return err
 	}
-	line, _, err := buf.ReadLine()
-	if err != nil {
-		return ErrNotInitialized
-	}
-	split := strings.Split(string(line), " ")
-	k, err := strconv.ParseInt(split[0], 10, 32)
-	if err != nil {
-		return ErrNotInitialized
-	}
-	m, err := strconv.ParseInt(split[1], 10, 32)
-	if err != nil {
-		return ErrNotInitialized
-	}
-	line, _, err = buf.ReadLine()
-	if err != nil {
-		return ErrNotInitialized
-	}
-	bs, err := strconv.ParseInt(string(line), 10, 32)
-	if err != nil {
-		return ErrNotInitialized
-	}
-	e.k = int(k)
-	e.m = int(m)
-	e.blockSize = bs
+	// e.K = int(k)
+	// e.M = int(m)
+	// e.BlockSize = bs
 	e.conStripes = conStripes
 	//initialize the ReedSolomon Code
-	e.enc, err = reedsolomon.New(e.k, e.m,
-		reedsolomon.WithAutoGoroutines(int(e.blockSize)),
+	e.enc, err = reedsolomon.New(e.K, e.M,
+		reedsolomon.WithAutoGoroutines(int(e.BlockSize)),
 		reedsolomon.WithCauchyMatrix(),
 		reedsolomon.WithConcurrentStreams(true),
 		reedsolomon.WithInversionCache(true),
 		reedsolomon.WithFastOneParityMatrix(),
 	)
-	e.dataStripeSize = int64(e.k) * blockSize
-	e.allStripeSize = int64(e.k+e.m) * blockSize
+	if err != nil {
+		return err
+	}
+	e.dataStripeSize = int64(e.K) * blockSize
+	e.allStripeSize = int64(e.K+e.M) * blockSize
 
 	e.errgroupPool.New = func() interface{} {
 		return &errgroup.Group{}
 	}
+	//unzip the fileMap
+	for _, f := range e.FileMeta {
+		stripeNum := len(f.Distribution)
+		f.blockToOffset = makeArr2DInt(stripeNum, e.K+e.M)
+		countSum := make([]int, len(e.diskInfos))
+		for row := range f.Distribution {
 
-	//e.sEnc, err = reedsolomon.NewStreamC(e.k, e.m, conReads, conWrites)
-	if err != nil {
-		return err
-	}
-	//next is the file lists //read all file meta
-	var str string
-	for {
-		//read the file name
-		if len(str) == 0 {
-			//if str is not empty, we retain previous file name
-			str, err = buf.ReadString('\n')
-
-		}
-		if err == io.EOF {
-			break
-		} else if err != nil {
-			return err
-		}
-		fi := &FileInfo{}
-		fi.fileName = strings.TrimSuffix(str, "\n")
-		//read the file size
-		str, err = buf.ReadString('\n')
-		if err == io.EOF {
-			return fmt.Errorf("%s 's meta data fileSize is incompleted, please check", fi.fileName)
-		} else if err != nil {
-			return err
-		}
-		fi.fileSize, _ = strconv.ParseInt(strings.TrimSuffix(str, "\n"), 10, 64)
-		//read file hash
-		str, err = buf.ReadString('\n')
-		if err == io.EOF {
-			return fmt.Errorf("%s 's meta data hash is incompleted, please check", fi.fileName)
-		} else if err != nil {
-			return err
-		}
-		fi.hash = strings.TrimSuffix(str, "\n")
-
-		//read the block distribution
-		for {
-			str, err = buf.ReadString('\n')
-			if len(str) == 0 || str[0] != '[' {
-				break
+			for line := range f.Distribution[row] {
+				diskId := f.Distribution[row][line]
+				f.blockToOffset[row][line] = countSum[diskId]
+				countSum[diskId]++
 			}
-			str = strings.Trim(str, "[]\n")
-
-			var stripeDist []int
-			for _, s := range strings.Split(str, " ") {
-				num, err := strconv.Atoi(s)
-				if err != nil {
-					return err
-				}
-				stripeDist = append(stripeDist, num)
-			}
-			fi.distribution = append(fi.distribution, stripeDist)
-			if err == io.EOF {
-				break
-			} else if err != nil {
-				return err
-			}
-
 		}
-		e.fileMap[fi.fileName] = fi
+		//update the numBlocks
+		for i := range countSum {
+			e.diskInfos[i].numBlocks += countSum[i]
+		}
+		e.fileMap[f.FileName] = f
 
 	}
+	// we
+	//e.sEnc, err = reedsolomon.NewStreamC(e.K, e.M, conReads, conWrites)
+	// if err != nil {
+	// 	return err
+	// }
 
 	return nil
 }
@@ -208,26 +165,18 @@ func (e *Erasure) writeConfig() error {
 	}
 	defer f.Close()
 
-	//1. k,m
-	//2. rand seed
+	if err != nil {
+		return err
+	}
+	data, err := json.Marshal(e)
+	// data, err := json.MarshalIndent(e, " ", "  ")
+	if err != nil {
+		return err
+	}
 	buf := bufio.NewWriter(f)
-	_, err = buf.WriteString("This file is automatically generated, DO NOT EDIT\n")
+	_, err = buf.Write(data)
 	if err != nil {
 		return err
-	}
-	line := fmt.Sprintf("%d %d\n%d\n", e.k, e.m, e.blockSize)
-	_, err = buf.WriteString(line)
-	if err != nil {
-		return err
-	}
-	//when fileMap is changed, we update the fileList
-	for _, v := range e.fileMap {
-		line := fmt.Sprintf("%s\n%d\n%s\n", filepath.Base(v.fileName), v.fileSize, v.hash)
-		buf.WriteString(line)
-		for _, v := range v.distribution {
-			tmp := fmt.Sprintf("%v\n", v)
-			buf.WriteString(tmp)
-		}
 	}
 	buf.Flush()
 	f.Sync()
@@ -235,7 +184,7 @@ func (e *Erasure) writeConfig() error {
 }
 
 //reconstruct the config file if possible
-func (e *Erasure) rebuildConfig() error {
+func (e *Erasure) rebuildConfig(restorePath string) error {
 	//we read file meta in the disk path and try to rebuild the config file
 	return nil
 }
@@ -255,7 +204,7 @@ func (e *Erasure) reset() error {
 		}
 		g.Go(func() error {
 			for _, file := range files {
-				err = os.RemoveAll(path.diskPath + "/" + file.Name())
+				err = os.RemoveAll(filepath.Join(path.diskPath, file.Name()))
 				if err != nil {
 					return err
 				}
@@ -284,7 +233,8 @@ func (e *Erasure) removeFile(filename string) error {
 			continue
 		}
 		g.Go(func() error {
-			err = os.RemoveAll(path.diskPath + "/" + filename)
+
+			err = os.RemoveAll(filepath.Join(path.diskPath, filename))
 			if err != nil {
 				return err
 			}
