@@ -22,6 +22,8 @@ We decide to base Grasure on Go-fuse for a native FUSE filesystem.
 
 - `erasure-read.go` contains operation for striped file reading, if some parts are lost, we try to recover.
 
+- `erasure-update.go` contains operation for striped file updating, if some parts are lost, we try to recover.
+
 import:
 [reedsolomon library](https://github.com/klauspost/reedsolomon)
 
@@ -73,6 +75,9 @@ sha256sum {source file path}
 ```
 sha256sum {destination file path}
 ```
+
+6. update the examplar file.
+./grasure -md update -f {source file path}
 
 
 ## CLI parameters
