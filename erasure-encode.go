@@ -152,32 +152,7 @@ func (e *Erasure) EncodeFile(ctx context.Context, filename string) (*FileInfo, e
 	for i := range of {
 		of[i].Close()
 	}
-	// //save diskToBlocks to disk
-	// erg = new(errgroup.Group)
-	// //save the blob
-	// for i := range e.diskInfos {
-	// 	i := i
-	// 	//we have to make sure the dist is appended to fi.Distribution in order
-	// 	erg.Go(func() error {
-	// 		folderPath := filepath.Join(e.diskInfos[i].diskPath, baseFileName)
-	// 		// We decide the part name according to whether it belongs to data or parity
-	// 		partPath := filepath.Join(folderPath, "META")
-	// 		//Create the file and write in the parted data
-	// 		of[i], err = os.OpenFile(partPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
-	// 		if err != nil {
-	// 			return err
-	// 		}
-	// 		dist := fmt.Sprintf("%v\n", diskToBlocks[i])
-	// 		_, err = of[i].WriteString(dist)
-	// 		if err != nil {
-	// 			return err
-	// 		}
-	// 		return nil
-	// 	})
-	// }
-	// if err := erg.Wait(); err != nil {
-	// 	return nil, err
-	// }
+
 	for i := range of {
 		of[i].Close()
 	}
@@ -216,39 +191,4 @@ func (e *Erasure) stripedFileSize(totalLen int64) int64 {
 	}
 	numStripe := ceilFracInt64(totalLen, e.dataStripeSize)
 	return numStripe * e.allStripeSize
-}
-
-//Encode the config file into the system for serveral parts
-//it's NOT striped and encoded as a whole piece.
-func (e *Erasure) enocdeConfig() error {
-	diskNum := len(e.diskInfos)
-	of := make([]*os.File, diskNum)
-	//first open relevant file resources
-	erg := new(errgroup.Group)
-	//save the blob
-	f, err := os.Open(e.configFile)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	for i := range e.diskInfos {
-		i := i
-		//we have to make sure the dist is appended to fi.Distribution in order
-		erg.Go(func() error {
-			folderPath := e.diskInfos[i].diskPath
-			//if override is specified, we override previous data
-			// We decide the part name according to whether it belongs to data or parity
-			partPath := filepath.Join(folderPath, "META")
-			//Create the file and write in the parted data
-			of[i], err = os.OpenFile(partPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
-			if err != nil {
-				return err
-			}
-			return nil
-		})
-	}
-	if err := erg.Wait(); err != nil {
-		return err
-	}
-	return nil
 }

@@ -83,21 +83,21 @@ func (e *Erasure) printDiskStatus() {
 //read the config info in config file
 //Every time read file list in system warm-up
 func (e *Erasure) readConfig() error {
+	err = erasure.readDiskPath()
+	if err != nil {
+		return fmt.Errorf("readDiskPath:%s error:%s", e.diskFilePath, err.Error())
+	}
 	if ex, err := PathExist(e.configFile); !ex && err == nil {
 		// we try to recover the config file from the storage system
 		// which renders the last chance to heal
 		err = e.rebuildConfig(e.configFile)
 		if err != nil {
-			return err
+			return ErrConfFileNotExist
 		}
-		return ErrConfFileNotExist
 	} else if err != nil {
 		return err
 	}
-	err = erasure.readDiskPath()
-	if err != nil {
-		return fmt.Errorf("readDiskPath:%s error:%s", e.diskFilePath, err.Error())
-	}
+
 	data, err := ioutil.ReadFile(e.configFile)
 	if err != nil {
 		return err
@@ -156,6 +156,23 @@ func (e *Erasure) readConfig() error {
 	return nil
 }
 
+//Replicate the config file into the system for k-fold
+//it's NOT striped and encoded as a whole piece.
+func (e *Erasure) replicateConfig(k int) error {
+	diskNum := len(e.diskInfos)
+	selectDisk := genRandomArr(diskNum, 0)[:k]
+	for i := range selectDisk {
+		disk := e.diskInfos[i]
+		replicaPath := filepath.Join(disk.diskPath, "META")
+		_, err = copyFile(e.configFile, replicaPath)
+		if err != nil {
+			log.Println(err.Error())
+		}
+
+	}
+	return nil
+}
+
 //write the erasure parameters into config files
 func (e *Erasure) writeConfig() error {
 
@@ -180,12 +197,25 @@ func (e *Erasure) writeConfig() error {
 	}
 	buf.Flush()
 	f.Sync()
+	err = e.replicateConfig(replicateFactor)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
 //reconstruct the config file if possible
 func (e *Erasure) rebuildConfig(restorePath string) error {
 	//we read file meta in the disk path and try to rebuild the config file
+	for i := range e.diskFilePath {
+		disk := e.diskInfos[i]
+		replicaPath := filepath.Join(disk.diskPath, "META")
+		_, err = copyFile(replicaPath, e.configFile)
+		if err != nil {
+			return err
+		}
+		break
+	}
 	return nil
 }
 
