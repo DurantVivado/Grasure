@@ -19,7 +19,7 @@ import (
 
 //consult user to avoid maloperation
 func consultUserBeforeAction() (bool, error) {
-	log.Println("If you are sure to proceed, type:\n [Y]es or [N]o.")
+	fmt.Println("If you are sure to proceed, type:\n [Y]es or [N]o.")
 
 	inputReader := bufio.NewReader(os.Stdin)
 	for {

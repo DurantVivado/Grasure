@@ -105,9 +105,9 @@ func (e *Erasure) readFile(filename string, savepath string) error {
 		blobBuf := *e.allBlobPool.Get().(*[][]byte)
 		for s := 0; s < nextStripe; s++ {
 			s := s
-			stripeNo := blob*e.conStripes + s
+			stripeNo := stripeCnt + s
 			// offset := int64(subCnt) * e.allStripeSize
-			eg.Go(func() error {
+			func() error {
 				erg := e.errgroupPool.Get().(*errgroup.Group)
 				defer e.errgroupPool.Put(erg)
 				//read all blocks in parallel
@@ -115,19 +115,20 @@ func (e *Erasure) readFile(filename string, savepath string) error {
 					i := i
 					diskId := dist[stripeNo][i]
 					disk := e.diskInfos[diskId]
-					erg.Go(func() error {
+					func() error {
 						if !disk.available {
 							return nil
 						}
 						//we also need to know the block's accurate offset with respect to disk
+						offset := fi.blockToOffset[stripeNo][i]
 						_, err := ifs[diskId].ReadAt(blobBuf[s][int64(i)*e.BlockSize:int64(i+1)*e.BlockSize],
-							int64(stripeNo)*e.BlockSize)
+							int64(offset)*e.BlockSize)
 						// fmt.Println("Read ", n, " bytes at", i, ", block ", block)
 						if err != nil && err != io.EOF {
 							return err
 						}
 						return nil
-					})
+					}()
 				}
 				if err := erg.Wait(); err != nil {
 					return err
@@ -177,7 +178,7 @@ func (e *Erasure) readFile(filename string, savepath string) error {
 					return err
 				}
 				return err
-			})
+			}()
 
 		}
 		e.allBlobPool.Put(&blobBuf)

@@ -42,7 +42,6 @@ func (e *Erasure) EncodeFile(ctx context.Context, filename string) (*FileInfo, e
 
 	//encode the data
 	stripeNum := int(ceilFracInt64(fileSize, e.dataStripeSize))
-	fi.Distribution = make([][]int, stripeNum)
 	//we split file into stripes and randomly distribute the blocks to various disks
 	//and for stripes of the same disk, we concatenate all blocks to create the sole file
 	//for accelerating, we start multiple goroutines
@@ -91,10 +90,10 @@ func (e *Erasure) EncodeFile(ctx context.Context, filename string) (*FileInfo, e
 		}
 		return &out
 	}
-	// diskToBlocks := make([][]int, diskNum)
-	// for i := range diskToBlocks {
-	// 	diskToBlocks[i] = make([]int, 0)
-	// }
+	//we make layout independent of encoding and user-friendly
+	//all described in erasure-layout.go
+
+	e.generateLayout(fi)
 	for blob := 0; blob < numBlob; blob++ {
 		if stripeCnt+e.conStripes > stripeNum {
 			nextStripe = stripeNum - stripeCnt
@@ -117,10 +116,9 @@ func (e *Erasure) EncodeFile(ctx context.Context, filename string) (*FileInfo, e
 					return err
 				}
 				//generate random distrinution for data and parity
-				randDist := genRandomArr(diskNum, 0)
+				randDist := fi.Distribution[stripeCnt+s]
 				// randDist := getSeqArr(e.K + e.M)
 
-				fi.Distribution[stripeCnt+s] = randDist[:e.K+e.M]
 				erg := e.errgroupPool.Get().(*errgroup.Group)
 				defer e.errgroupPool.Put(erg)
 				//save the blob
@@ -128,7 +126,8 @@ func (e *Erasure) EncodeFile(ctx context.Context, filename string) (*FileInfo, e
 					i := i
 					diskId := randDist[i]
 					erg.Go(func() error {
-						_, err := of[diskId].WriteAt(encodeData[i], int64(stripeCnt+s)*e.BlockSize)
+						offset := fi.blockToOffset[stripeCnt+s][i]
+						_, err := of[diskId].WriteAt(encodeData[i], int64(offset)*e.BlockSize)
 						if err != nil {
 							return err
 						}

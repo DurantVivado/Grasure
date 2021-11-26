@@ -23,9 +23,10 @@ type HDRInfo struct {
 }
 
 type DiskInfo struct {
-	diskPath    string
-	available   bool
-	blockOffset map[int]int64
+	diskPath  string //the disk path
+	available bool   //it's flag and when disk fails, it renders false.
+	numBlocks int    //it tells how many blocks a disk holds
+	capacity  int64  //the capacity of a disk
 }
 
 type Erasure struct {
@@ -48,11 +49,12 @@ type Erasure struct {
 	blockPool      sync.Pool                 //the pool for block-size access
 }
 type FileInfo struct {
-	FileName     string  `json:"fileName"` //file name
-	FileSize     int64   `json:"fileSize"` //file size
-	Hash         string  `json:"fileHash"` //hash value (SHA256 by default)
-	Dist         string  `json:"fileDist"` //stringified  distribution
-	Distribution [][]int //distribution represents the block replacement for specific file, in stripeno x diskno manner
+	FileName      string  `json:"fileName"` //file name
+	FileSize      int64   `json:"fileSize"` //file size
+	Hash          string  `json:"fileHash"` //hash value (SHA256 by default)
+	Distribution  [][]int `json:"fileDist"` //distribution forms a block->disk mapping
+	blockToOffset [][]int //blockToOffset has the same row and column number as Distribution but points to the block offset relative to a disk.
+
 	// metaInfo     *os.FileInfo //system-level file info
 }
 
