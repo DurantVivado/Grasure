@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"io"
 	"log"
 	"os"
@@ -10,7 +9,7 @@ import (
 	"golang.org/x/sync/errgroup"
 ) //split and encode a file into parity blocks concurrently
 
-func (e *Erasure) EncodeFile(ctx context.Context, filename string) (*FileInfo, error) {
+func (e *Erasure) EncodeFile(filename string) (*FileInfo, error) {
 	baseFileName := filepath.Base(filename)
 	if _, ok := e.fileMap[baseFileName]; ok && !override {
 		log.Fatalf("the file %s has already been in HDR file system, you should update instead of encoding", baseFileName)

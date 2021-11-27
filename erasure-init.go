@@ -108,7 +108,7 @@ func (e *Erasure) readConfig() error {
 	}
 	// e.K = int(k)
 	// e.M = int(m)
-	// e.BlockSize = bs
+	// e.BlockSize = blockSize
 	e.conStripes = conStripes
 	//initialize the ReedSolomon Code
 	e.enc, err = reedsolomon.New(e.K, e.M,
@@ -121,8 +121,8 @@ func (e *Erasure) readConfig() error {
 	if err != nil {
 		return err
 	}
-	e.dataStripeSize = int64(e.K) * blockSize
-	e.allStripeSize = int64(e.K+e.M) * blockSize
+	e.dataStripeSize = int64(e.K) * e.BlockSize
+	e.allStripeSize = int64(e.K+e.M) * e.BlockSize
 
 	e.errgroupPool.New = func() interface{} {
 		return &errgroup.Group{}

@@ -3,7 +3,6 @@
 package main
 
 import (
-	"context"
 	"os"
 	"testing"
 )
@@ -55,7 +54,6 @@ func TestEncode4096(t *testing.T) {
 	//Group3: 1M, 2M, 4M, 8M, ...,1024M
 	//Group4: 1G, 4G, 8G, 16G
 	//we open file and write data
-	ctx, _ := context.WithCancel(context.Background())
 	testEC := &Erasure{
 		BlockSize: 4096,
 	}
@@ -79,7 +77,7 @@ func TestEncode4096(t *testing.T) {
 				testEC.M = m
 				t.Logf("k:%d,m:%d fails when fileSize is %d, for %s", k, m, fileSize, err.Error())
 
-				_, err := testEC.EncodeFile(ctx, tempFile)
+				_, err := testEC.EncodeFile(tempFile)
 				if err != nil {
 					t.Errorf("k:%d,m:%d fails when fileSize is %d, for %s", k, m, fileSize, err.Error())
 				}

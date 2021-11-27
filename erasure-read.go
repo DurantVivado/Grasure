@@ -21,11 +21,6 @@ func (e *Erasure) readFile(filename string, savepath string) error {
 
 	fileSize := fi.FileSize
 	stripeNum := int(ceilFracInt64(fileSize, e.dataStripeSize))
-	// fi.Distribution = makeArr2DInt(stripeNum, e.K+e.M)
-	// err := e.readMeta(fi)
-	// if err != nil {
-	// 	return err
-	// }
 	dist := fi.Distribution
 	//first we check the number of alive disks
 	// to judge if any part need reconstruction
@@ -106,7 +101,7 @@ func (e *Erasure) readFile(filename string, savepath string) error {
 			s := s
 			stripeNo := stripeCnt + s
 			// offset := int64(subCnt) * e.allStripeSize
-			eg.Go(func() error {
+			func() error {
 				erg := e.errgroupPool.Get().(*errgroup.Group)
 				defer e.errgroupPool.Put(erg)
 				//read all blocks in parallel
@@ -153,8 +148,8 @@ func (e *Erasure) readFile(filename string, savepath string) error {
 
 				for i := 0; i < e.K; i++ {
 					i := i
-					writeOffset := int64(stripeNo)*e.dataStripeSize + int64(i)*blockSize
-					if fileSize-writeOffset <= blockSize {
+					writeOffset := int64(stripeNo)*e.dataStripeSize + int64(i)*e.BlockSize
+					if fileSize-writeOffset <= e.BlockSize {
 						leftLen := fileSize - writeOffset
 						_, err := sf.WriteAt(splitData[i][:leftLen], writeOffset)
 						if err != nil {
@@ -177,7 +172,7 @@ func (e *Erasure) readFile(filename string, savepath string) error {
 					return err
 				}
 				return err
-			})
+			}()
 
 		}
 		e.allBlobPool.Put(&blobBuf)

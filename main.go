@@ -8,7 +8,6 @@
 package main
 
 import (
-	"context"
 	"flag"
 	"log"
 	"time"
@@ -19,7 +18,7 @@ func main() {
 	flag_init()
 	flag.Parse()
 	//We read the config file
-	ctx, _ := context.WithCancel(context.Background())
+	// ctx, _ := context.WithCancel(context.Background())
 	// go monitorCancel(cancel)
 	start := time.Now()
 	switch mode {
@@ -38,7 +37,7 @@ func main() {
 		err = erasure.readConfig()
 		failOnErr(mode, err)
 
-		_, err := erasure.EncodeFile(ctx, filePath)
+		_, err := erasure.EncodeFile(filePath)
 		failOnErr(mode, err)
 		err = erasure.writeConfig()
 		failOnErr(mode, err)
