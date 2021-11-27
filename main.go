@@ -48,6 +48,8 @@ func main() {
 		failOnErr(mode, err)
 		err = erasure.update(filePath, filePath)
 		failOnErr(mode, err)
+		err = erasure.writeConfig()
+		failOnErr(mode, err)
 	// case "recover":
 	// 	//recover all the blocks of a disk and put the recovered result to new path
 	// 	e.readConfig()
