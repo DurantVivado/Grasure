@@ -12,8 +12,9 @@ import (
 
 func (e *Erasure) EncodeFile(filename string) (*FileInfo, error) {
 	baseFileName := filepath.Base(filename)
-	if _, ok := e.fileMap[baseFileName]; ok {
-		return nil, fmt.Errorf("the file %s has already been in HDR file system, you should update instead of encoding", baseFileName)
+	if _, ok := e.fileMap[baseFileName]; ok && !override {
+		return nil, fmt.Errorf("the file %s has already been in the file system, if you wish to override, please attach `-o`",
+			baseFileName)
 	}
 	f, err := os.Open(filename)
 	if err != nil {
@@ -83,7 +84,7 @@ func (e *Erasure) EncodeFile(filename string) (*FileInfo, error) {
 	nextStripe := 0
 	//allocate the memory pool only when needed
 	e.dataBlobPool.New = func() interface{} {
-		out := make([][]byte, conStripes)
+		out := make([][]byte, e.conStripes)
 		for i := range out {
 			out[i] = make([]byte, e.dataStripeSize)
 		}

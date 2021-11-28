@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sync"
 	"sync/atomic"
 
 	"github.com/DurantVivado/reedsolomon"
@@ -29,6 +30,7 @@ func (e *Erasure) readFile(filename string, savepath string) error {
 	ifs := make([]*os.File, diskNum)
 	erg := new(errgroup.Group)
 	diskFailList := make(map[int]bool)
+	var mu sync.Mutex
 	for i, disk := range e.diskInfos {
 		i := i
 		disk := disk
@@ -36,7 +38,9 @@ func (e *Erasure) readFile(filename string, savepath string) error {
 			folderPath := filepath.Join(disk.diskPath, baseFileName)
 			blobPath := filepath.Join(folderPath, "BLOB")
 			if !disk.available {
+				mu.Lock()
 				diskFailList[i] = true
+				mu.Unlock()
 				return &DiskError{disk.diskPath, " available flag set false"}
 			}
 			ifs[i], err = os.Open(blobPath)
@@ -83,12 +87,13 @@ func (e *Erasure) readFile(filename string, savepath string) error {
 	nextStripe := 0
 	//allocate stripe-size pool if and only if needed
 	e.allBlobPool.New = func() interface{} {
-		out := make([][]byte, conStripes)
+		out := make([][]byte, e.conStripes)
 		for i := range out {
 			out[i] = make([]byte, e.allStripeSize)
 		}
 		return &out
 	}
+
 	for blob := 0; blob < numBlob; blob++ {
 		if stripeCnt+e.conStripes > stripeNum {
 			nextStripe = stripeNum - stripeCnt
@@ -101,7 +106,7 @@ func (e *Erasure) readFile(filename string, savepath string) error {
 			s := s
 			stripeNo := stripeCnt + s
 			// offset := int64(subCnt) * e.allStripeSize
-			func() error {
+			eg.Go(func() error {
 				erg := e.errgroupPool.Get().(*errgroup.Group)
 				defer e.errgroupPool.Put(erg)
 				//read all blocks in parallel
@@ -172,7 +177,7 @@ func (e *Erasure) readFile(filename string, savepath string) error {
 					return err
 				}
 				return err
-			}()
+			})
 
 		}
 		e.allBlobPool.Put(&blobBuf)

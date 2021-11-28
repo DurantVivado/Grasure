@@ -4,6 +4,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"math/rand"
 	"os"
 	"testing"
@@ -59,13 +60,6 @@ var bigFilePaths = []string{
 	"./test/file.16G",
 }
 
-// func TestInit(t *testing.T) {
-
-// 	err = testEC.initHDR()
-// 	if err != nil {
-// 		t.Fatal(err)
-// 	}
-// }
 func generateRandomFileSize(minSize, maxSize int64, num int) []int64 {
 	out := make([]int64, num)
 	for i := 0; i < num; i++ {
@@ -93,6 +87,27 @@ func generateRandomFileBySize(filename string, fileSize int64) error {
 	}
 	return nil
 }
+
+func deleteTempFiles(tempFileSizes []int64) {
+	for _, fileSize := range tempFileSizes {
+		inpath := fmt.Sprintf("./test/temp-%d", fileSize)
+		outpath := fmt.Sprintf("./output/temp-%d", fileSize)
+		if ex, _ := PathExist(inpath); !ex {
+			continue
+		}
+		err = os.Remove(inpath)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if ex, _ := PathExist(outpath); !ex {
+			continue
+		}
+		err = os.Remove(outpath)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+}
 func TestEncodeDecode(t *testing.T) {
 	//we generate temp data and encode it into real storage sytem
 	//after that, all temporary file should be deleted
@@ -109,22 +124,10 @@ func TestEncodeDecode(t *testing.T) {
 		replicateFactor: 3,
 		conStripes:      100,
 	}
+	override = true
 	rand.Seed(100000007)
 	tempFileSizes := generateRandomFileSize(1*KiB, 1*MiB, 100)
-	defer func() {
-		for _, fileSize := range tempFileSizes {
-			inpath := fmt.Sprintf("./test/temp-%d", fileSize)
-			if ex, err := PathExist(inpath); !ex && err == nil {
-				return
-			} else if err != nil {
-				t.Fatal(err)
-			}
-			err = os.Remove(inpath)
-			if err != nil {
-				t.Fatal(err)
-			}
-		}
-	}()
+	defer deleteTempFiles(tempFileSizes)
 	err = testEC.readDiskPath()
 	if err != nil {
 		t.Fatal(err)
@@ -137,11 +140,11 @@ func TestEncodeDecode(t *testing.T) {
 			testEC.M = m
 			for N := k + m; N <= totalDisk; N++ {
 				testEC.diskInfos = totalDiskInfo[:N]
-				for _, blockSize := range blockSizesV1 {
-					testEC.BlockSize = blockSize
+				for _, bs := range blockSizesV1 {
+					testEC.BlockSize = bs
 					err = testEC.resetSystem()
 					if err != nil {
-						t.Fatal(err)
+						t.Fatalf("k:%d,m:%d,bs:%d,N:%d,%s\n", k, m, bs, N, err.Error())
 					}
 					for _, fileSize := range tempFileSizes {
 						//system-level paras
@@ -149,43 +152,47 @@ func TestEncodeDecode(t *testing.T) {
 						outpath := fmt.Sprintf("./output/temp-%d", fileSize)
 						err = generateRandomFileBySize(inpath, fileSize)
 						if err != nil {
-							t.Fatal(err)
+							t.Errorf("k:%d,m:%d,bs:%d,N:%d,%s\n", k, m, bs, N, err.Error())
 						}
 
 						// t.Logf("k:%d,m:%d fails when fileSize is %d, for %s", k, m, fileSize, err.Error())
 						err = testEC.readConfig()
 						if err != nil {
-							t.Fatal(err)
+							t.Errorf("k:%d,m:%d,bs:%d,N:%d,%s\n", k, m, bs, N, err.Error())
 						}
 						_, err := testEC.EncodeFile(inpath)
 						if err != nil {
-							t.Fatalf("k:%d,m:%d,bs:%d encode fails when fileSize is %d, for %s", k, m, blockSize, fileSize, err.Error())
+							t.Errorf("k:%d,m:%d,bs:%d encode fails when fileSize is %d, for %s", k, m, blockSize, fileSize, err.Error())
 						}
-						err = erasure.writeConfig()
+						err = testEC.writeConfig()
 						if err != nil {
-							t.Fatal(err)
+							t.Errorf("k:%d,m:%d,bs:%d,N:%d,%s\n", k, m, bs, N, err.Error())
 						}
-						err = erasure.updateConfigReplica()
+						err = testEC.updateConfigReplica()
 						if err != nil {
-							t.Fatal(err)
+							t.Errorf("k:%d,m:%d,bs:%d,N:%d,%s\n", k, m, bs, N, err.Error())
 						}
 
 						//simulate failure of disks
-						for fail := 0; fail < m; fail++ {
-							erasure.destroy("diskFail", fail)
-							err = erasure.readFile(inpath, outpath)
-							if err != nil {
-								t.Fatalf("k:%d,m:%d,bs:%d read fails when fileSize is %d, for %s", k, m, blockSize, fileSize, err.Error())
-							}
-
+						// for fail := 0; fail <= m; fail++ {
+						// fail := 0
+						// testEC.destroy("diskFail", fail)
+						// err = testEC.readConfig()
+						// if err != nil {
+						// 	t.Errorf("k:%d,m:%d,bs:%d,N:%d,%s\n", k, m, bs, N, err.Error())
+						// }
+						err = testEC.readFile(inpath, outpath)
+						if err != nil {
+							t.Errorf("k:%d,m:%d,bs:%d read fails when fileSize is %d, for %s", k, m, blockSize, fileSize, err.Error())
 						}
 
 						//evaluate the results
 						if ok, err := checkFileIfSame(inpath, outpath); !ok && err != nil {
-							t.Errorf("k:%d,m:%d,bs:%d read fails when fileSize is %d, for hash check fail", k, m, blockSize, fileSize)
+							t.Fatalf("k:%d,m:%d,bs:%d read fails when fileSize is %d, for hash check fail", k, m, blockSize, fileSize)
 						} else if err != nil {
-							t.Errorf("k:%d,m:%d,bs:%d read fails when fileSize is %d, for %s", k, m, blockSize, fileSize, err.Error())
+							t.Fatalf("k:%d,m:%d,bs:%d read fails when fileSize is %d, for %s", k, m, blockSize, fileSize, err.Error())
 						}
+						// }
 					}
 				}
 			}

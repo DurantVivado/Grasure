@@ -1,6 +1,6 @@
 # Grasure
 
-Simplified Erasure Coding Architecture in Go
+Universal Erasure Coding Architecture in Go
 Implementing most popular erasured-based filesystem operations, it's readily used and integrated into other filesystems. 
 
 Project home: https://github.com/DurantVivado/Grasure
@@ -29,7 +29,8 @@ import:
 [reedsolomon library](https://github.com/klauspost/reedsolomon)
 
 
-## Usage
+## CLI Usage
+A complete demonstration of various CLI usage lies in `buildAndRun.sh`.
 0. Build the project:
 ```
 go build -o grasure erasure-*.go main.go
@@ -79,6 +80,8 @@ sha256sum {source file path}
 ```
 sha256sum {destination file path}
 ```
+## API
+If you want to integrate Grasure into your own system. You can refer to examples in `./Examples`. Let's give a brief introduction.
 
 ## Storage System Structure
 We display the structure of storage system using `tree` command. As shown below, each `file` is encoded and split into `k`+`m` parts then saved in `N` disks. Every part named `BLOB` is placed into a folder with the same basename of `file`. And the system's metadata (e.g., filename, filesize, filehash and file distribution) is recorded in META. Concerning reliability, we replicate the `META` file K-fold.(K is uppercased and not equal to aforementioned `k`). It functions as the  general erasure-coding experiment settings and easily integrated into other systems.
