@@ -1,8 +1,8 @@
 #!/bin/bash
-file=Goprogramming.pdf
+file=temp-184537
 go build -o grasure erasure-*.go main.go
 # init the system
-# ./grasure -md init -k 12 -m 4 -bs 4096
+./grasure -md init -k 2 -m 1 -bs 1024
 
 # A loopback system
 ./grasure -md encode -f test/$file -conStripes 100 -o

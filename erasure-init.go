@@ -39,30 +39,48 @@ func (e *Erasure) readDiskPath() error {
 }
 
 //initiate the erasure-coded system
-func (e *Erasure) initHDR() error {
+func (e *Erasure) initSystem(assume bool) error {
 	fmt.Println("Warning: you are intializing a new erasure-coded system, which means the previous data will also be reset.")
-	if ans, err := consultUserBeforeAction(); !ans && err == nil {
-		return nil
-	} else if err != nil {
-		return err
+	if !assume {
+		if ans, err := consultUserBeforeAction(); !ans && err == nil {
+			return nil
+		} else if err != nil {
+			return err
+		}
 	}
 	e.K = k
 	e.M = m
+	e.BlockSize = blockSize
 	if e.K <= 0 || e.M <= 0 {
-		failOnErr(mode, reedsolomon.ErrInvShardNum)
+		return reedsolomon.ErrInvShardNum
 	}
 	//The reedsolomon library only implements GF(2^8) and will be improved later
 	if e.K+e.M > 256 {
-		failOnErr(mode, reedsolomon.ErrMaxShardNum)
+		return reedsolomon.ErrMaxShardNum
 	}
-	e.BlockSize = blockSize
+	if e.K+e.M > len(e.diskInfos) {
+		return ErrTooFewDisks
+	}
+	//replicate the config files
+	if replicateFactor < 0 {
+		return ErrNegativeReplicateFactor
+	}
+	e.replicateFactor = replicateFactor
 	err = e.readDiskPath()
 	if err != nil {
 		return err
 	}
-	if e.K+e.M > len(e.diskInfos) {
-		failOnErr(mode, ErrTooFewDisks)
+	err = e.resetSystem()
+	if err != nil {
+		return err
 	}
+
+	fmt.Printf("System init!\n Erasure parameters: dataShards:%d, parityShards:%d,blocksize:%d\n",
+		k, m, blockSize)
+	return nil
+}
+
+func (e *Erasure) resetSystem() error {
 	//we persist meta info info in hard drives
 	err = e.writeConfig()
 	if err != nil {
@@ -74,16 +92,11 @@ func (e *Erasure) initHDR() error {
 	if err != nil {
 		return err
 	}
-	//replicate the config files
-	if replicateFactor < 0 {
-		return ErrNegativeReplicateFactor
-	}
-	err = e.replicateConfig(replicateFactor)
+
+	err = e.replicateConfig(e.replicateFactor)
 	if err != nil {
 		return err
 	}
-	fmt.Printf("System init!\n Erasure parameters: dataShards:%d, parityShards:%d,blocksize:%d\n",
-		k, m, blockSize)
 	return nil
 }
 
@@ -136,7 +149,9 @@ func (e *Erasure) readConfig() error {
 	// e.K = int(k)
 	// e.M = int(m)
 	// e.BlockSize = blockSize
-	e.conStripes = conStripes
+	if conStripes > 0 {
+		e.conStripes = conStripes
+	}
 	//initialize the ReedSolomon Code
 	e.enc, err = reedsolomon.New(e.K, e.M,
 		reedsolomon.WithAutoGoroutines(int(e.BlockSize)),

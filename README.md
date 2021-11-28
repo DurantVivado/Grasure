@@ -2,7 +2,9 @@
 
 Simplified Erasure Coding Architecture in Go
 Implementing most popular erasured-based filesystem operations, it's readily used and integrated into other filesystems. 
+
 Project home: https://github.com/DurantVivado/Grasure
+
 Godoc: -
 
 

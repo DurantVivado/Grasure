@@ -23,7 +23,7 @@ func main() {
 	start := time.Now()
 	switch mode {
 	case "init":
-		err = erasure.initHDR()
+		err = erasure.initSystem(false)
 		failOnErr(mode, err)
 	case "read":
 		//read a file

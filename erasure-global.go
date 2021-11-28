@@ -30,23 +30,24 @@ type DiskInfo struct {
 }
 
 type Erasure struct {
-	K              int                       `json:"dataShards"`   // the number of data blocks in a stripe
-	M              int                       `json:"parityShards"` // the number of parity blocks in a stripe
-	BlockSize      int64                     `json:"blockSize"`    // the block size. default to 4KiB
-	FileMeta       []*FileInfo               `json:"FileLists"`
-	conStripes     int                       //how many stripes are allowed to encode/decode concurrently
-	sEnc           reedsolomon.StreamEncoder // the reedsolomon streaming encoder, for streaming access
-	enc            reedsolomon.Encoder       // the reedsolomon encoder, for block access
-	dataStripeSize int64                     //the data stripe size, equal to k*bs
-	allStripeSize  int64                     //the data plus parity stripe size, equal to (k+m)*bs
-	diskInfos      []*DiskInfo               // disk paths
-	configFile     string                    // configure file
-	fileMap        map[string]*FileInfo      // File info lists
-	diskFilePath   string                    // the path of file recording all disks path
-	dataBlobPool   sync.Pool                 // memory pool for conStripes data  access
-	allBlobPool    sync.Pool                 // memory pool for conStripes stripe access
-	errgroupPool   sync.Pool                 //errgroup pool
-	blockPool      sync.Pool                 //the pool for block-size access
+	K               int                       `json:"dataShards"`   // the number of data blocks in a stripe
+	M               int                       `json:"parityShards"` // the number of parity blocks in a stripe
+	BlockSize       int64                     `json:"blockSize"`    // the block size. default to 4KiB
+	FileMeta        []*FileInfo               `json:"FileLists"`
+	conStripes      int                       //how many stripes are allowed to encode/decode concurrently
+	replicateFactor int                       // the replication factor for config file
+	sEnc            reedsolomon.StreamEncoder // the reedsolomon streaming encoder, for streaming access
+	enc             reedsolomon.Encoder       // the reedsolomon encoder, for block access
+	dataStripeSize  int64                     //the data stripe size, equal to k*bs
+	allStripeSize   int64                     //the data plus parity stripe size, equal to (k+m)*bs
+	diskInfos       []*DiskInfo               // disk paths
+	configFile      string                    // configure file
+	fileMap         map[string]*FileInfo      // File info lists
+	diskFilePath    string                    // the path of file recording all disks path
+	dataBlobPool    sync.Pool                 // memory pool for conStripes data  access
+	allBlobPool     sync.Pool                 // memory pool for conStripes stripe access
+	errgroupPool    sync.Pool                 //errgroup pool
+	blockPool       sync.Pool                 //the pool for block-size access
 }
 type FileInfo struct {
 	FileName      string  `json:"fileName"` //file name

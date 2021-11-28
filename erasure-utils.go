@@ -227,7 +227,7 @@ func stringToSlice2D(s string) [][]int {
 	return out
 }
 
-//copfile
+//copyfile
 func copyFile(srcFile, destFile string) (int64, error) {
 	file1, err := os.Open(srcFile)
 	if err != nil {
