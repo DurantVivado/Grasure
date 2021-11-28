@@ -15,6 +15,7 @@ var ErrFileNotFound = errors.New("file not found")
 var ErrSurvivalNotEnoughForDecoding = errors.New("the failed block number exceeds fault tolerance, data renders unrecoverable")
 var ErrFileIncompleted = errors.New("file hash check fails, file renders incompleted")
 var ErrFailModeNotRecognized = errors.New("the fail mode is not recognizable, please specify in \"diskFail\" or \"bitRot\"")
+var ErrNegativeReplicateFactor = errors.New("the replicate factor MUST be non-negative")
 
 type DiskError struct {
 	diskPath string

@@ -39,12 +39,12 @@ func (e *Erasure) readDiskPath() error {
 }
 
 //initiate the erasure-coded system
-func (e *Erasure) initHDR() {
+func (e *Erasure) initHDR() error {
 	fmt.Println("Warning: you are intializing a new erasure-coded system, which means the previous data will also be reset.")
-	if ans, err := consultUserBeforeAction(); !ans {
-		return
+	if ans, err := consultUserBeforeAction(); !ans && err == nil {
+		return nil
 	} else if err != nil {
-		failOnErr(mode, err)
+		return err
 	}
 	e.K = k
 	e.M = m
@@ -57,18 +57,34 @@ func (e *Erasure) initHDR() {
 	}
 	e.BlockSize = blockSize
 	err = e.readDiskPath()
-	failOnErr(mode, err)
+	if err != nil {
+		return err
+	}
 	if e.K+e.M > len(e.diskInfos) {
 		failOnErr(mode, ErrTooFewDisks)
 	}
-	//we persit meta info info in hard drives
+	//we persist meta info info in hard drives
 	err = e.writeConfig()
-	failOnErr(mode, err)
+	if err != nil {
+		return err
+	}
+
 	//delete the data blocks under all diskPath
 	err = e.reset()
-	failOnErr(mode, err)
+	if err != nil {
+		return err
+	}
+	//replicate the config files
+	if replicateFactor < 0 {
+		return ErrNegativeReplicateFactor
+	}
+	err = e.replicateConfig(replicateFactor)
+	if err != nil {
+		return err
+	}
 	fmt.Printf("System init!\n Erasure parameters: dataShards:%d, parityShards:%d,blocksize:%d\n",
 		k, m, blockSize)
+	return nil
 }
 
 //disk status
@@ -90,7 +106,7 @@ func (e *Erasure) readConfig() error {
 	if ex, err := PathExist(e.configFile); !ex && err == nil {
 		// we try to recover the config file from the storage system
 		// which renders the last chance to heal
-		err = e.rebuildConfig(e.configFile)
+		err = e.rebuildConfig()
 		if err != nil {
 			return ErrConfFileNotExist
 		}
@@ -104,7 +120,18 @@ func (e *Erasure) readConfig() error {
 	}
 	err = json.Unmarshal(data, &e)
 	if err != nil {
-		return err
+		err = e.rebuildConfig()
+		if err != nil {
+			return ErrConfFileNotExist
+		}
+		data, err := ioutil.ReadFile(e.configFile)
+		if err != nil {
+			return err
+		}
+		err = json.Unmarshal(data, &e)
+		if err != nil {
+			return err
+		}
 	}
 	// e.K = int(k)
 	// e.M = int(m)
@@ -161,7 +188,7 @@ func (e *Erasure) readConfig() error {
 func (e *Erasure) replicateConfig(k int) error {
 	diskNum := len(e.diskInfos)
 	selectDisk := genRandomArr(diskNum, 0)[:k]
-	for i := range selectDisk {
+	for _, i := range selectDisk {
 		disk := e.diskInfos[i]
 		replicaPath := filepath.Join(disk.diskPath, "META")
 		_, err = copyFile(e.configFile, replicaPath)
@@ -197,24 +224,44 @@ func (e *Erasure) writeConfig() error {
 	}
 	buf.Flush()
 	f.Sync()
-	err = e.replicateConfig(replicateFactor)
-	if err != nil {
-		return err
-	}
+
 	return nil
 }
 
 //reconstruct the config file if possible
-func (e *Erasure) rebuildConfig(restorePath string) error {
+func (e *Erasure) rebuildConfig() error {
 	//we read file meta in the disk path and try to rebuild the config file
-	for i := range e.diskFilePath {
+	for i := range e.diskInfos {
 		disk := e.diskInfos[i]
 		replicaPath := filepath.Join(disk.diskPath, "META")
+		if ok, err := PathExist(replicaPath); !ok && err == nil {
+			continue
+		}
 		_, err = copyFile(replicaPath, e.configFile)
 		if err != nil {
 			return err
 		}
 		break
+	}
+	return nil
+}
+
+//update the config file of all replica
+func (e *Erasure) updateConfigReplica() error {
+	//we read file meta in the disk path and try to rebuild the config file
+	if replicateFactor < 1 {
+		return nil
+	}
+	for i := range e.diskInfos {
+		disk := e.diskInfos[i]
+		replicaPath := filepath.Join(disk.diskPath, "META")
+		if ok, err := PathExist(replicaPath); !ok && err == nil {
+			continue
+		}
+		_, err = copyFile(e.configFile, replicaPath)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }

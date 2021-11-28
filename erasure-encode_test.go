@@ -45,7 +45,7 @@ var bigFilePaths = []string{
 	"./test/file.16G",
 }
 
-func TestEncode4096(t *testing.T) {
+func TestEncode(t *testing.T) {
 	//we generate temp data and encode it into real storage sytem
 	//after that, all temporary file should be deleted
 	//fileSize:
@@ -57,6 +57,7 @@ func TestEncode4096(t *testing.T) {
 	testEC := &Erasure{
 		BlockSize: 4096,
 	}
+	err = testEC.readConfig()
 	for _, fileSize := range fileSizes {
 		//system-level paras
 		fileSize := fileSize
@@ -75,7 +76,7 @@ func TestEncode4096(t *testing.T) {
 			for _, m := range parityShards {
 				testEC.K = k
 				testEC.M = m
-				t.Logf("k:%d,m:%d fails when fileSize is %d, for %s", k, m, fileSize, err.Error())
+				// t.Logf("k:%d,m:%d fails when fileSize is %d, for %s", k, m, fileSize, err.Error())
 
 				_, err := testEC.EncodeFile(tempFile)
 				if err != nil {

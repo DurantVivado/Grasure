@@ -234,7 +234,7 @@ func copyFile(srcFile, destFile string) (int64, error) {
 		return 0, err
 	}
 	defer file1.Close()
-	file2, err := os.OpenFile(destFile, os.O_WRONLY|os.O_CREATE, os.ModePerm)
+	file2, err := os.OpenFile(destFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, os.ModePerm)
 	if err != nil {
 		return 0, err
 	}

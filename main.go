@@ -23,7 +23,8 @@ func main() {
 	start := time.Now()
 	switch mode {
 	case "init":
-		erasure.initHDR()
+		err = erasure.initHDR()
+		failOnErr(mode, err)
 	case "read":
 		//read a file
 		err = erasure.readConfig()
@@ -36,10 +37,11 @@ func main() {
 		//We are entering the encoding mode, and for brevity,we only encode one filePath
 		err = erasure.readConfig()
 		failOnErr(mode, err)
-
 		_, err := erasure.EncodeFile(filePath)
 		failOnErr(mode, err)
 		err = erasure.writeConfig()
+		failOnErr(mode, err)
+		err = erasure.updateConfigReplica()
 		failOnErr(mode, err)
 	case "update":
 		//update an old file according to a new file

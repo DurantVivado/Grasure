@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"io"
 	"log"
 	"os"
@@ -11,9 +12,8 @@ import (
 
 func (e *Erasure) EncodeFile(filename string) (*FileInfo, error) {
 	baseFileName := filepath.Base(filename)
-	if _, ok := e.fileMap[baseFileName]; ok && !override {
-		log.Fatalf("the file %s has already been in HDR file system, you should update instead of encoding", baseFileName)
-		return nil, nil
+	if _, ok := e.fileMap[baseFileName]; ok {
+		return nil, fmt.Errorf("the file %s has already been in HDR file system, you should update instead of encoding", baseFileName)
 	}
 	f, err := os.Open(filename)
 	if err != nil {
@@ -151,17 +151,11 @@ func (e *Erasure) EncodeFile(filename string) (*FileInfo, error) {
 	for i := range of {
 		of[i].Close()
 	}
-
-	for i := range of {
-		of[i].Close()
-	}
 	//record the file meta
 	//transform map into array for json marshaling
 
 	e.fileMap[baseFileName] = fi
-	for _, v := range e.fileMap {
-		e.FileMeta = append(e.FileMeta, v)
-	}
+	e.FileMeta = append(e.FileMeta, fi)
 	log.Println(baseFileName, " successfully encoded. encoding size ", e.stripedFileSize(fileSize), "bytes")
 	return fi, nil
 }

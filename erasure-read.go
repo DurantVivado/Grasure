@@ -51,7 +51,7 @@ func (e *Erasure) readFile(filename string, savepath string) error {
 		})
 	}
 	if err := erg.Wait(); err != nil {
-		log.Printf("read failed %s:", err.Error())
+		log.Printf("%s", err.Error())
 	}
 	defer func() {
 		for i := 0; i < diskNum; i++ {
@@ -64,7 +64,7 @@ func (e *Erasure) readFile(filename string, savepath string) error {
 		//the disk renders inrecoverable
 		return ErrTooFewDisks
 	}
-	if int(alive) == e.K+e.M {
+	if int(alive) == diskNum {
 		log.Println("start reading blocks")
 	} else {
 		log.Println("start reconstructing blocks")
