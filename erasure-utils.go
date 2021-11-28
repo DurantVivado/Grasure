@@ -226,3 +226,18 @@ func stringToSlice2D(s string) [][]int {
 	}
 	return out
 }
+
+//copfile
+func copyFile(srcFile, destFile string) (int64, error) {
+	file1, err := os.Open(srcFile)
+	if err != nil {
+		return 0, err
+	}
+	defer file1.Close()
+	file2, err := os.OpenFile(destFile, os.O_WRONLY|os.O_CREATE, os.ModePerm)
+	if err != nil {
+		return 0, err
+	}
+	defer file2.Close()
+	return io.Copy(file2, file1)
+}

@@ -2,7 +2,7 @@
 file=Goprogramming.pdf
 go build -o grasure erasure-*.go main.go
 # init the system
-./grasure -md init -k 12 -m 4 -bs 4096
+./grasure -md init -k 9 -m 3 -bs 1048576
 
 # A loopback system
 ./grasure -md encode -f test/$file -conStripes 100 -o

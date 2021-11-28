@@ -17,11 +17,15 @@ Godoc: -
 
 - `erasure-encode.go` contains operation for striped file encoding, one great thing is that you could specify the data layout. 
 
-- `erasure-encode.go` contains operation for striped file encoding, you could specific the layout. 
+- `erasure-layout.go` You could specific the layout, for example, random data distribution or some other heuristics. 
 
 - `erasure-read.go` contains operation for striped file reading, if some parts are lost, we try to recover.
 
+<<<<<<< HEAD
 - `erasure-update.go` contains operation for striped file updating, if some parts are lost, we try to recover.
+=======
+- `erasure-errors.go` contains the definitions for various possible errors.
+>>>>>>> 774227feac6f28285a1e4a58ab7f043b0f4399b9
 
 import:
 [reedsolomon library](https://github.com/klauspost/reedsolomon)
@@ -82,6 +86,62 @@ sha256sum {destination file path}
 6. update the examplar file.
 ```
 ./grasure -md update -f {source file path}
+## Storage System Structure
+We display the structure of storage system using `tree` command. As shown below, each `file` is encoded and split into `k`+`m` parts then saved in `N` disks. Every part named `BLOB` is placed into a folder with the same basename of `file`. And the system's metadata (e.g., filename, filesize, filehash and file distribution) is recorded in META. Concerning reliability, we replicate the `META` file K-fold.(K is uppercased and not equal to aforementioned `k`). It functions as the  general erasure-coding experiment settings and easily integrated into other systems.
+It currently suppports `encode`, `read`, `update`, and more coming soon.
+ ```
+ server1@ubuntu:~/data$ sudo tree . -Rh
+.
+├── [4.0K]  data1
+│   ├── [4.0K]  Goprogramming.pdf
+│   │   └── [1.3M]  BLOB
+│   └── [ 46K]  META
+├── [4.0K]  data10
+│   └── [4.0K]  Goprogramming.pdf
+│       └── [1.4M]  BLOB
+├── [4.0K]  data11
+│   └── [4.0K]  Goprogramming.pdf
+│       └── [1.4M]  BLOB
+├── [4.0K]  data12
+│   └── [4.0K]  Goprogramming.pdf
+│       └── [1.4M]  BLOB
+├── [4.0K]  data13
+│   └── [4.0K]  Goprogramming.pdf
+│       └── [1.4M]  BLOB
+├── [4.0K]  data14
+│   └── [4.0K]  Goprogramming.pdf
+│       └── [1.4M]  BLOB
+├── [4.0K]  data15
+│   └── [4.0K]  Goprogramming.pdf
+│       └── [1.4M]  BLOB
+├── [4.0K]  data16
+│   └── [4.0K]  Goprogramming.pdf
+│       └── [1.4M]  BLOB
+├── [4.0K]  data17
+│   └── [4.0K]  Goprogramming.pdf
+│       └── [1.4M]  BLOB
+├── [4.0K]  data18
+│   └── [4.0K]  Goprogramming.pdf
+│       └── [1.4M]  BLOB
+├── [4.0K]  data19
+│   └── [4.0K]  Goprogramming.pdf
+│       └── [1.4M]  BLOB
+├── [4.0K]  data2
+│   ├── [4.0K]  Goprogramming.pdf
+│   │   └── [1.4M]  BLOB
+│   └── [ 46K]  META
+├── [4.0K]  data20
+│   └── [4.0K]  Goprogramming.pdf
+│       └── [1.5M]  BLOB
+├── [4.0K]  data21
+│   └── [4.0K]  Goprogramming.pdf
+│       └── [1.4M]  BLOB
+├── [4.0K]  data22
+│   └── [4.0K]  Goprogramming.pdf
+│       └── [1.3M]  BLOB
+├── [4.0K]  data23
+│   └── [4.0K]  Goprogramming.pdf
+│       └── [1.4M]  BLOB
 ```
 
 

@@ -76,6 +76,7 @@ var (
 	conWrites         bool
 	conReads          bool
 	conStripes        int
+	replicateFactor   int
 )
 
 //the parameter lists, with fullname or abbreviation
@@ -121,6 +122,9 @@ func flag_init() {
 
 	flag.IntVar(&failNum, "fn", 0, "simulate multiple disk failure, provides the fail number of disks")
 	flag.IntVar(&failNum, "failNum", 0, "simulate multiple disk failure, provides the fail number of disks")
+
+	flag.IntVar(&replicateFactor, "rf", 3, "the meta data is replicated `rf`- fold to provide enough reliability, default is 3-fold")
+	flag.IntVar(&replicateFactor, "replicateFactor", 3, "the meta data is replicated `rf`- fold to provide enough reliability, default is 3-fold")
 
 	flag.IntVar(&conStripes, "cs", 100, "how many stripes are allowed to encode/decode concurrently")
 	flag.IntVar(&conStripes, "conStripes", 100, "how many stripes are allowed to encode/decode concurrently")
