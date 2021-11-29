@@ -142,18 +142,21 @@ func (e *Erasure) update(oldFile, newFile string) error {
 				// read old data shards
 				// fmt.Println("old")
 				eg.Go(func() error {
+					No := stripeNo
+					s := s
 					erg := e.errgroupPool.Get().(*errgroup.Group)
 					defer e.errgroupPool.Put(erg)
 					for i := 0; i < e.K+e.M; i++ {
 						i := i
 						erg.Go(func() error {
 							a := i
-							diskID := dist[stripeNo][a]
+							s := s
+							diskID := dist[No][a]
 							disk := e.diskInfos[diskID]
 							if !disk.available {
 								return nil
 							}
-							offset := fi.blockToOffset[stripeNo][a]
+							offset := fi.blockToOffset[No][a]
 							_, err := ifs[diskID].ReadAt(oldBlobBuf[s][int64(a)*e.BlockSize:int64(a+1)*e.BlockSize],
 								int64(offset)*e.BlockSize)
 							if err != nil && err != io.EOF {
@@ -232,11 +235,12 @@ func (e *Erasure) update(oldFile, newFile string) error {
 							copy(newBlock, newData[i])
 						}
 						erg.Go(func() error {
-							diskID := fi.Distribution[stripeNo][i]
-							if i < e.K {
-								fmt.Println("old ", string(newBlock))
-							}
-							_, err := ifs[diskID].WriteAt(newBlock, int64(stripeCnt+s)*e.BlockSize)
+							diskID := fi.Distribution[No][i]
+							offset := fi.blockToOffset[No][i]
+							// if i < e.K {
+							// 	fmt.Println("old ", string(newBlock), "stripeNo ", No, "offset ", string(offset))
+							// }
+							_, err := ifs[diskID].WriteAt(newBlock, int64(offset)*e.BlockSize)
 							if err != nil {
 								return err
 							}
@@ -253,6 +257,7 @@ func (e *Erasure) update(oldFile, newFile string) error {
 				// fmt.Println("new")
 				eg.Go(func() error {
 					stripeCnt := stripeNo
+					s := s
 					offset := int64(stripeCnt) * e.dataStripeSize
 					_, err = nf.ReadAt(newBlobBuf[s], offset)
 					if err != nil && err != io.EOF {
@@ -274,9 +279,9 @@ func (e *Erasure) update(oldFile, newFile string) error {
 							a := i
 							diskID := fi.Distribution[stripeCnt][a]
 							writeOffset := fi.blockToOffset[stripeCnt][a]
-							if i < e.K {
-								fmt.Println("new ", string(newData[a]))
-							}
+							// if i < e.K {
+							// 	fmt.Println("new ", string(newData[a]))
+							// }
 							_, err := ifs[diskID].WriteAt(newData[a], int64(writeOffset)*e.BlockSize)
 							if err != nil {
 								return err
