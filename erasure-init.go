@@ -163,6 +163,7 @@ func (e *Erasure) readConfig() error {
 	if err != nil {
 		return err
 	}
+	e.DiskNum = len(e.diskInfos)
 	e.dataStripeSize = int64(e.K) * e.BlockSize
 	e.allStripeSize = int64(e.K+e.M) * e.BlockSize
 

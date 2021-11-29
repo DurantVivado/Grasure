@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"path/filepath"
 
@@ -46,8 +45,7 @@ func (e *Erasure) EncodeFile(filename string) (*FileInfo, error) {
 	//and for stripes of the same disk, we concatenate all blocks to create the sole file
 	//for accelerating, we start multiple goroutines
 	//The last stripe will be refilled with zeros
-	diskNum := len(e.diskInfos)
-	of := make([]*os.File, diskNum)
+	of := make([]*os.File, e.DiskNum)
 	//first open relevant file resources
 	erg := new(errgroup.Group)
 	//save the blob
@@ -83,17 +81,18 @@ func (e *Erasure) EncodeFile(filename string) (*FileInfo, error) {
 	//for every conStripe stripes, we set one goroutine
 	nextStripe := 0
 	//allocate the memory pool only when needed
-	e.dataBlobPool.New = func() interface{} {
-		out := make([][]byte, e.conStripes)
-		for i := range out {
-			out[i] = make([]byte, e.dataStripeSize)
-		}
-		return &out
-	}
+	// e.dataBlobPool.New = func() interface{} {
+	// 	out := make([][]byte, e.conStripes)
+	// 	for i := range out {
+	// 		out[i] = make([]byte, e.dataStripeSize)
+	// 	}
+	// 	return &out
+	// }
 	//we make layout independent of encoding and user-friendly
 	//all described in erasure-layout.go
 
 	e.generateLayout(fi)
+	blobBuf := makeArr2DByte(e.conStripes, int(e.dataStripeSize))
 	for blob := 0; blob < numBlob; blob++ {
 		if stripeCnt+e.conStripes > stripeNum {
 			nextStripe = stripeNum - stripeCnt
@@ -101,7 +100,7 @@ func (e *Erasure) EncodeFile(filename string) (*FileInfo, error) {
 			nextStripe = e.conStripes
 		}
 		eg := e.errgroupPool.Get().(*errgroup.Group)
-		blobBuf := *e.dataBlobPool.Get().(*[][]byte)
+		// blobBuf := *e.dataBlobPool.Get().(*[][]byte)
 		for s := 0; s < nextStripe; s++ {
 			s := s
 			offset := int64(stripeCnt+s) * e.dataStripeSize
@@ -145,7 +144,7 @@ func (e *Erasure) EncodeFile(filename string) (*FileInfo, error) {
 			return nil, err
 		}
 		e.errgroupPool.Put(eg)
-		e.dataBlobPool.Put(&blobBuf)
+		// e.dataBlobPool.Put(&blobBuf)
 		stripeCnt += nextStripe
 
 	}
@@ -157,7 +156,7 @@ func (e *Erasure) EncodeFile(filename string) (*FileInfo, error) {
 
 	e.fileMap[baseFileName] = fi
 	e.FileMeta = append(e.FileMeta, fi)
-	log.Println(baseFileName, " successfully encoded. encoding size ", e.stripedFileSize(fileSize), "bytes")
+	// log.Println(baseFileName, " successfully encoded. encoding size ", e.stripedFileSize(fileSize), "bytes")
 	return fi, nil
 }
 

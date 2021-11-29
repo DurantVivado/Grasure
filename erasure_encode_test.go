@@ -25,16 +25,6 @@ var parityShards = []int{
 	1, 2, 3, 4,
 }
 
-type encodeTest []struct {
-	dataBlocks   int
-	parityBlocks int
-	diskNum      int
-	blockSize    int64
-	// missingData, missingParity int
-	// reconstructParity          bool
-	// shouldFail                 bool
-}
-
 var fileSizesV1 = []int64{
 	128, 256, 512, 1024,
 	128 * KiB, 256 * KiB, 512 * KiB,
@@ -134,11 +124,13 @@ func TestEncodeDecode(t *testing.T) {
 	}
 	totalDiskInfo := testEC.diskInfos
 	totalDisk := len(testEC.diskInfos)
+	// for each tuple (k,m,N,bs) we testify  encoding
+	// and decoding functions for numerous files
 	for _, k := range dataShards {
 		testEC.K = k
 		for _, m := range parityShards {
 			testEC.M = m
-			for N := k + m; N <= totalDisk; N++ {
+			for N := k + m; N <= min(k+m+2, totalDisk); N++ {
 				testEC.diskInfos = totalDiskInfo[:N]
 				for _, bs := range blockSizesV1 {
 					testEC.BlockSize = bs
@@ -146,6 +138,8 @@ func TestEncodeDecode(t *testing.T) {
 					if err != nil {
 						t.Fatalf("k:%d,m:%d,bs:%d,N:%d,%s\n", k, m, bs, N, err.Error())
 					}
+					// log.Printf("----k:%d,m:%d,bs:%d,N:%d----\n", k, m, bs, N)
+
 					for _, fileSize := range tempFileSizes {
 						//system-level paras
 						inpath := fmt.Sprintf("./test/temp-%d", fileSize)
@@ -162,7 +156,7 @@ func TestEncodeDecode(t *testing.T) {
 						}
 						_, err := testEC.EncodeFile(inpath)
 						if err != nil {
-							t.Errorf("k:%d,m:%d,bs:%d encode fails when fileSize is %d, for %s", k, m, blockSize, fileSize, err.Error())
+							t.Errorf("k:%d,m:%d,bs:%d,N:%d encode fails when fileSize is %d, for %s", k, m, bs, N, fileSize, err.Error())
 						}
 						err = testEC.writeConfig()
 						if err != nil {
@@ -183,14 +177,14 @@ func TestEncodeDecode(t *testing.T) {
 						// }
 						err = testEC.readFile(inpath, outpath)
 						if err != nil {
-							t.Errorf("k:%d,m:%d,bs:%d read fails when fileSize is %d, for %s", k, m, blockSize, fileSize, err.Error())
+							t.Errorf("k:%d,m:%d,bs:%d,N:%d read fails when fileSize is %d, for %s", k, m, bs, N, fileSize, err.Error())
 						}
 
 						//evaluate the results
 						if ok, err := checkFileIfSame(inpath, outpath); !ok && err != nil {
-							t.Fatalf("k:%d,m:%d,bs:%d read fails when fileSize is %d, for hash check fail", k, m, blockSize, fileSize)
+							t.Fatalf("k:%d,m:%d,bs:%d,N:%d read fails when fileSize is %d, for hash check fail", k, m, bs, N, fileSize)
 						} else if err != nil {
-							t.Fatalf("k:%d,m:%d,bs:%d read fails when fileSize is %d, for %s", k, m, blockSize, fileSize, err.Error())
+							t.Fatalf("k:%d,m:%d,bs:%d,N:%d read fails when fileSize is %d, for %s", k, m, bs, N, fileSize, err.Error())
 						}
 						// }
 					}
