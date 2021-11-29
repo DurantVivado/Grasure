@@ -35,8 +35,8 @@ var fileSizesV2 = []int64{
 	128 * MiB, 256 * MiB, 512 * MiB, 1024 * MiB,
 }
 var blockSizesV1 = []int64{
-	1 * KiB, 2 * KiB, 4 * KiB, 8 * KiB, 16 * KiB, 32 * KiB, 64 * KiB, 128 * KiB,
-	256 * KiB, 512 * KiB,
+	4 * KiB, 16 * KiB, 64 * KiB,
+	256 * KiB, 512 * KiB, 1 * MiB,
 }
 
 var blockSizesV2 = []int64{
@@ -138,7 +138,7 @@ func TestEncodeDecode(t *testing.T) {
 					if err != nil {
 						t.Fatalf("k:%d,m:%d,bs:%d,N:%d,%s\n", k, m, bs, N, err.Error())
 					}
-					// log.Printf("----k:%d,m:%d,bs:%d,N:%d----\n", k, m, bs, N)
+					log.Printf("----k:%d,m:%d,bs:%d,N:%d----\n", k, m, bs, N)
 
 					for _, fileSize := range tempFileSizes {
 						//system-level paras

@@ -58,7 +58,12 @@ func (e *Erasure) initSystem(assume bool) error {
 	if e.K+e.M > 256 {
 		return reedsolomon.ErrMaxShardNum
 	}
-	if e.K+e.M > len(e.diskInfos) {
+	err = e.readDiskPath()
+	if err != nil {
+		return err
+	}
+	e.DiskNum = len(e.diskInfos)
+	if e.K+e.M > e.DiskNum {
 		return ErrTooFewDisks
 	}
 	//replicate the config files
@@ -66,10 +71,7 @@ func (e *Erasure) initSystem(assume bool) error {
 		return ErrNegativeReplicateFactor
 	}
 	e.replicateFactor = replicateFactor
-	err = e.readDiskPath()
-	if err != nil {
-		return err
-	}
+
 	err = e.resetSystem()
 	if err != nil {
 		return err
@@ -133,6 +135,7 @@ func (e *Erasure) readConfig() error {
 	}
 	err = json.Unmarshal(data, &e)
 	if err != nil {
+		//if json file is broken, we try to recover it
 		err = e.rebuildConfig()
 		if err != nil {
 			return ErrConfFileNotExist
@@ -174,7 +177,7 @@ func (e *Erasure) readConfig() error {
 	for _, f := range e.FileMeta {
 		stripeNum := len(f.Distribution)
 		f.blockToOffset = makeArr2DInt(stripeNum, e.K+e.M)
-		countSum := make([]int, len(e.diskInfos))
+		countSum := make([]int, e.DiskNum)
 		for row := range f.Distribution {
 
 			for line := range f.Distribution[row] {
