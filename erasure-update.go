@@ -147,13 +147,14 @@ func (e *Erasure) update(oldFile, newFile string) error {
 					for i := 0; i < e.K+e.M; i++ {
 						i := i
 						erg.Go(func() error {
-							diskID := dist[stripeNo][i]
+							a := i
+							diskID := dist[stripeNo][a]
 							disk := e.diskInfos[diskID]
 							if !disk.available {
 								return nil
 							}
-							offset := fi.blockToOffset[stripeNo][i]
-							_, err := ifs[diskID].ReadAt(oldBlobBuf[s][int64(i)*e.BlockSize:int64(i+1)*e.BlockSize],
+							offset := fi.blockToOffset[stripeNo][a]
+							_, err := ifs[diskID].ReadAt(oldBlobBuf[s][int64(a)*e.BlockSize:int64(a+1)*e.BlockSize],
 								int64(offset)*e.BlockSize)
 							if err != nil && err != io.EOF {
 								return err
