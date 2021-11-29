@@ -140,7 +140,7 @@ func (e *Erasure) update(oldFile, newFile string) error {
 			stripeNo := stripeCnt + s
 			if stripeNo < oldStripeNum {
 				// read old data shards
-				fmt.Println("old")
+				// fmt.Println("old")
 				eg.Go(func() error {
 					erg := e.errgroupPool.Get().(*errgroup.Group)
 					defer e.errgroupPool.Put(erg)
@@ -192,7 +192,7 @@ func (e *Erasure) update(oldFile, newFile string) error {
 						return err
 					}
 					// compare
-					diffIdx, err := compare(oldData[0:e.K], newData[0:e.K])
+					diffIdx, err := compareStripe(oldData[0:e.K], newData[0:e.K])
 					if err != nil {
 						return err
 					}
@@ -232,6 +232,9 @@ func (e *Erasure) update(oldFile, newFile string) error {
 						}
 						erg.Go(func() error {
 							diskID := fi.Distribution[stripeNo][i]
+							if i < e.K {
+								fmt.Println("old ", string(newBlock))
+							}
 							_, err := ifs[diskID].WriteAt(newBlock, int64(stripeCnt+s)*e.BlockSize)
 							if err != nil {
 								return err
@@ -246,9 +249,10 @@ func (e *Erasure) update(oldFile, newFile string) error {
 				})
 			} else {
 				// if new filesize is greater than old filesize, we just encode the remaining data
-				fmt.Println("new")
+				// fmt.Println("new")
 				eg.Go(func() error {
-					offset := int64(stripeNo) * e.dataStripeSize
+					stripeCnt := stripeNo
+					offset := int64(stripeCnt) * e.dataStripeSize
 					_, err = nf.ReadAt(newBlobBuf[s], offset)
 					if err != nil && err != io.EOF {
 						return err
@@ -266,9 +270,13 @@ func (e *Erasure) update(oldFile, newFile string) error {
 					for i := 0; i < e.K+e.M; i++ {
 						i := i
 						erg.Go(func() error {
-							diskID := fi.Distribution[stripeNo][i]
-							writeOffset := fi.blockToOffset[stripeNo][i]
-							_, err := ifs[diskID].WriteAt(newData[i], int64(writeOffset)*e.BlockSize)
+							a := i
+							diskID := fi.Distribution[stripeCnt][a]
+							writeOffset := fi.blockToOffset[stripeCnt][a]
+							if i < e.K {
+								fmt.Println("new ", string(newData[a]))
+							}
+							_, err := ifs[diskID].WriteAt(newData[a], int64(writeOffset)*e.BlockSize)
 							if err != nil {
 								return err
 							}
@@ -297,7 +305,7 @@ func (e *Erasure) update(oldFile, newFile string) error {
 
 // compare the oldStripe and newStripe and return the different blocks' index
 // if oldStripe == newStripe, return nil
-func compare(oldStripe, newStripe [][]byte) ([]int, error) {
+func compareStripe(oldStripe, newStripe [][]byte) ([]int, error) {
 	if len(oldStripe) != len(newStripe) {
 		return nil, errors.New("compare error: Invalid Input")
 	}

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"io"
 	"log"
 	"os"
@@ -23,7 +22,6 @@ func (e *Erasure) readFile(filename string, savepath string) error {
 
 	fileSize := fi.FileSize
 	stripeNum := int(ceilFracInt64(fileSize, e.dataStripeSize))
-	fmt.Println(stripeNum)
 	dist := fi.Distribution
 	//first we check the number of alive disks
 	// to judge if any part need reconstruction

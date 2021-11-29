@@ -15,16 +15,16 @@
             "program": "${fileDirname}",
             "args": [ 
                         //init mode
-                        // "-md","init", 
-                        // "-k", "2", 
-                        // "-m","2",
-                        // "-bs","4096"
+                        "-md","init", 
+                        "-k", "12", 
+                        "-m","4",
+                        "-bs","1"
                         
                         //encode mode
-                        "-md","encode", 
-                        "-f","test/Goprogramming.pdf",
-                        "-conStripes","100",
-                        "-o"
+                        // "-md","encode", 
+                        // "-f","LICENSE",
+                        // "-conStripes","100",
+                        // "-o"
                         // "-md","encode", 
                         // "-f","test/LICENSE.txt",
                         // "-conStripes","100",
@@ -32,14 +32,15 @@
                         
                         //read mode, just input basename of file
                         // "-md","read", 
-                        // "-f","Goprogramming.pdf",
+                        // "-f","LICENSE",
                         // "-conStripes","100",
                         // "-fn","2",
-                        // "-sp","output/Goprogramming.pdf",
+                        // "-sp","output/LICENSE",
                         // "-md","read", 
                         // "-f","file.128",
                         // "-conStripes","100",
                         // "-sp","output/file.128"
+
                         //update mode
                         // "-md","update", 
                         // "-f","LICENSE",
