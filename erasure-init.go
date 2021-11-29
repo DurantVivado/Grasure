@@ -39,36 +39,67 @@ func (e *Erasure) readDiskPath() error {
 }
 
 //initiate the erasure-coded system
-func (e *Erasure) initHDR() {
+func (e *Erasure) initSystem(assume bool) error {
 	fmt.Println("Warning: you are intializing a new erasure-coded system, which means the previous data will also be reset.")
-	if ans, err := consultUserBeforeAction(); !ans {
-		return
-	} else if err != nil {
-		failOnErr(mode, err)
+	if !assume {
+		if ans, err := consultUserBeforeAction(); !ans && err == nil {
+			return nil
+		} else if err != nil {
+			return err
+		}
 	}
 	e.K = k
 	e.M = m
+	e.BlockSize = blockSize
 	if e.K <= 0 || e.M <= 0 {
-		failOnErr(mode, reedsolomon.ErrInvShardNum)
+		return reedsolomon.ErrInvShardNum
 	}
 	//The reedsolomon library only implements GF(2^8) and will be improved later
 	if e.K+e.M > 256 {
-		failOnErr(mode, reedsolomon.ErrMaxShardNum)
+		return reedsolomon.ErrMaxShardNum
 	}
-	e.BlockSize = blockSize
 	err = e.readDiskPath()
-	failOnErr(mode, err)
-	if e.K+e.M > len(e.diskInfos) {
-		failOnErr(mode, ErrTooFewDisks)
+	if err != nil {
+		return err
 	}
-	//we persit meta info info in hard drives
-	err = e.writeConfig()
-	failOnErr(mode, err)
-	//delete the data blocks under all diskPath
-	err = e.reset()
-	failOnErr(mode, err)
+	e.DiskNum = len(e.diskInfos)
+	if e.K+e.M > e.DiskNum {
+		return ErrTooFewDisks
+	}
+	//replicate the config files
+	if replicateFactor < 0 {
+		return ErrNegativeReplicateFactor
+	}
+	e.replicateFactor = replicateFactor
+
+	err = e.resetSystem()
+	if err != nil {
+		return err
+	}
+
 	fmt.Printf("System init!\n Erasure parameters: dataShards:%d, parityShards:%d,blocksize:%d\n",
 		k, m, blockSize)
+	return nil
+}
+
+func (e *Erasure) resetSystem() error {
+	//we persist meta info info in hard drives
+	err = e.writeConfig()
+	if err != nil {
+		return err
+	}
+
+	//delete the data blocks under all diskPath
+	err = e.reset()
+	if err != nil {
+		return err
+	}
+
+	err = e.replicateConfig(e.replicateFactor)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 //disk status
@@ -90,7 +121,7 @@ func (e *Erasure) readConfig() error {
 	if ex, err := PathExist(e.configFile); !ex && err == nil {
 		// we try to recover the config file from the storage system
 		// which renders the last chance to heal
-		err = e.rebuildConfig(e.configFile)
+		err = e.rebuildConfig()
 		if err != nil {
 			return ErrConfFileNotExist
 		}
@@ -104,12 +135,26 @@ func (e *Erasure) readConfig() error {
 	}
 	err = json.Unmarshal(data, &e)
 	if err != nil {
-		return err
+		//if json file is broken, we try to recover it
+		err = e.rebuildConfig()
+		if err != nil {
+			return ErrConfFileNotExist
+		}
+		data, err := ioutil.ReadFile(e.configFile)
+		if err != nil {
+			return err
+		}
+		err = json.Unmarshal(data, &e)
+		if err != nil {
+			return err
+		}
 	}
 	// e.K = int(k)
 	// e.M = int(m)
 	// e.BlockSize = blockSize
-	e.conStripes = conStripes
+	if conStripes > 0 {
+		e.conStripes = conStripes
+	}
 	//initialize the ReedSolomon Code
 	e.enc, err = reedsolomon.New(e.K, e.M,
 		reedsolomon.WithAutoGoroutines(int(e.BlockSize)),
@@ -121,6 +166,7 @@ func (e *Erasure) readConfig() error {
 	if err != nil {
 		return err
 	}
+	e.DiskNum = len(e.diskInfos)
 	e.dataStripeSize = int64(e.K) * e.BlockSize
 	e.allStripeSize = int64(e.K+e.M) * e.BlockSize
 
@@ -131,7 +177,7 @@ func (e *Erasure) readConfig() error {
 	for _, f := range e.FileMeta {
 		stripeNum := len(f.Distribution)
 		f.blockToOffset = makeArr2DInt(stripeNum, e.K+e.M)
-		countSum := make([]int, len(e.diskInfos))
+		countSum := make([]int, e.DiskNum)
 		for row := range f.Distribution {
 
 			for line := range f.Distribution[row] {
@@ -161,7 +207,7 @@ func (e *Erasure) readConfig() error {
 func (e *Erasure) replicateConfig(k int) error {
 	diskNum := len(e.diskInfos)
 	selectDisk := genRandomArr(diskNum, 0)[:k]
-	for i := range selectDisk {
+	for _, i := range selectDisk {
 		disk := e.diskInfos[i]
 		replicaPath := filepath.Join(disk.diskPath, "META")
 		_, err = copyFile(e.configFile, replicaPath)
@@ -197,24 +243,44 @@ func (e *Erasure) writeConfig() error {
 	}
 	buf.Flush()
 	f.Sync()
-	err = e.replicateConfig(replicateFactor)
-	if err != nil {
-		return err
-	}
+
 	return nil
 }
 
 //reconstruct the config file if possible
-func (e *Erasure) rebuildConfig(restorePath string) error {
+func (e *Erasure) rebuildConfig() error {
 	//we read file meta in the disk path and try to rebuild the config file
-	for i := range e.diskFilePath {
+	for i := range e.diskInfos {
 		disk := e.diskInfos[i]
 		replicaPath := filepath.Join(disk.diskPath, "META")
+		if ok, err := PathExist(replicaPath); !ok && err == nil {
+			continue
+		}
 		_, err = copyFile(replicaPath, e.configFile)
 		if err != nil {
 			return err
 		}
 		break
+	}
+	return nil
+}
+
+//update the config file of all replica
+func (e *Erasure) updateConfigReplica() error {
+	//we read file meta in the disk path and try to rebuild the config file
+	if replicateFactor < 1 {
+		return nil
+	}
+	for i := range e.diskInfos {
+		disk := e.diskInfos[i]
+		replicaPath := filepath.Join(disk.diskPath, "META")
+		if ok, err := PathExist(replicaPath); !ok && err == nil {
+			continue
+		}
+		_, err = copyFile(e.configFile, replicaPath)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
