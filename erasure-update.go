@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"io"
 	"log"
 	"os"
@@ -96,7 +95,7 @@ func (e *Erasure) update(oldFile, newFile string) error {
 	}
 	oldStripeNum := int(ceilFracInt64(oldFileSize, e.dataStripeSize))
 	newStripeNum := int(ceilFracInt64(fi.FileSize, e.dataStripeSize))
-	fmt.Println(oldStripeNum, newStripeNum)
+	// fmt.Println(oldStripeNum, newStripeNum)
 	numBlob := ceilFracInt(newStripeNum, e.conStripes)
 	countSum := make([]int, diskNum)
 	if newStripeNum > oldStripeNum {
@@ -142,22 +141,18 @@ func (e *Erasure) update(oldFile, newFile string) error {
 				// read old data shards
 				// fmt.Println("old")
 				eg.Go(func() error {
-					No := stripeNo
-					s := s
 					erg := e.errgroupPool.Get().(*errgroup.Group)
 					defer e.errgroupPool.Put(erg)
 					for i := 0; i < e.K+e.M; i++ {
 						i := i
 						erg.Go(func() error {
-							a := i
-							s := s
-							diskID := dist[No][a]
+							diskID := dist[stripeNo][i]
 							disk := e.diskInfos[diskID]
 							if !disk.available {
 								return nil
 							}
-							offset := fi.blockToOffset[No][a]
-							_, err := ifs[diskID].ReadAt(oldBlobBuf[s][int64(a)*e.BlockSize:int64(a+1)*e.BlockSize],
+							offset := fi.blockToOffset[stripeNo][i]
+							_, err := ifs[diskID].ReadAt(oldBlobBuf[s][int64(i)*e.BlockSize:int64(i+1)*e.BlockSize],
 								int64(offset)*e.BlockSize)
 							if err != nil && err != io.EOF {
 								return err
@@ -235,11 +230,8 @@ func (e *Erasure) update(oldFile, newFile string) error {
 							copy(newBlock, newData[i])
 						}
 						erg.Go(func() error {
-							diskID := fi.Distribution[No][i]
-							offset := fi.blockToOffset[No][i]
-							// if i < e.K {
-							// 	fmt.Println("old ", string(newBlock), "stripeNo ", No, "offset ", string(offset))
-							// }
+							diskID := fi.Distribution[stripeNo][i]
+							offset := fi.blockToOffset[stripeNo][i]
 							_, err := ifs[diskID].WriteAt(newBlock, int64(offset)*e.BlockSize)
 							if err != nil {
 								return err
@@ -256,9 +248,7 @@ func (e *Erasure) update(oldFile, newFile string) error {
 				// if new filesize is greater than old filesize, we just encode the remaining data
 				// fmt.Println("new")
 				eg.Go(func() error {
-					stripeCnt := stripeNo
-					s := s
-					offset := int64(stripeCnt) * e.dataStripeSize
+					offset := int64(stripeNo) * e.dataStripeSize
 					_, err = nf.ReadAt(newBlobBuf[s], offset)
 					if err != nil && err != io.EOF {
 						return err
@@ -277,11 +267,8 @@ func (e *Erasure) update(oldFile, newFile string) error {
 						i := i
 						erg.Go(func() error {
 							a := i
-							diskID := fi.Distribution[stripeCnt][a]
-							writeOffset := fi.blockToOffset[stripeCnt][a]
-							// if i < e.K {
-							// 	fmt.Println("new ", string(newData[a]))
-							// }
+							diskID := fi.Distribution[stripeNo][a]
+							writeOffset := fi.blockToOffset[stripeNo][a]
 							_, err := ifs[diskID].WriteAt(newData[a], int64(writeOffset)*e.BlockSize)
 							if err != nil {
 								return err
