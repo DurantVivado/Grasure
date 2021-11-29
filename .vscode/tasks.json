@@ -1,0 +1,27 @@
+{
+        "tasks": [
+            {
+                "label": "make",
+                "command": "make",
+                "type": "shell"
+                
+            },
+            {
+                
+                "label": "clean",
+                "command":"make",
+                "args": ["clean"],
+                "type": "shell",
+                
+    
+            },
+            {
+                "label": "CleanBuild",
+                "dependsOn": [
+                    "clean",
+                    "make"
+                ]
+            }
+        ],
+        "version": "2.0.0"
+    }

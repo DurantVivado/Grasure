@@ -36,7 +36,7 @@ var fileSizesV2 = []int64{
 }
 var blockSizesV1 = []int64{
 	4 * KiB, 16 * KiB, 64 * KiB,
-	256 * KiB, 512 * KiB, 1 * MiB,
+	256 * KiB, 512 * KiB,
 }
 
 var blockSizesV2 = []int64{
@@ -118,6 +118,7 @@ func TestEncodeDecode(t *testing.T) {
 	rand.Seed(100000007)
 	tempFileSizes := generateRandomFileSize(1*KiB, 1*MiB, 100)
 	defer deleteTempFiles(tempFileSizes)
+	//1. read disk paths
 	err = testEC.readDiskPath()
 	if err != nil {
 		t.Fatal(err)
@@ -130,11 +131,11 @@ func TestEncodeDecode(t *testing.T) {
 		testEC.K = k
 		for _, m := range parityShards {
 			testEC.M = m
-			for N := k + m; N <= min(k+m+2, totalDisk); N++ {
+			for N := k + m; N <= min(k+m+4, totalDisk); N++ {
 				testEC.diskInfos = totalDiskInfo[:N]
 				for _, bs := range blockSizesV1 {
 					testEC.BlockSize = bs
-					err = testEC.resetSystem()
+					err = testEC.initSystem(true)
 					if err != nil {
 						t.Fatalf("k:%d,m:%d,bs:%d,N:%d,%s\n", k, m, bs, N, err.Error())
 					}

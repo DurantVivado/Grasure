@@ -40,7 +40,7 @@ func (e *Erasure) readDiskPath() error {
 
 //initiate the erasure-coded system
 func (e *Erasure) initSystem(assume bool) error {
-	fmt.Println("Warning: you are intializing a new erasure-coded system, which means the previous data will also be reset.")
+	// fmt.Println("Warning: you are intializing a new erasure-coded system, which means the previous data will also be reset.")
 	if !assume {
 		if ans, err := consultUserBeforeAction(); !ans && err == nil {
 			return nil
@@ -48,19 +48,12 @@ func (e *Erasure) initSystem(assume bool) error {
 			return err
 		}
 	}
-	e.K = k
-	e.M = m
-	e.BlockSize = blockSize
 	if e.K <= 0 || e.M <= 0 {
 		return reedsolomon.ErrInvShardNum
 	}
 	//The reedsolomon library only implements GF(2^8) and will be improved later
 	if e.K+e.M > 256 {
 		return reedsolomon.ErrMaxShardNum
-	}
-	err = e.readDiskPath()
-	if err != nil {
-		return err
 	}
 	e.DiskNum = len(e.diskInfos)
 	if e.K+e.M > e.DiskNum {
@@ -77,13 +70,17 @@ func (e *Erasure) initSystem(assume bool) error {
 		return err
 	}
 
-	fmt.Printf("System init!\n Erasure parameters: dataShards:%d, parityShards:%d,blocksize:%d\n",
-		k, m, blockSize)
+	// fmt.Printf("System init!\n Erasure parameters: dataShards:%d, parityShards:%d,blocksize:%d\n",
+	// k, m, blockSize)
 	return nil
 }
 
 func (e *Erasure) resetSystem() error {
 	//we persist meta info info in hard drives
+	e.FileMeta = make([]*FileInfo, 0)
+	for k := range e.fileMap {
+		delete(e.fileMap, k)
+	}
 	err = e.writeConfig()
 	if err != nil {
 		return err
@@ -114,10 +111,7 @@ func (e *Erasure) printDiskStatus() {
 //read the config info in config file
 //Every time read file list in system warm-up
 func (e *Erasure) readConfig() error {
-	err = erasure.readDiskPath()
-	if err != nil {
-		return fmt.Errorf("readDiskPath:%s error:%s", e.diskFilePath, err.Error())
-	}
+
 	if ex, err := PathExist(e.configFile); !ex && err == nil {
 		// we try to recover the config file from the storage system
 		// which renders the last chance to heal
@@ -152,9 +146,6 @@ func (e *Erasure) readConfig() error {
 	// e.K = int(k)
 	// e.M = int(m)
 	// e.BlockSize = blockSize
-	if conStripes > 0 {
-		e.conStripes = conStripes
-	}
 	//initialize the ReedSolomon Code
 	e.enc, err = reedsolomon.New(e.K, e.M,
 		reedsolomon.WithAutoGoroutines(int(e.BlockSize)),
@@ -193,6 +184,7 @@ func (e *Erasure) readConfig() error {
 		e.fileMap[f.FileName] = f
 
 	}
+	e.FileMeta = make([]*FileInfo, 0)
 	// we
 	//e.sEnc, err = reedsolomon.NewStreamC(e.K, e.M, conReads, conWrites)
 	// if err != nil {
@@ -222,14 +214,15 @@ func (e *Erasure) replicateConfig(k int) error {
 //write the erasure parameters into config files
 func (e *Erasure) writeConfig() error {
 
-	f, err := os.OpenFile(e.configFile, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
+	f, err := os.OpenFile(e.configFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
 
-	if err != nil {
-		return err
+	// we marsh filemap into fileLists
+	for _, v := range e.fileMap {
+		e.FileMeta = append(e.FileMeta, v)
 	}
 	data, err := json.Marshal(e)
 	// data, err := json.MarshalIndent(e, " ", "  ")

@@ -1,0 +1,25 @@
+// settings.json 文件内容如下：主要是goroot和gopath
+{
+        "files.autoSave": "onFocusChange",
+        
+        "go.buildOnSave": "package",
+        "go.lintOnSave": "package",
+        "go.vetOnSave": "package",
+        "go.buildTags": "",
+        "go.buildFlags": [],
+        "go.testTimeout": "3600s",
+        "go.testFlags": ["-v"],
+        "go.lintFlags": [],
+        "go.vetFlags": [],
+        "go.coverOnSave": false,
+        "go.useCodeSnippetsOnFunctionSuggest": true,
+        "go.autocompleteUnimportedPackages": true,
+        "go.formatTool": "gofmt",
+        "go.goroot": "/usr/local/go",    
+        "go.gopath": "/home/server1/go", 
+        "go.gocodeAutoBuild": true
+    
+        
+    }
+    
+    

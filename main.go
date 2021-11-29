@@ -13,6 +13,16 @@ import (
 	"time"
 )
 
+var erasure = Erasure{
+	configFile:   "conf.json",
+	fileMap:      make(map[string]*FileInfo),
+	diskFilePath: ".hdr.disks.path",
+	K:            k,
+	M:            m,
+	BlockSize:    blockSize,
+	conStripes:   conStripes,
+}
+
 func main() {
 	//We read each file and make byte flow
 	flag_init()
@@ -21,6 +31,9 @@ func main() {
 	// ctx, _ := context.WithCancel(context.Background())
 	// go monitorCancel(cancel)
 	start := time.Now()
+	err = erasure.readDiskPath()
+	failOnErr(mode, err)
+
 	switch mode {
 	case "init":
 		err = erasure.initSystem(false)
@@ -49,6 +62,10 @@ func main() {
 		failOnErr(mode, err)
 		err = erasure.update(filePath, newFilePath)
 		failOnErr(mode, err)
+		err = erasure.writeConfig()
+		failOnErr(mode, err)
+		err = erasure.updateConfigReplica()
+		failOnErr(mode, err)
 	// case "recover":
 	// 	//recover all the blocks of a disk and put the recovered result to new path
 	// 	e.readConfig()
@@ -58,11 +75,12 @@ func main() {
 	// 	e.readConfig()
 	// 	scaling(new_k, new_m)
 	case "delete":
-		err = erasure.readConfig()
-		failOnErr(mode, err)
+
 		err = erasure.removeFile(filePath)
 		failOnErr(mode, err)
 		err = erasure.writeConfig()
+		failOnErr(mode, err)
+		err = erasure.updateConfigReplica()
 		failOnErr(mode, err)
 	default:
 		log.Fatalf("Can't parse the parameters, please check %s!", mode)
