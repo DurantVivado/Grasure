@@ -155,7 +155,6 @@ func (e *Erasure) EncodeFile(filename string) (*FileInfo, error) {
 	//transform map into array for json marshaling
 
 	e.fileMap[baseFileName] = fi
-	e.FileMeta = append(e.FileMeta, fi)
 	// log.Println(baseFileName, " successfully encoded. encoding size ", e.stripedFileSize(fileSize), "bytes")
 	return fi, nil
 }

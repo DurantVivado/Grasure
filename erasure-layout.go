@@ -7,12 +7,11 @@ func (e *Erasure) generateLayout(fi *FileInfo) {
 		return
 	}
 	stripeNum := int(ceilFracInt64(fi.FileSize, e.dataStripeSize))
-	diskNum := len(e.diskInfos)
 	fi.Distribution = make([][]int, stripeNum)
 	fi.blockToOffset = makeArr2DInt(stripeNum, e.K+e.M)
-	countSum := make([]int, len(e.diskInfos))
+	countSum := make([]int, e.DiskNum)
 	for i := 0; i < stripeNum; i++ {
-		fi.Distribution[i] = genRandomArr(diskNum, 0)[:e.K+e.M]
+		fi.Distribution[i] = genRandomArr(e.DiskNum, 0)[:e.K+e.M]
 		for j := 0; j < e.K+e.M; j++ {
 			diskId := fi.Distribution[i][j]
 			fi.blockToOffset[i][j] = countSum[diskId]

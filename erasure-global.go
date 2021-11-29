@@ -33,8 +33,8 @@ type Erasure struct {
 	K               int                       `json:"dataShards"`   // the number of data blocks in a stripe
 	M               int                       `json:"parityShards"` // the number of parity blocks in a stripe
 	BlockSize       int64                     `json:"blockSize"`    // the block size. default to 4KiB
-	FileMeta        []*FileInfo               `json:"fileLists"`
 	DiskNum         int                       `json:"diskNum"`
+	FileMeta        []*FileInfo               `json:"fileLists"`
 	conStripes      int                       //how many stripes are allowed to encode/decode concurrently
 	replicateFactor int                       // the replication factor for config file
 	sEnc            reedsolomon.StreamEncoder // the reedsolomon streaming encoder, for streaming access
@@ -134,13 +134,8 @@ func flag_init() {
 
 //global system-level variables
 var (
-	wg      sync.WaitGroup
-	err     error
-	erasure = Erasure{
-		configFile:   "conf.json",
-		fileMap:      make(map[string]*FileInfo),
-		diskFilePath: ".hdr.disks.path",
-	}
+	wg  sync.WaitGroup
+	err error
 )
 
 //constant variables
