@@ -13,20 +13,19 @@ import (
 	"time"
 )
 
-var erasure = Erasure{
-	configFile:   "conf.json",
-	fileMap:      make(map[string]*FileInfo),
-	diskFilePath: ".hdr.disks.path",
-	K:            k,
-	M:            m,
-	BlockSize:    blockSize,
-	conStripes:   conStripes,
-}
-
 func main() {
 	//We read each file and make byte flow
 	flag_init()
 	flag.Parse()
+	erasure := Erasure{
+		configFile:   "conf.json",
+		fileMap:      make(map[string]*FileInfo),
+		diskFilePath: ".hdr.disks.path",
+		K:            k,
+		M:            m,
+		BlockSize:    blockSize,
+		conStripes:   conStripes,
+	}
 	//We read the config file
 	// ctx, _ := context.WithCancel(context.Background())
 	// go monitorCancel(cancel)

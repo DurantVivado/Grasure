@@ -2,7 +2,6 @@ package main
 
 import (
 	"io"
-	"log"
 	"os"
 	"path/filepath"
 	"sync"
@@ -54,7 +53,7 @@ func (e *Erasure) readFile(filename string, savepath string) error {
 		})
 	}
 	if err := erg.Wait(); err != nil {
-		log.Printf("%s", err.Error())
+		// log.Printf("%s", err.Error())
 	}
 	defer func() {
 		for i := 0; i < e.DiskNum; i++ {

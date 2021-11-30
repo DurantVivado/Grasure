@@ -30,7 +30,8 @@ import:
 
 
 ## CLI Usage
-A complete demonstration of various CLI usage lies in `buildAndRun.sh`.
+A complete demonstration of various CLI usage lies in `buildAndRun.sh`. You may have a glimpse.
+
 0. Build the project:
 ```
 go build -o grasure erasure-*.go main.go
