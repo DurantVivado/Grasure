@@ -45,10 +45,11 @@ type Erasure struct {
 	configFile      string                    // configure file
 	fileMap         map[string]*FileInfo      // File info lists
 	diskFilePath    string                    // the path of file recording all disks path
-	dataBlobPool    sync.Pool                 // memory pool for conStripes data  access
-	allBlobPool     sync.Pool                 // memory pool for conStripes stripe access
+	override        bool                      //whether or not to override former files or directories, default to false
 	errgroupPool    sync.Pool                 //errgroup pool
-	blockPool       sync.Pool                 //the pool for block-size access
+	// dataBlobPool    sync.Pool                 // memory pool for conStripes data  access
+	// allBlobPool     sync.Pool                 // memory pool for conStripes stripe access
+
 }
 type FileInfo struct {
 	FileName      string  `json:"fileName"` //file name
@@ -110,14 +111,14 @@ func flag_init() {
 	flag.StringVar(&recoveredDiskPath, "rDP", "/tmp/restore", "the data path for recovered disk, default to /tmp/data")
 	flag.StringVar(&recoveredDiskPath, "recoverDiskPath", "/tmp/restore", "the data path for recovered disk, default to /tmp/data")
 
-	flag.BoolVar(&override, "o", false, "whether to override former files or directories, default to false")
-	flag.BoolVar(&override, "override", false, "whether to override former files or directories, default to false")
+	flag.BoolVar(&override, "o", false, "whether or not to override former files or directories, default to false")
+	flag.BoolVar(&override, "override", false, "whether or not to override former files or directories, default to false")
 
-	flag.BoolVar(&conWrites, "cw", true, "whether to enable concurrent write, default is false")
-	flag.BoolVar(&conWrites, "conWrites", true, "whether to enable concurrent write, default is false")
+	flag.BoolVar(&conWrites, "cw", true, "whether or not to enable concurrent write, default is false")
+	flag.BoolVar(&conWrites, "conWrites", true, "whether or not to enable concurrent write, default is false")
 
-	flag.BoolVar(&conReads, "cr", true, "whether to enable concurrent read, default is false")
-	flag.BoolVar(&conReads, "conReads", true, "whether to enable concurrent read, default is false")
+	flag.BoolVar(&conReads, "cr", true, "whether or not to enable concurrent read, default is false")
+	flag.BoolVar(&conReads, "conReads", true, "whether or not to enable concurrent read, default is false")
 
 	flag.StringVar(&failMode, "fmd", "diskFail", "simulate [diskFail] or [bitRot] mode")
 	flag.StringVar(&failMode, "failMode", "diskFail", "simulate [diskFail] or [bitRot] mode")

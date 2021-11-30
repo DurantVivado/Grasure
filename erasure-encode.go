@@ -11,7 +11,7 @@ import (
 
 func (e *Erasure) EncodeFile(filename string) (*FileInfo, error) {
 	baseFileName := filepath.Base(filename)
-	if _, ok := e.fileMap[baseFileName]; ok && !override {
+	if _, ok := e.fileMap[baseFileName]; ok && !e.override {
 		return nil, fmt.Errorf("the file %s has already been in the file system, if you wish to override, please attach `-o`",
 			baseFileName)
 	}
@@ -55,7 +55,7 @@ func (e *Erasure) EncodeFile(filename string) (*FileInfo, error) {
 		erg.Go(func() error {
 			folderPath := filepath.Join(e.diskInfos[i].diskPath, baseFileName)
 			//if override is specified, we override previous data
-			if override {
+			if e.override {
 				if err := os.RemoveAll(folderPath); err != nil {
 					return err
 				}

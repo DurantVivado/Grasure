@@ -17,7 +17,7 @@ func main() {
 	//We read each file and make byte flow
 	flag_init()
 	flag.Parse()
-	erasure := Erasure{
+	erasure := &Erasure{
 		configFile:   "conf.json",
 		fileMap:      make(map[string]*FileInfo),
 		diskFilePath: ".hdr.disks.path",
@@ -25,6 +25,7 @@ func main() {
 		M:            m,
 		BlockSize:    blockSize,
 		conStripes:   conStripes,
+		override:     override,
 	}
 	//We read the config file
 	// ctx, _ := context.WithCancel(context.Background())
