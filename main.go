@@ -14,7 +14,7 @@ import (
 )
 
 func main() {
-	//We read each file and make byte flow
+
 	flag_init()
 	flag.Parse()
 	erasure := &Erasure{

@@ -150,9 +150,7 @@ func (e *Erasure) readConfig() error {
 	e.enc, err = reedsolomon.New(e.K, e.M,
 		reedsolomon.WithAutoGoroutines(int(e.BlockSize)),
 		reedsolomon.WithCauchyMatrix(),
-		reedsolomon.WithConcurrentStreams(true),
 		reedsolomon.WithInversionCache(true),
-		reedsolomon.WithFastOneParityMatrix(),
 	)
 	if err != nil {
 		return err

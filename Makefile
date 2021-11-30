@@ -1,3 +1,4 @@
+# This file is deprecated since v1.0
 # Go parameters
 # Set TABSIZE as 8 to avoid stupid mistake like  *** missing separator
 PWD := $(shell pwd)
@@ -34,5 +35,5 @@ install:
 build-linux:
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o $(BINARY_UNIX) -v
 docker-build:
-	docker run --rm -it -v "$(GOPATH)":/go -w /go/src/bitbucket.org/rsohlich/makepost golang:latest go build -o "$(BINARY_UNIX)" -v
+	# docker run --rm -it -v "$(GOPATH)":/go -w /go/src/bitbucket.org/rsohlich/makepost golang:latest go build -o "$(BINARY_UNIX)" -v
 

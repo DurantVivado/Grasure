@@ -81,7 +81,7 @@ sha256sum {source file path}
 ```
 sha256sum {destination file path}
 ```
-## API
+## API Usage
 If you want to integrate Grasure into your own system. You can refer to examples in `./Examples`. Let's give a brief introduction.
 
 ## Storage System Structure

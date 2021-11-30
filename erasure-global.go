@@ -39,17 +39,16 @@ type Erasure struct {
 	replicateFactor int                       // the replication factor for config file
 	sEnc            reedsolomon.StreamEncoder // the reedsolomon streaming encoder, for streaming access
 	enc             reedsolomon.Encoder       // the reedsolomon encoder, for block access
-	dataStripeSize  int64                     //the data stripe size, equal to k*bs
-	allStripeSize   int64                     //the data plus parity stripe size, equal to (k+m)*bs
+	dataStripeSize  int64                     // the data stripe size, equal to k*bs
+	allStripeSize   int64                     // the data plus parity stripe size, equal to (k+m)*bs
 	diskInfos       []*DiskInfo               // disk paths
 	configFile      string                    // configure file
 	fileMap         map[string]*FileInfo      // File info lists
 	diskFilePath    string                    // the path of file recording all disks path
-	override        bool                      //whether or not to override former files or directories, default to false
-	errgroupPool    sync.Pool                 //errgroup pool
+	override        bool                      // whether or not to override former files or directories, default to false
+	errgroupPool    sync.Pool                 // errgroup pool
 	// dataBlobPool    sync.Pool                 // memory pool for conStripes data  access
 	// allBlobPool     sync.Pool                 // memory pool for conStripes stripe access
-
 }
 type FileInfo struct {
 	FileName      string  `json:"fileName"` //file name
