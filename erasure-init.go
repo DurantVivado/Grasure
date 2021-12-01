@@ -115,25 +115,30 @@ func (e *Erasure) readConfig() error {
 	if ex, err := PathExist(e.configFile); !ex && err == nil {
 		// we try to recover the config file from the storage system
 		// which renders the last chance to heal
+		e.mu.Lock()
 		err = e.rebuildConfig()
 		if err != nil {
 			return ErrConfFileNotExist
 		}
+		e.mu.Unlock()
 	} else if err != nil {
 		return err
 	}
-
+	e.mu.RLock()
 	data, err := ioutil.ReadFile(e.configFile)
 	if err != nil {
 		return err
 	}
+	e.mu.RUnlock()
 	err = json.Unmarshal(data, &e)
 	if err != nil {
 		//if json file is broken, we try to recover it
+		e.mu.Lock()
 		err = e.rebuildConfig()
 		if err != nil {
 			return ErrConfFileNotExist
 		}
+		e.mu.Unlock()
 		data, err := ioutil.ReadFile(e.configFile)
 		if err != nil {
 			return err

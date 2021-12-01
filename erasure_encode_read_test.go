@@ -734,6 +734,7 @@ func benchmarkParallel(b *testing.B, dataShards, parityShards, diskNum int, bloc
 	b.RunParallel(func(p *testing.PB) {
 		for p.Next() {
 			i := <-fileCh
+			log.Println(i)
 			err = testEC.readConfig()
 			if err != nil {
 				b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
@@ -761,10 +762,11 @@ func benchmarkParallel(b *testing.B, dataShards, parityShards, diskNum int, bloc
 			} else if err != nil {
 				b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
 			}
+			fileCh <- i
 		}
 	})
 }
 
-func BenchmarkParallel_2x1x3x512x1M(b *testing.B) {
-	benchmarkParallel(b, 2, 1, 3, 512, 1*MiB)
+func BenchmarkParallel_4x2x6x1024x1M(b *testing.B) {
+	benchmarkParallel(b, 4, 2, 6, 1024, 1*MiB)
 }
