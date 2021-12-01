@@ -162,7 +162,7 @@ It currently suppports `encode`, `read`, `update`, and more coming soon.
 |failMode(fmd)|simulate [diskFail] or [bitRot] mode"|diskFail|
 |failNum(fn)|simulate multiple disk failure, provides the fail number of disks|0|
 |conStripes(cs)|how many stripes are allowed to encode/decode concurrently|100|
-
+|quiet(q)|whether or not to mute outputs in terminal|false|
 ## Performance
 
 

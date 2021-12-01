@@ -40,7 +40,7 @@ func (e *Erasure) readDiskPath() error {
 	return nil
 }
 
-//initiate the erasure-coded system
+//initiate the erasure-coded system, this func CANNOT be called concurrently
 func (e *Erasure) initSystem(assume bool) error {
 	if !e.quiet {
 		fmt.Println("Warning: you are intializing a new erasure-coded system, which means the previous data will also be reset.")
