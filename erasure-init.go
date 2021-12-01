@@ -15,7 +15,8 @@ import (
 )
 
 //read the disk paths from diskFilePath
-//There should be One disk path at each line
+//There should be exactly ONE disk path at each line
+//This func can NOT be called concurrently
 func (e *Erasure) readDiskPath() error {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
@@ -40,7 +41,7 @@ func (e *Erasure) readDiskPath() error {
 	return nil
 }
 
-//initiate the erasure-coded system, this func CANNOT be called concurrently
+//initiate the erasure-coded system, this func can NOT be called concurrently
 func (e *Erasure) initSystem(assume bool) error {
 	if !e.quiet {
 		fmt.Println("Warning: you are intializing a new erasure-coded system, which means the previous data will also be reset.")
@@ -59,7 +60,6 @@ func (e *Erasure) initSystem(assume bool) error {
 	if e.K+e.M > 256 {
 		return reedsolomon.ErrMaxShardNum
 	}
-	e.DiskNum = len(e.diskInfos)
 	if e.K+e.M > e.DiskNum {
 		return ErrTooFewDisks
 	}
@@ -85,7 +85,7 @@ func (e *Erasure) reset() error {
 
 	g := new(errgroup.Group)
 
-	for _, path := range e.diskInfos {
+	for _, path := range e.diskInfos[:e.DiskNum] {
 		path := path
 		files, err := os.ReadDir(path.diskPath)
 		if err != nil {
@@ -198,7 +198,6 @@ func (e *Erasure) readConfig() error {
 	if err != nil {
 		return err
 	}
-	e.DiskNum = len(e.diskInfos)
 	e.dataStripeSize = int64(e.K) * e.BlockSize
 	e.allStripeSize = int64(e.K+e.M) * e.BlockSize
 
@@ -239,8 +238,7 @@ func (e *Erasure) readConfig() error {
 //Replicate the config file into the system for k-fold
 //it's NOT striped and encoded as a whole piece.
 func (e *Erasure) replicateConfig(k int) error {
-	diskNum := len(e.diskInfos)
-	selectDisk := genRandomArr(diskNum, 0)[:k]
+	selectDisk := genRandomArr(e.DiskNum, 0)[:k]
 	for _, i := range selectDisk {
 		disk := e.diskInfos[i]
 		replicaPath := filepath.Join(disk.diskPath, "META")
@@ -291,7 +289,7 @@ func (e *Erasure) writeConfig() error {
 //reconstruct the config file if possible
 func (e *Erasure) rebuildConfig() error {
 	//we read file meta in the disk path and try to rebuild the config file
-	for i := range e.diskInfos {
+	for i := range e.diskInfos[:e.DiskNum] {
 		disk := e.diskInfos[i]
 		replicaPath := filepath.Join(disk.diskPath, "META")
 		if ok, err := PathExist(replicaPath); !ok && err == nil {
@@ -315,7 +313,7 @@ func (e *Erasure) updateConfigReplica() error {
 	if replicateFactor < 1 {
 		return nil
 	}
-	for i := range e.diskInfos {
+	for i := range e.diskInfos[:e.DiskNum] {
 		disk := e.diskInfos[i]
 		replicaPath := filepath.Join(disk.diskPath, "META")
 		if ok, err := PathExist(replicaPath); !ok && err == nil {
@@ -336,7 +334,7 @@ func (e *Erasure) removeFile(filename string) error {
 
 	g := new(errgroup.Group)
 
-	for _, path := range e.diskInfos {
+	for _, path := range e.diskInfos[:e.DiskNum] {
 		path := path
 		files, err := os.ReadDir(path.diskPath)
 		if err != nil {

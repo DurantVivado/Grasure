@@ -31,7 +31,7 @@ func (e *Erasure) readFile(filename string, savepath string) error {
 	erg := new(errgroup.Group)
 	diskFailList := make(map[int]bool)
 	var mu sync.Mutex
-	for i, disk := range e.diskInfos {
+	for i, disk := range e.diskInfos[:e.DiskNum] {
 		i := i
 		disk := disk
 		erg.Go(func() error {
@@ -70,11 +70,15 @@ func (e *Erasure) readFile(filename string, savepath string) error {
 		//the disk renders inrecoverable
 		return ErrTooFewDisks
 	}
-	// if int(alive) == e.DiskNum {
-	// 	log.Println("start reading blocks")
-	// } else {
-	// 	log.Println("start reconstructing blocks")
-	// }
+	if int(alive) == e.DiskNum {
+		if !e.quiet {
+			log.Println("start reading blocks")
+		}
+	} else {
+		if !e.quiet {
+			log.Println("start reconstructing blocks")
+		}
+	}
 	//for local save path
 	sf, err := os.OpenFile(savepath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0666)
 	if err != nil {

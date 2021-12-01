@@ -128,6 +128,7 @@ func TestEncodeDecodeNormal(t *testing.T) {
 		replicateFactor: 3,
 		conStripes:      100,
 		override:        true,
+		quiet:           true,
 	}
 	rand.Seed(100000007)
 	tempFileSizes := generateRandomFileSize(1*KiB, 1*MiB, 100)
@@ -137,7 +138,6 @@ func TestEncodeDecodeNormal(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	totalDiskInfo := testEC.diskInfos
 	totalDisk := len(testEC.diskInfos)
 	// for each tuple (k,m,N,bs) we testify  encoding
 	// and decoding functions for numerous files
@@ -146,7 +146,7 @@ func TestEncodeDecodeNormal(t *testing.T) {
 		for _, m := range parityShards {
 			testEC.M = m
 			for N := k + m; N <= min(k+m+4, totalDisk); N++ {
-				testEC.diskInfos = totalDiskInfo[:N]
+				testEC.DiskNum = N
 				for _, bs := range blockSizesV1 {
 					testEC.BlockSize = bs
 					err = testEC.initSystem(true)
@@ -200,88 +200,6 @@ func TestEncodeDecodeNormal(t *testing.T) {
 }
 
 // PASS
-//Test parallel
-func TestEncodeDecodeNormalParallel(t *testing.T) {
-	//we generate temp data and encode it into real storage sytem
-	//after that, all temporary file should be deleted
-	testEC := &Erasure{
-		configFile: "conf.json",
-		// fileMap:         make(map[string]*FileInfo),
-		diskFilePath:    ".hdr.disks.path",
-		replicateFactor: 3,
-		conStripes:      100,
-		override:        true,
-	}
-
-	rand.Seed(100000007)
-	tempFileSizes := generateRandomFileSize(1*KiB, 1*MiB, 100)
-	defer deleteTempFiles(tempFileSizes)
-	//1. read disk paths
-	err = testEC.readDiskPath()
-	if err != nil {
-		t.Fatal(err)
-	}
-	totalDiskInfo := testEC.diskInfos
-	totalDisk := len(testEC.diskInfos)
-	// for each tuple (k,m,N,bs) we testify  encoding
-	// and decoding functions for numerous files
-	for _, k := range dataShards {
-		testEC.K = k
-		for _, m := range parityShards {
-			testEC.M = m
-			for N := k + m; N <= min(k+m+4, totalDisk); N++ {
-				testEC.diskInfos = totalDiskInfo[:N]
-				for _, bs := range blockSizesV1 {
-					testEC.BlockSize = bs
-					err = testEC.initSystem(true)
-					if err != nil {
-						t.Fatalf("k:%d,m:%d,bs:%d,N:%d,%s\n", k, m, bs, N, err.Error())
-					}
-					log.Printf("----k:%d,m:%d,bs:%d,N:%d----\n", k, m, bs, N)
-
-					for _, fileSize := range tempFileSizes {
-						inpath := fmt.Sprintf("./test/temp-%d", fileSize)
-						outpath := fmt.Sprintf("./output/temp-%d", fileSize)
-						err = generateRandomFileBySize(inpath, fileSize)
-						if err != nil {
-							t.Errorf("k:%d,m:%d,bs:%d,N:%d,%s\n", k, m, bs, N, err.Error())
-						}
-
-						err = testEC.readConfig()
-						if err != nil {
-							t.Errorf("k:%d,m:%d,bs:%d,N:%d,%s\n", k, m, bs, N, err.Error())
-						}
-						_, err := testEC.EncodeFile(inpath)
-						if err != nil {
-							t.Errorf("k:%d,m:%d,bs:%d,N:%d encode fails when fileSize is %d, for %s", k, m, bs, N, fileSize, err.Error())
-						}
-						err = testEC.writeConfig()
-						if err != nil {
-							t.Errorf("k:%d,m:%d,bs:%d,N:%d,%s\n", k, m, bs, N, err.Error())
-						}
-						err = testEC.updateConfigReplica()
-						if err != nil {
-							t.Errorf("k:%d,m:%d,bs:%d,N:%d,%s\n", k, m, bs, N, err.Error())
-						}
-
-						err = testEC.readFile(inpath, outpath)
-						if err != nil {
-							t.Errorf("k:%d,m:%d,bs:%d,N:%d read fails when fileSize is %d, for %s", k, m, bs, N, fileSize, err.Error())
-						}
-
-						//evaluate the results
-						if ok, err := checkFileIfSame(inpath, outpath); !ok && err != nil {
-							t.Fatalf("k:%d,m:%d,bs:%d,N:%d read fails when fileSize is %d, for hash check fail", k, m, bs, N, fileSize)
-						} else if err != nil {
-							t.Fatalf("k:%d,m:%d,bs:%d,N:%d read fails when fileSize is %d, for %s", k, m, bs, N, fileSize, err.Error())
-						}
-					}
-				}
-			}
-		}
-	}
-
-}
 
 //Test when one disk fails
 func TestEncodeDecodeOneFailure(t *testing.T) {
@@ -293,8 +211,9 @@ func TestEncodeDecodeOneFailure(t *testing.T) {
 		diskFilePath:    ".hdr.disks.path",
 		replicateFactor: 3,
 		conStripes:      100,
+		override:        true,
+		quiet:           true,
 	}
-	override = true
 	rand.Seed(100000007)
 	tempFileSizes := generateRandomFileSize(1*KiB, 1*MiB, 100)
 	defer deleteTempFiles(tempFileSizes)
@@ -303,7 +222,6 @@ func TestEncodeDecodeOneFailure(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	totalDiskInfo := testEC.diskInfos
 	totalDisk := len(testEC.diskInfos)
 	//simulate one disk failure
 	testEC.diskInfos[0].available = false
@@ -314,7 +232,7 @@ func TestEncodeDecodeOneFailure(t *testing.T) {
 		for _, m := range parityShards {
 			testEC.M = m
 			for N := k + m; N <= min(k+m+4, totalDisk); N++ {
-				testEC.diskInfos = totalDiskInfo[:N]
+				testEC.DiskNum = N
 				for _, bs := range blockSizesV1 {
 					testEC.BlockSize = bs
 					err = testEC.initSystem(true)
@@ -383,6 +301,7 @@ func TestEncodeDecodeTwoFailure(t *testing.T) {
 		replicateFactor: 3,
 		conStripes:      100,
 		override:        true,
+		quiet:           true,
 	}
 	rand.Seed(100000007)
 	tempFileSizes := generateRandomFileSize(1*KiB, 1*MiB, 100)
@@ -392,7 +311,6 @@ func TestEncodeDecodeTwoFailure(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	totalDiskInfo := testEC.diskInfos
 	totalDisk := len(testEC.diskInfos)
 	//simulate two disk failure
 	testEC.diskInfos[0].available = false
@@ -404,7 +322,7 @@ func TestEncodeDecodeTwoFailure(t *testing.T) {
 		for _, m := range parityShards[1:] {
 			testEC.M = m
 			for N := k + m; N <= min(k+m+4, totalDisk); N++ {
-				testEC.diskInfos = totalDiskInfo[:N]
+				testEC.DiskNum = N
 				for _, bs := range blockSizesV1 {
 					testEC.BlockSize = bs
 					err = testEC.initSystem(true)
@@ -487,13 +405,11 @@ func benchmarkEncodeDecode(b *testing.B, dataShards, parityShards, diskNum int, 
 		if err != nil {
 			b.Fatal(err)
 		}
-		totalDiskInfo := testEC.diskInfos
 		// for each tuple (k,m,N,bs) we testify  encoding
 		// and decoding functions for numerous files
 		testEC.K = dataShards
 		testEC.M = parityShards
 		testEC.DiskNum = diskNum
-		testEC.diskInfos = totalDiskInfo[:diskNum]
 		testEC.BlockSize = blockSize
 		err = testEC.initSystem(true)
 		if err != nil {
@@ -558,16 +474,14 @@ func benchmarkEncodeDecodeWithFault(b *testing.B, dataShards, parityShards, disk
 		if err != nil {
 			b.Fatal(err)
 		}
-		totalDiskInfo := testEC.diskInfos
 		for j := 0; j < failNum; j++ {
-			totalDiskInfo[j].available = false
+			testEC.diskInfos[j].available = false
 		}
 		// for each tuple (k,m,N,bs) we testify  encoding
 		// and decoding functions for numerous files
 		testEC.K = dataShards
 		testEC.M = parityShards
 		testEC.DiskNum = diskNum
-		testEC.diskInfos = totalDiskInfo[:diskNum]
 
 		testEC.BlockSize = blockSize
 		err = testEC.initSystem(true)
@@ -699,13 +613,11 @@ func benchmarkParallel(b *testing.B, dataShards, parityShards, diskNum int, bloc
 	if err != nil {
 		b.Fatal(err)
 	}
-	totalDiskInfo := testEC.diskInfos
 	// for each tuple (k,m,N,bs) we testify  encoding
 	// and decoding functions for numerous files
 	testEC.K = dataShards
 	testEC.M = parityShards
 	testEC.DiskNum = diskNum
-	testEC.diskInfos = totalDiskInfo[:diskNum]
 
 	testEC.BlockSize = blockSize
 	err = testEC.initSystem(true)

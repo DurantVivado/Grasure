@@ -21,6 +21,7 @@ func main() {
 		configFile: "conf.json",
 		// fileMap:         make(map[string]*FileInfo),
 		diskFilePath: ".hdr.disks.path",
+		DiskNum:      diskNum,
 		K:            k,
 		M:            m,
 		BlockSize:    blockSize,

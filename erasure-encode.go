@@ -50,7 +50,7 @@ func (e *Erasure) EncodeFile(filename string) (*FileInfo, error) {
 	//first open relevant file resources
 	erg := new(errgroup.Group)
 	//save the blob
-	for i := range e.diskInfos {
+	for i := range e.diskInfos[:e.DiskNum] {
 		i := i
 		//we have to make sure the dist is appended to fi.Distribution in order
 		erg.Go(func() error {

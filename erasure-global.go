@@ -68,6 +68,7 @@ var (
 	mode              string
 	k                 int
 	m                 int
+	diskNum           int
 	filePath          string
 	savePath          string
 	newFilePath       string
@@ -97,6 +98,9 @@ func flag_init() {
 
 	flag.IntVar(&m, "m", 4, "the number of parity shards(2-4)")
 	flag.IntVar(&m, "parityNum", 4, "the number of parity shards(2-4)")
+
+	flag.IntVar(&diskNum, "dn", 4, "the number of disks used in .hdr.disk.path")
+	flag.IntVar(&diskNum, "diskNum", 4, "the number of disks used in .hdr.disk.path")
 
 	flag.StringVar(&filePath, "f", "", "upload: the local file path, download&update: the remote file name")
 	flag.StringVar(&filePath, "filePath", "", "upload: the local file path, download&update: the remote file name")

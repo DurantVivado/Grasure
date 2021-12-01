@@ -2,7 +2,7 @@
 file=LICENSE.txt
 go build -o grasure erasure-*.go main.go
 # init the system
-# ./grasure -md init -k 12 -m 4 -bs 4096
+./grasure -md init -k 12 -m 4 -dn 16 -bs 4096
 
 # A loopback system
 ./grasure -md encode -f test/$file -conStripes 100 -o

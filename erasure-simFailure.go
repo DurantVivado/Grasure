@@ -14,8 +14,8 @@ func (e *Erasure) destroy(mode string, failNum int) {
 			return
 		}
 		//we randomly picked up failNum disks and mark as unavailable
-		shuff := make([]int, len(e.diskInfos))
-		for i := 0; i < len(e.diskInfos); i++ {
+		shuff := make([]int, e.DiskNum)
+		for i := 0; i < e.DiskNum; i++ {
 			shuff[i] = i
 		}
 		rand.Seed(time.Now().UnixNano())
