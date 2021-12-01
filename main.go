@@ -18,14 +18,15 @@ func main() {
 	flag_init()
 	flag.Parse()
 	erasure := &Erasure{
-		configFile:   "conf.json",
-		fileMap:      make(map[string]*FileInfo),
+		configFile: "conf.json",
+		// fileMap:         make(map[string]*FileInfo),
 		diskFilePath: ".hdr.disks.path",
 		K:            k,
 		M:            m,
 		BlockSize:    blockSize,
 		conStripes:   conStripes,
 		override:     override,
+		quiet:        quiet,
 	}
 	//We read the config file
 	// ctx, _ := context.WithCancel(context.Background())

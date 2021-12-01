@@ -2,6 +2,7 @@ package main
 
 import (
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"sync"
@@ -14,7 +15,8 @@ import (
 //read file on the system and return byte stream, include recovering
 func (e *Erasure) readFile(filename string, savepath string) error {
 	baseFileName := filepath.Base(filename)
-	fi, ok := e.fileMap[baseFileName]
+	intFi, ok := e.fileMap.Load(baseFileName)
+	fi := intFi.(*FileInfo)
 	if !ok {
 		return ErrFileNotFound
 	}
@@ -53,7 +55,9 @@ func (e *Erasure) readFile(filename string, savepath string) error {
 		})
 	}
 	if err := erg.Wait(); err != nil {
-		// log.Printf("%s", err.Error())
+		if !e.quiet {
+			log.Printf("%s", err.Error())
+		}
 	}
 	defer func() {
 		for i := 0; i < e.DiskNum; i++ {
@@ -186,7 +190,9 @@ func (e *Erasure) readFile(filename string, savepath string) error {
 		stripeCnt += nextStripe
 
 	}
-	// log.Printf("reading %s!", filename)
+	if !e.quiet {
+		log.Printf("reading %s!", filename)
+	}
 	return nil
 }
 

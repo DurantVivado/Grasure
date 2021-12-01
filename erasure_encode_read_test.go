@@ -7,7 +7,6 @@ import (
 	"log"
 	"math/rand"
 	"os"
-	"runtime"
 	"testing"
 )
 
@@ -123,8 +122,8 @@ func TestEncodeDecodeNormal(t *testing.T) {
 	//we generate temp data and encode it into real storage sytem
 	//after that, all temporary file should be deleted
 	testEC := &Erasure{
-		configFile:      "conf.json",
-		fileMap:         make(map[string]*FileInfo),
+		configFile: "conf.json",
+		// fileMap:         make(map[string]*FileInfo),
 		diskFilePath:    ".hdr.disks.path",
 		replicateFactor: 3,
 		conStripes:      100,
@@ -206,8 +205,8 @@ func TestEncodeDecodeNormalParallel(t *testing.T) {
 	//we generate temp data and encode it into real storage sytem
 	//after that, all temporary file should be deleted
 	testEC := &Erasure{
-		configFile:      "conf.json",
-		fileMap:         make(map[string]*FileInfo),
+		configFile: "conf.json",
+		// fileMap:         make(map[string]*FileInfo),
 		diskFilePath:    ".hdr.disks.path",
 		replicateFactor: 3,
 		conStripes:      100,
@@ -289,8 +288,8 @@ func TestEncodeDecodeOneFailure(t *testing.T) {
 	//we generate temp data and encode it into real storage sytem
 	//after that, all temporary file should be deleted
 	testEC := &Erasure{
-		configFile:      "conf.json",
-		fileMap:         make(map[string]*FileInfo),
+		configFile: "conf.json",
+		// fileMap:         make(map[string]*FileInfo),
 		diskFilePath:    ".hdr.disks.path",
 		replicateFactor: 3,
 		conStripes:      100,
@@ -378,8 +377,8 @@ func TestEncodeDecodeTwoFailure(t *testing.T) {
 	//we generate temp data and encode it into real storage sytem
 	//after that, all temporary file should be deleted
 	testEC := &Erasure{
-		configFile:      "conf.json",
-		fileMap:         make(map[string]*FileInfo),
+		configFile: "conf.json",
+		// fileMap:         make(map[string]*FileInfo),
 		diskFilePath:    ".hdr.disks.path",
 		replicateFactor: 3,
 		conStripes:      100,
@@ -464,13 +463,16 @@ func TestEncodeDecodeTwoFailure(t *testing.T) {
 //Benchmarks dataShards, parityShards, diskNum, blockSize, fileSize
 func benchmarkEncodeDecode(b *testing.B, dataShards, parityShards, diskNum int, blockSize, fileSize int64) {
 	b.ResetTimer()
+	b.SetBytes(fileSize)
+
 	testEC := &Erasure{
-		configFile:      "conf.json",
-		fileMap:         make(map[string]*FileInfo),
+		configFile: "conf.json",
+		// fileMap:         make(map[string]*FileInfo),
 		diskFilePath:    ".hdr.disks.path",
 		replicateFactor: 3,
 		conStripes:      100,
 		override:        true,
+		quiet:           true,
 	}
 	defer deleteTempFiles([]int64{fileSize})
 	inpath := fmt.Sprintf("./test/temp-%d", fileSize)
@@ -531,13 +533,15 @@ func benchmarkEncodeDecode(b *testing.B, dataShards, parityShards, diskNum int, 
 }
 func benchmarkEncodeDecodeWithFault(b *testing.B, dataShards, parityShards, diskNum int, blockSize, fileSize int64, failNum int) {
 	b.ResetTimer()
+	b.SetBytes(fileSize)
 	testEC := &Erasure{
-		configFile:      "conf.json",
-		fileMap:         make(map[string]*FileInfo),
+		configFile: "conf.json",
+		// fileMap:         make(map[string]*FileInfo),
 		diskFilePath:    ".hdr.disks.path",
 		replicateFactor: 3,
 		conStripes:      100,
 		override:        true,
+		quiet:           true,
 	}
 	rand.Seed(100000007)
 	defer deleteTempFiles([]int64{fileSize})
@@ -681,14 +685,15 @@ func BenchmarkEncodeDecode20x4x24x4096x20Mx4fault(b *testing.B) {
 }
 
 // test performance when multiple users send encode/read requests.
-func benchmarkParallel(b *testing.B, dataShards, parityShards, diskNum int, blockSize, fileSize int64) {
+func benchmarkParallel(b *testing.B, dataShards, parityShards, diskNum int, blockSize, fileSize int64, conNum int) {
 	testEC := &Erasure{
-		configFile:      "conf.json",
-		fileMap:         make(map[string]*FileInfo),
+		configFile: "conf.json",
+		// fileMap:         make(map[string]*FileInfo),
 		diskFilePath:    ".hdr.disks.path",
 		replicateFactor: 3,
 		conStripes:      100,
 		override:        true,
+		quiet:           true,
 	}
 	err = testEC.readDiskPath()
 	if err != nil {
@@ -709,14 +714,13 @@ func benchmarkParallel(b *testing.B, dataShards, parityShards, diskNum int, bloc
 	}
 
 	//set the channel
-	c := runtime.GOMAXPROCS(0)
 	rand.Seed(100000007)
 	// create shards channel
-	fileCh := make(chan int, c)
-	inpath := make([]string, c)
-	outpath := make([]string, c)
+	fileCh := make(chan int, conNum)
+	inpath := make([]string, conNum)
+	outpath := make([]string, conNum)
 	//create c files and sent to channel
-	for i := 0; i < c; i++ {
+	for i := 0; i < conNum; i++ {
 		inpath[i] = fmt.Sprintf("./test/temp%d-%d", i, fileSize)
 		outpath[i] = fmt.Sprintf("./output/temp%d-%d", i, fileSize)
 		err = generateRandomFileBySize(inpath[i], fileSize)
@@ -727,14 +731,13 @@ func benchmarkParallel(b *testing.B, dataShards, parityShards, diskNum int, bloc
 	}
 	defer deleteTempFileGroup(inpath, outpath)
 	b.SetBytes(fileSize)
-	b.SetParallelism(c)
+	b.SetParallelism(conNum)
 	b.ReportAllocs()
 	b.ResetTimer()
 	//start the benchmark goroutines
 	b.RunParallel(func(p *testing.PB) {
 		for p.Next() {
 			i := <-fileCh
-			log.Println(i)
 			err = testEC.readConfig()
 			if err != nil {
 				b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
@@ -767,6 +770,9 @@ func benchmarkParallel(b *testing.B, dataShards, parityShards, diskNum int, bloc
 	})
 }
 
-func BenchmarkParallel_4x2x6x1024x1M(b *testing.B) {
-	benchmarkParallel(b, 4, 2, 6, 1024, 1*MiB)
+func BenchmarkParallel_2x2x4x1024x1Mx2(b *testing.B) {
+	benchmarkParallel(b, 2, 2, 4, 1024, 1*MiB, 2)
+}
+func BenchmarkParallel_4x2x6x1024x1Mx4(b *testing.B) {
+	benchmarkParallel(b, 4, 2, 6, 1024, 1*MiB, 4)
 }

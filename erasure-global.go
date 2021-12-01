@@ -43,11 +43,12 @@ type Erasure struct {
 	allStripeSize   int64                     // the data plus parity stripe size, equal to (k+m)*bs
 	diskInfos       []*DiskInfo               // disk paths
 	configFile      string                    // configure file
-	fileMap         map[string]*FileInfo      // File info lists
+	fileMap         sync.Map                  // File info lists
 	diskFilePath    string                    // the path of file recording all disks path
 	override        bool                      // whether or not to override former files or directories, default to false
 	errgroupPool    sync.Pool                 // errgroup pool
-	mu              sync.RWMutex
+	mu              sync.RWMutex              // the read and write lock
+	quiet           bool                      //whether or not to mute outputs
 	// dataBlobPool    sync.Pool                 // memory pool for conStripes data  access
 	// allBlobPool     sync.Pool                 // memory pool for conStripes stripe access
 }
@@ -80,6 +81,7 @@ var (
 	conReads          bool
 	conStripes        int
 	replicateFactor   int
+	quiet             bool
 )
 
 //the parameter lists, with fullname or abbreviation
@@ -131,11 +133,14 @@ func flag_init() {
 
 	flag.IntVar(&conStripes, "cs", 100, "how many stripes are allowed to encode/decode concurrently")
 	flag.IntVar(&conStripes, "conStripes", 100, "how many stripes are allowed to encode/decode concurrently")
+
+	flag.BoolVar(&quiet, "q", false, "if true mute outputs otherwise print them")
+	flag.BoolVar(&quiet, "quiet", false, "if true mute outputs otherwise print them")
+
 }
 
 //global system-level variables
 var (
-	wg  sync.WaitGroup
 	err error
 )
 

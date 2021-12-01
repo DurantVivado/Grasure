@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 
@@ -11,7 +12,7 @@ import (
 
 func (e *Erasure) EncodeFile(filename string) (*FileInfo, error) {
 	baseFileName := filepath.Base(filename)
-	if _, ok := e.fileMap[baseFileName]; ok && !e.override {
+	if _, ok := e.fileMap.Load(baseFileName); ok && !e.override {
 		return nil, fmt.Errorf("the file %s has already been in the file system, if you wish to override, please attach `-o`",
 			baseFileName)
 	}
@@ -153,9 +154,12 @@ func (e *Erasure) EncodeFile(filename string) (*FileInfo, error) {
 	}
 	//record the file meta
 	//transform map into array for json marshaling
-
-	e.fileMap[baseFileName] = fi
-	// log.Println(baseFileName, " successfully encoded. encoding size ", e.stripedFileSize(fileSize), "bytes")
+	e.fileMap.Store(baseFileName, fi)
+	// e.fileMap[baseFileName] = fi
+	if !e.quiet {
+		log.Println(baseFileName, " successfully encoded. encoding size ",
+			e.stripedFileSize(fileSize), "bytes")
+	}
 	return fi, nil
 }
 
