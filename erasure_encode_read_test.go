@@ -7,6 +7,7 @@ import (
 	"log"
 	"math/rand"
 	"os"
+	"runtime"
 	"testing"
 )
 
@@ -98,6 +99,26 @@ func deleteTempFiles(tempFileSizes []int64) {
 		}
 	}
 }
+
+func deleteTempFileGroup(inpath, outpath []string) {
+	for i := range inpath {
+		if ex, _ := PathExist(inpath[i]); !ex {
+			continue
+		}
+		err = os.Remove(inpath[i])
+		if err != nil {
+			log.Fatal(err)
+		}
+		if ex, _ := PathExist(outpath[i]); !ex {
+			continue
+		}
+		err = os.Remove(outpath[i])
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+}
+
 func TestEncodeDecodeNormal(t *testing.T) {
 	//we generate temp data and encode it into real storage sytem
 	//after that, all temporary file should be deleted
@@ -451,7 +472,6 @@ func benchmarkEncodeDecode(b *testing.B, dataShards, parityShards, diskNum int, 
 		conStripes:      100,
 		override:        true,
 	}
-	rand.Seed(100000007)
 	defer deleteTempFiles([]int64{fileSize})
 	inpath := fmt.Sprintf("./test/temp-%d", fileSize)
 	outpath := fmt.Sprintf("./output/temp-%d", fileSize)
@@ -660,6 +680,91 @@ func BenchmarkEncodeDecode20x4x24x4096x20Mx4fault(b *testing.B) {
 	benchmarkEncodeDecodeWithFault(b, 20, 4, 24, 4096, 20*MiB, 4)
 }
 
+// test performance when multiple users send encode/read requests.
 func benchmarkParallel(b *testing.B, dataShards, parityShards, diskNum int, blockSize, fileSize int64) {
+	testEC := &Erasure{
+		configFile:      "conf.json",
+		fileMap:         make(map[string]*FileInfo),
+		diskFilePath:    ".hdr.disks.path",
+		replicateFactor: 3,
+		conStripes:      100,
+		override:        true,
+	}
+	err = testEC.readDiskPath()
+	if err != nil {
+		b.Fatal(err)
+	}
+	totalDiskInfo := testEC.diskInfos
+	// for each tuple (k,m,N,bs) we testify  encoding
+	// and decoding functions for numerous files
+	testEC.K = dataShards
+	testEC.M = parityShards
+	testEC.DiskNum = diskNum
+	testEC.diskInfos = totalDiskInfo[:diskNum]
 
+	testEC.BlockSize = blockSize
+	err = testEC.initSystem(true)
+	if err != nil {
+		b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
+	}
+
+	//set the channel
+	c := runtime.GOMAXPROCS(0)
+	rand.Seed(100000007)
+	// create shards channel
+	fileCh := make(chan int, c)
+	inpath := make([]string, c)
+	outpath := make([]string, c)
+	//create c files and sent to channel
+	for i := 0; i < c; i++ {
+		inpath[i] = fmt.Sprintf("./test/temp%d-%d", i, fileSize)
+		outpath[i] = fmt.Sprintf("./output/temp%d-%d", i, fileSize)
+		err = generateRandomFileBySize(inpath[i], fileSize)
+		if err != nil {
+			b.Fatal(err)
+		}
+		fileCh <- i
+	}
+	defer deleteTempFileGroup(inpath, outpath)
+	b.SetBytes(fileSize)
+	b.SetParallelism(c)
+	b.ReportAllocs()
+	b.ResetTimer()
+	//start the benchmark goroutines
+	b.RunParallel(func(p *testing.PB) {
+		for p.Next() {
+			i := <-fileCh
+			err = testEC.readConfig()
+			if err != nil {
+				b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
+			}
+			_, err := testEC.EncodeFile(inpath[i])
+			if err != nil {
+				b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
+			}
+			err = testEC.writeConfig()
+			if err != nil {
+				b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
+			}
+			err = testEC.updateConfigReplica()
+			if err != nil {
+				b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
+			}
+
+			err = testEC.readFile(inpath[i], outpath[i])
+			if err != nil {
+				b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
+			}
+			//evaluate the results
+			if ok, err := checkFileIfSame(inpath[i], outpath[i]); !ok && err != nil {
+				b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
+			} else if err != nil {
+				b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
+			}
+		}
+	})
+}
+
+func BenchmarkParallel_2x1x3x512x1M(b *testing.B) {
+	benchmarkParallel(b, 2, 1, 3, 512, 1*MiB)
 }
