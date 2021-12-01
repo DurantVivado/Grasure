@@ -151,6 +151,7 @@ It currently suppports `encode`, `read`, `update`, and more coming soon.
 |mode(md)|the mode of ec system, one of (encode, decode, update, scaling, recover)||
 |dataNum(k)|the number of data shards|12|
 |parityNum(m)|the number of parity shards(fault tolerance)|4|
+|diskNum(dn)|the number of disks (may be less than those listed in `.hdr.disk.path`)|4|
 |filePath(f)|upload: the local file path, download&update: the remote file basename||
 |savePath|the local save path (local path)|file.save|
 |newDataNum(new_k)|the new number of data shards|32|
