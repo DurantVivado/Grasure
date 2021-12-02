@@ -20,14 +20,15 @@ func main() {
 	erasure := &Erasure{
 		configFile: "conf.json",
 		// fileMap:         make(map[string]*FileInfo),
-		diskFilePath: ".hdr.disks.path",
-		DiskNum:      diskNum,
-		K:            k,
-		M:            m,
-		BlockSize:    blockSize,
-		conStripes:   conStripes,
-		override:     override,
-		quiet:        quiet,
+		diskFilePath:    ".hdr.disks.path",
+		DiskNum:         diskNum,
+		K:               k,
+		M:               m,
+		BlockSize:       blockSize,
+		conStripes:      conStripes,
+		override:        override,
+		quiet:           quiet,
+		replicateFactor: replicateFactor,
 	}
 	//We read the config file
 	// ctx, _ := context.WithCancel(context.Background())
@@ -68,10 +69,14 @@ func main() {
 		failOnErr(mode, err)
 		err = erasure.updateConfigReplica()
 		failOnErr(mode, err)
-	// case "recover":
-	// 	//recover all the blocks of a disk and put the recovered result to new path
-	// 	e.readConfig()
-	// 	recover(recoveredDiskPath)
+	case "recover":
+		//recover all the blocks of a disk and put the recovered result to new path
+		err = erasure.readConfig()
+		failOnErr(mode, err)
+		erasure.destroy(failMode, failNum)
+		err = erasure.recover()
+		failOnErr(mode, err)
+
 	// case "scaling":
 	// 	//scaling the system, ALERT: this is a system-level operation and irreversible
 	// 	e.readConfig()

@@ -112,7 +112,7 @@ func (e *Erasure) readFile(filename string, savepath string) error {
 				erg := e.errgroupPool.Get().(*errgroup.Group)
 				defer e.errgroupPool.Put(erg)
 				//read all blocks in parallel
-				for i := 0; i < e.K; i++ {
+				for i := 0; i < e.K+e.M; i++ {
 					i := i
 					diskId := dist[stripeNo][i]
 					disk := e.diskInfos[diskId]
@@ -140,17 +140,17 @@ func (e *Erasure) readFile(filename string, savepath string) error {
 					return err
 				}
 				//verify and reconstruct
-				// ok, err := e.enc.Verify(splitData)
-				// if err != nil {
-				// 	return err
-				// }
-				// if !ok {
-				// fmt.Println("reconstruct data of stripe:", stripeNo)
-				err = e.enc.ReconstructWithList(splitData, &diskFailList, &(fi.Distribution[stripeNo]), false)
+				ok, err := e.enc.Verify(splitData)
 				if err != nil {
 					return err
 				}
-				// }
+				if !ok {
+					// fmt.Println("reconstruct data of stripe:", stripeNo)
+					err = e.enc.ReconstructWithList(splitData, &diskFailList, &(fi.Distribution[stripeNo]), false)
+					if err != nil {
+						return err
+					}
+				}
 				//join and write to output file
 
 				for i := 0; i < e.K; i++ {

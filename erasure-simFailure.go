@@ -20,7 +20,7 @@ func (e *Erasure) destroy(mode string, failNum int) {
 		}
 		rand.Seed(time.Now().UnixNano())
 		rand.Shuffle(len(shuff), func(i, j int) { shuff[i], shuff[j] = shuff[j], shuff[i] })
-		log.Println("simulate on failure of:")
+		log.Println("simulate failure on:")
 		for i := 0; i < failNum; i++ {
 			fmt.Println(e.diskInfos[shuff[i]].diskPath)
 			e.diskInfos[shuff[i]].available = false

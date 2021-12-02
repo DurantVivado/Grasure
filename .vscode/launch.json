@@ -16,15 +16,16 @@
             "args": [ 
                         //init mode
                         // "-md","init", 
-                        // "-k", "2", 
-                        // "-m","2",
-                        // "-bs","4096"
+                        // "-k", "9", 
+                        // "-m","3",
+                        // "-bs","4096",
+                        // "-dn", "16"
                         
                         //encode mode
-                        "-md","encode", 
-                        "-f","test/Goprogramming.pdf",
-                        "-conStripes","100",
-                        "-o"
+                        // "-md","encode", 
+                        // "-f","test/Goprogramming.pdf",
+                        // "-conStripes","100",
+                        // "-o"
                         // "-md","encode", 
                         // "-f","test/LICENSE.txt",
                         // "-conStripes","100",
@@ -48,6 +49,11 @@
                         //delete mode
                         // "-md","delete", 
                         // "-f","LICENSE.txt",
+
+                        //recover mode
+                        "-md", "recover",
+                         "-fn","4",
+                        "-o"
                        
                         
                     ]
