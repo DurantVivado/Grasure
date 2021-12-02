@@ -42,18 +42,17 @@ func (e *Erasure) recover() error {
 	if failNum == 0 {
 		return nil
 	}
-	backups := e.diskInfos[e.DiskNum:]
 	if failNum > e.DiskNum-e.K {
 		return ErrTooFewDisksAlive
 	}
-	if failNum > len(backups) {
+	if failNum > len(e.diskInfos)-e.DiskNum {
 		return ErrNotEnoughBackupForRecovery
 	}
 	//the failed disks are mapped to backup disks
 	replaceMap := make(map[int]int, failNum)
 	diskFailList := make(map[int]bool, failNum)
-	j := 0
-	for i := 0; i < e.DiskNum && j < len(backups); i++ {
+	j := e.DiskNum
+	for i := 0; i < e.DiskNum; i++ {
 		if !e.diskInfos[i].available {
 			replaceMap[i] = j
 			diskFailList[i] = true
@@ -70,6 +69,9 @@ func (e *Erasure) recover() error {
 		//These files can be repaired concurrently
 		func() error {
 			//read the current disks
+			erg := e.errgroupPool.Get().(*errgroup.Group)
+			defer e.errgroupPool.Put(erg)
+
 			for i, disk := range e.diskInfos[:e.DiskNum] {
 				i := i
 				disk := disk
@@ -88,6 +90,9 @@ func (e *Erasure) recover() error {
 					return nil
 				})
 			}
+			if err := erg.Wait(); err != nil {
+				return err
+			}
 			//open restore path IOs
 			for i, disk := range e.diskInfos[e.DiskNum : e.DiskNum+failNum] {
 				i := i
@@ -103,7 +108,7 @@ func (e *Erasure) recover() error {
 					if err := os.Mkdir(folderPath, 0666); err != nil {
 						return ErrDataDirExist
 					}
-					rfs[i], err = os.Open(blobPath)
+					rfs[i], err = os.Create(blobPath)
 					if err != nil {
 						return err
 					}
@@ -112,9 +117,7 @@ func (e *Erasure) recover() error {
 				})
 			}
 			if err := erg.Wait(); err != nil {
-				if !e.quiet {
-					log.Printf("%s", err.Error())
-				}
+				return err
 			}
 			defer func() {
 				for i := 0; i < failNum; i++ {
@@ -202,13 +205,11 @@ func (e *Erasure) recover() error {
 						for i := 0; i < e.K+e.M; i++ {
 							i := i
 							diskId := dist[stripeNo][i]
-							disk := e.diskInfos[diskId]
-							if disk.available {
-								restorePath := replaceMap[i]
+							if v, ok := replaceMap[diskId]; ok {
+								restoreId := v - e.DiskNum
 								writeOffset := fd.blockToOffset[stripeNo][i]
 								egp.Go(func() error {
-									// fmt.Println("i:", i, "writeOffset", writeOffset+e.BlockSize, "at stripe", subCnt)
-									_, err := rfs[restorePath].WriteAt(splitData[i],
+									_, err := rfs[restoreId].WriteAt(splitData[i],
 										int64(writeOffset)*e.BlockSize)
 									if err != nil {
 										return err
@@ -269,7 +270,7 @@ func (e *Erasure) updateDiskPath(replaceMap map[int]int) error {
 			newDiskInfos = append(newDiskInfos, e.diskInfos[i])
 		}
 	}
-	for j := len(replaceMap); j < len(e.diskInfos); j++ {
+	for j := e.DiskNum + len(replaceMap); j < len(e.diskInfos); j++ {
 		newDiskInfos = append(newDiskInfos, e.diskInfos[j])
 	}
 	e.diskInfos = newDiskInfos
