@@ -8,7 +8,7 @@
         "go.buildTags": "",
         "go.buildFlags": [],
         "go.testTimeout": "7200s",
-        // "go.testFlags": ["-v"],
+        "go.testFlags": ["-v"],
         "go.lintFlags": [],
         "go.vetFlags": [],
         "go.coverOnSave": false,

@@ -5,7 +5,7 @@ Implementing most popular erasured-based filesystem operations, it's readily use
 
 Project home: https://github.com/DurantVivado/Grasure
 
-Godoc: -
+Godoc: https://pkg.go.dev/github.com/DurantVivado/Grasure
 
 
 ## Project Architecture:

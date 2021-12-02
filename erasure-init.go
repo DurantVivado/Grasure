@@ -61,14 +61,13 @@ func (e *Erasure) initSystem(assume bool) error {
 		return reedsolomon.ErrMaxShardNum
 	}
 	if e.K+e.M > e.DiskNum {
-		return ErrTooFewDisks
+		return ErrTooFewDisksAlive
 	}
 	//replicate the config files
-	if replicateFactor < 0 {
+
+	if e.replicateFactor < 1 {
 		return ErrNegativeReplicateFactor
 	}
-	e.replicateFactor = replicateFactor
-
 	err = e.resetSystem()
 	if err != nil {
 		return err
@@ -186,9 +185,6 @@ func (e *Erasure) readConfig() error {
 			return err
 		}
 	}
-	// e.K = int(k)
-	// e.M = int(m)
-	// e.BlockSize = blockSize
 	//initialize the ReedSolomon Code
 	e.enc, err = reedsolomon.New(e.K, e.M,
 		reedsolomon.WithAutoGoroutines(int(e.BlockSize)),
@@ -329,9 +325,11 @@ func (e *Erasure) updateConfigReplica() error {
 
 //delete specific file
 func (e *Erasure) removeFile(filename string) error {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-
+	baseFilename := filepath.Base(filename)
+	if _, ok := e.fileMap.Load(baseFilename); !ok {
+		return fmt.Errorf("the file %s does not exist in the file system",
+			baseFilename)
+	}
 	g := new(errgroup.Group)
 
 	for _, path := range e.diskInfos[:e.DiskNum] {
@@ -345,7 +343,7 @@ func (e *Erasure) removeFile(filename string) error {
 		}
 		g.Go(func() error {
 
-			err = os.RemoveAll(filepath.Join(path.diskPath, filename))
+			err = os.RemoveAll(filepath.Join(path.diskPath, baseFilename))
 			if err != nil {
 				return err
 			}
@@ -355,8 +353,47 @@ func (e *Erasure) removeFile(filename string) error {
 	if err := g.Wait(); err != nil {
 		return err
 	}
-	e.fileMap.Delete(filename)
+	e.fileMap.Delete(baseFilename)
 	// delete(e.fileMap, filename)
-	log.Printf("file %s successfully deleted.", filename)
+	if !e.quiet {
+		log.Printf("file %s successfully deleted.", baseFilename)
+	}
 	return nil
+}
+
+//check if file exists both in config and storage blobs
+func (e *Erasure) checkIfFileExist(filename string) (bool, error) {
+	//1. first check the storage blobs if file still exists
+	baseFilename := filepath.Base(filename)
+
+	g := new(errgroup.Group)
+
+	for _, path := range e.diskInfos[:e.DiskNum] {
+		path := path
+		files, err := os.ReadDir(path.diskPath)
+		if err != nil {
+			return false, err
+		}
+		if len(files) == 0 {
+			continue
+		}
+		g.Go(func() error {
+
+			subpath := filepath.Join(path.diskPath, baseFilename)
+			if ok, err := PathExist(subpath); !ok && err == nil {
+				return ErrFileBlobNotFound
+			} else if err != nil {
+				return err
+			}
+			return nil
+		})
+	}
+	if err := g.Wait(); err != nil {
+		return false, err
+	}
+	//2. check if fileMap contains the file
+	if _, ok := e.fileMap.Load(baseFilename); !ok {
+		return false, nil
+	}
+	return true, nil
 }

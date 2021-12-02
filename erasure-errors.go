@@ -9,13 +9,15 @@ import (
 var ErrConfFileNotExist = errors.New("the conf file not exist")
 var ErrEmptyData = errors.New("the file to encode is empty")
 var ErrDataDirExist = errors.New("data directory already exists")
-var ErrTooFewDisks = errors.New("too few survival disks, i.e., k+m < N")
+var ErrTooFewDisksAlive = errors.New("too few survival disks, i.e., k+m < N")
 var ErrNotInitialized = errors.New("system not initialized, please initialize with `-mode init` first")
 var ErrFileNotFound = errors.New("file not found")
 var ErrSurvivalNotEnoughForDecoding = errors.New("the failed block number exceeds fault tolerance, data renders unrecoverable")
 var ErrFileIncompleted = errors.New("file hash check fails, file renders incompleted")
 var ErrFailModeNotRecognized = errors.New("the fail mode is not recognizable, please specify in \"diskFail\" or \"bitRot\"")
 var ErrNegativeReplicateFactor = errors.New("the replicate factor MUST be non-negative")
+var ErrNotEnoughBackupForRecovery = errors.New("not enough disk for recovery, needs more backup devices")
+var ErrFileBlobNotFound = errors.New("file blob not found. please try to read it.")
 
 type DiskError struct {
 	diskPath string

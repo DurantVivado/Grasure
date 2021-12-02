@@ -50,6 +50,7 @@ var bigFilePaths = []string{
 	"./test/file.16G",
 }
 
+//-------------------------TEST UNIT----------------------------
 func generateRandomFileSize(minSize, maxSize int64, num int) []int64 {
 	out := make([]int64, num)
 	for i := 0; i < num; i++ {
@@ -376,8 +377,82 @@ func TestEncodeDecodeTwoFailure(t *testing.T) {
 
 }
 
-//PASS
+// Test remove func
+func TestRemove(t *testing.T) {
+	testEC := &Erasure{
+		configFile:      "conf.json",
+		diskFilePath:    ".hdr.disks.path",
+		replicateFactor: 3,
+		conStripes:      100,
+		override:        true,
+		quiet:           true,
+	}
+	rand.Seed(100000007)
+	tempFileSizes := generateRandomFileSize(1*KiB, 1*MiB, 100)
+	defer deleteTempFiles(tempFileSizes)
+	//1. read disk paths
+	err = testEC.readDiskPath()
+	if err != nil {
+		t.Fatal(err)
+	}
+	totalDisk := len(testEC.diskInfos)
+	// for each tuple (k,m,N,bs) we testify  encoding
+	// and decoding functions for numerous files
+	for _, k := range dataShards {
+		testEC.K = k
+		for _, m := range parityShards {
+			testEC.M = m
+			for N := k + m; N <= min(k+m+4, totalDisk); N++ {
+				testEC.DiskNum = N
+				for _, bs := range blockSizesV1 {
+					testEC.BlockSize = bs
+					err = testEC.initSystem(true)
+					if err != nil {
+						t.Fatalf("k:%d,m:%d,bs:%d,N:%d,%s\n", k, m, bs, N, err.Error())
+					}
+					log.Printf("----k:%d,m:%d,bs:%d,N:%d----\n", k, m, bs, N)
 
+					for _, fileSize := range tempFileSizes {
+						inpath := fmt.Sprintf("./test/temp-%d", fileSize)
+						err = generateRandomFileBySize(inpath, fileSize)
+						if err != nil {
+							t.Errorf("k:%d,m:%d,bs:%d,N:%d,%s\n", k, m, bs, N, err.Error())
+						}
+
+						err = testEC.readConfig()
+						if err != nil {
+							t.Errorf("k:%d,m:%d,bs:%d,N:%d,%s\n", k, m, bs, N, err.Error())
+						}
+						_, err := testEC.EncodeFile(inpath)
+						if err != nil {
+							t.Errorf("k:%d,m:%d,bs:%d,N:%d encode fails when fileSize is %d, for %s", k, m, bs, N, fileSize, err.Error())
+						}
+						err = testEC.removeFile(inpath)
+						if err != nil {
+							t.Fatalf("k:%d,m:%d,bs:%d,N:%d,%s\n", k, m, bs, N, err.Error())
+						}
+						err = testEC.writeConfig()
+						if err != nil {
+							t.Errorf("k:%d,m:%d,bs:%d,N:%d,%s\n", k, m, bs, N, err.Error())
+						}
+						err = testEC.updateConfigReplica()
+						if err != nil {
+							t.Errorf("k:%d,m:%d,bs:%d,N:%d,%s\n", k, m, bs, N, err.Error())
+						}
+						if ok, err := testEC.checkIfFileExist(inpath); err != ErrFileBlobNotFound || ok {
+							t.Fatalf("k:%d,m:%d,bs:%d,N:%d,%s\n", k, m, bs, N, err.Error())
+
+						}
+					}
+				}
+			}
+		}
+	}
+
+}
+
+//PASS
+//---------------------BENCHMARK---------------------------------
 //Benchmarks dataShards, parityShards, diskNum, blockSize, fileSize
 func benchmarkEncodeDecode(b *testing.B, dataShards, parityShards, diskNum int, blockSize, fileSize int64) {
 	b.ResetTimer()
@@ -642,26 +717,30 @@ func benchmarkParallel(b *testing.B, dataShards, parityShards, diskNum int, bloc
 		fileCh <- i
 	}
 	defer deleteTempFileGroup(inpath, outpath)
-	b.SetBytes(fileSize)
+	b.SetBytes(fileSize * int64(conNum))
 	b.SetParallelism(conNum)
 	b.ReportAllocs()
 	b.ResetTimer()
 	//start the benchmark goroutines
+	err = testEC.readConfig()
+	if err != nil {
+		b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
+	}
+	defer func() {
+		err = testEC.writeConfig()
+		if err != nil {
+			b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
+		}
+	}()
 	b.RunParallel(func(p *testing.PB) {
 		for p.Next() {
 			i := <-fileCh
-			err = testEC.readConfig()
-			if err != nil {
-				b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
-			}
+
 			_, err := testEC.EncodeFile(inpath[i])
 			if err != nil {
 				b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
 			}
-			err = testEC.writeConfig()
-			if err != nil {
-				b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
-			}
+
 			err = testEC.updateConfigReplica()
 			if err != nil {
 				b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
@@ -687,4 +766,36 @@ func BenchmarkParallel_2x2x4x1024x1Mx2(b *testing.B) {
 }
 func BenchmarkParallel_4x2x6x1024x1Mx4(b *testing.B) {
 	benchmarkParallel(b, 4, 2, 6, 1024, 1*MiB, 4)
+}
+
+func BenchmarkParallel_2x3x6x4096x1Mx4(b *testing.B) {
+	benchmarkParallel(b, 2, 3, 6, 4096, 1*MiB, 4)
+}
+
+func BenchmarkParallel_4x3x8x4096x1Mx8(b *testing.B) {
+	benchmarkParallel(b, 4, 3, 8, 4096, 1*MiB, 8)
+}
+
+func BenchmarkParallel_6x3x9x4096x5Mx3(b *testing.B) {
+	benchmarkParallel(b, 6, 3, 9, 4096, 5*MiB, 3)
+}
+
+func BenchmarkParallel_12x4x18x8192x10Mx12(b *testing.B) {
+	benchmarkParallel(b, 12, 4, 18, 8192, 10*MiB, 12)
+}
+
+func BenchmarkParallel_16x4x24x8192x10Mx40(b *testing.B) {
+	benchmarkParallel(b, 16, 4, 24, 8192, 10*MiB, 40)
+}
+
+func BenchmarkParallel_20x4x24x16384x10Mx80(b *testing.B) {
+	benchmarkParallel(b, 20, 4, 24, 16384, 10*MiB, 80)
+}
+
+func BenchmarkParallel_20x4x24x16384x10Mx100(b *testing.B) {
+	benchmarkParallel(b, 20, 4, 24, 16384, 10*MiB, 100)
+}
+
+func BenchmarkParallel_20x4x24x16384x1Mx200(b *testing.B) {
+	benchmarkParallel(b, 20, 4, 24, 16384, 10*MiB, 200)
 }

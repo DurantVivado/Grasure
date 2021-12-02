@@ -5,7 +5,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"sync"
 	"sync/atomic"
 
 	"github.com/DurantVivado/reedsolomon"
@@ -30,7 +29,6 @@ func (e *Erasure) readFile(filename string, savepath string) error {
 	ifs := make([]*os.File, e.DiskNum)
 	erg := new(errgroup.Group)
 	diskFailList := make(map[int]bool)
-	var mu sync.Mutex
 	for i, disk := range e.diskInfos[:e.DiskNum] {
 		i := i
 		disk := disk
@@ -38,9 +36,7 @@ func (e *Erasure) readFile(filename string, savepath string) error {
 			folderPath := filepath.Join(disk.diskPath, baseFileName)
 			blobPath := filepath.Join(folderPath, "BLOB")
 			if !disk.available {
-				mu.Lock()
 				diskFailList[i] = true
-				mu.Unlock()
 				return &DiskError{disk.diskPath, " available flag set false"}
 			}
 			ifs[i], err = os.Open(blobPath)
@@ -68,7 +64,7 @@ func (e *Erasure) readFile(filename string, savepath string) error {
 	}()
 	if int(alive) < e.K {
 		//the disk renders inrecoverable
-		return ErrTooFewDisks
+		return ErrTooFewDisksAlive
 	}
 	if int(alive) == e.DiskNum {
 		if !e.quiet {
@@ -116,7 +112,7 @@ func (e *Erasure) readFile(filename string, savepath string) error {
 				erg := e.errgroupPool.Get().(*errgroup.Group)
 				defer e.errgroupPool.Put(erg)
 				//read all blocks in parallel
-				for i := 0; i < e.K+e.M; i++ {
+				for i := 0; i < e.K; i++ {
 					i := i
 					diskId := dist[stripeNo][i]
 					disk := e.diskInfos[diskId]
@@ -144,17 +140,17 @@ func (e *Erasure) readFile(filename string, savepath string) error {
 					return err
 				}
 				//verify and reconstruct
-				ok, err := e.enc.Verify(splitData)
+				// ok, err := e.enc.Verify(splitData)
+				// if err != nil {
+				// 	return err
+				// }
+				// if !ok {
+				// fmt.Println("reconstruct data of stripe:", stripeNo)
+				err = e.enc.ReconstructWithList(splitData, &diskFailList, &(fi.Distribution[stripeNo]), false)
 				if err != nil {
 					return err
 				}
-				if !ok {
-					// fmt.Println("reconstruct data of stripe:", stripeNo)
-					err = e.enc.ReconstructWithList(splitData, &diskFailList, &(fi.Distribution[stripeNo]), false)
-					if err != nil {
-						return err
-					}
-				}
+				// }
 				//join and write to output file
 
 				for i := 0; i < e.K; i++ {
