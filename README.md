@@ -38,7 +38,7 @@ Here we elaborate the steps as following, in dir `./examples`:
 go build -o main ./main.go ./flag.go 
 ```
 
-1. New a file named `.hdr.disks.path` in project root, type the path of your local disks, e.g.,
+1. New a file named `.hdr.disks.path` in `./examples`, list the path of your local disks, e.g.,
 ```
 /home/server1/data/data1
 /home/server1/data/data2
