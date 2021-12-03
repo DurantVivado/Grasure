@@ -1,4 +1,4 @@
-package main
+package grasure
 
 //update a file according to a new file, the local `filename` will be used to update the file in the cloud with the same name
 func (e *Erasure) update(oldFile, newFile string) error {
@@ -36,8 +36,8 @@ func (e *Erasure) update(oldFile, newFile string) error {
 	// 	// } else if err != nil {
 	// 	// 	return err
 	// 	// }
-	// 	e.removeFile(oldFile)
-	// 	return e.writeConfig()
+	// 	e.RemoveFile(oldFile)
+	// 	return e.WriteConfig()
 	// }
 	// h := sha256.New()
 	// f.Seek(0, 0)
@@ -117,7 +117,7 @@ func (e *Erasure) update(oldFile, newFile string) error {
 	// }
 
 	// //write into config
-	// err = e.writeConfig()
+	// err = e.WriteConfig()
 	// if err != nil {
 	// 	return err
 	// }

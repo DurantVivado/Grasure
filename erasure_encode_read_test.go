@@ -1,6 +1,6 @@
 // This test unit tests the encoding and decoding efficiency
 //
-package main
+package grasure
 
 import (
 	"fmt"
@@ -51,6 +51,7 @@ var bigFilePaths = []string{
 }
 
 //-------------------------TEST UNIT----------------------------
+
 func generateRandomFileSize(minSize, maxSize int64, num int) []int64 {
 	out := make([]int64, num)
 	for i := 0; i < num; i++ {
@@ -123,19 +124,19 @@ func TestEncodeDecodeNormal(t *testing.T) {
 	//we generate temp data and encode it into real storage sytem
 	//after that, all temporary file should be deleted
 	testEC := &Erasure{
-		configFile: "conf.json",
+		ConfigFile: "conf.json",
 		// fileMap:         make(map[string]*FileInfo),
-		diskFilePath:    ".hdr.disks.path",
-		replicateFactor: 3,
-		conStripes:      100,
-		override:        true,
-		quiet:           true,
+		DiskFilePath:    "examples/.hdr.disks.path",
+		ReplicateFactor: 3,
+		ConStripes:      100,
+		Override:        true,
+		Quiet:           true,
 	}
 	rand.Seed(100000007)
 	tempFileSizes := generateRandomFileSize(1*KiB, 1*MiB, 100)
 	defer deleteTempFiles(tempFileSizes)
 	//1. read disk paths
-	err = testEC.readDiskPath()
+	err = testEC.ReadDiskPath()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -150,7 +151,7 @@ func TestEncodeDecodeNormal(t *testing.T) {
 				testEC.DiskNum = N
 				for _, bs := range blockSizesV1 {
 					testEC.BlockSize = bs
-					err = testEC.initSystem(true)
+					err = testEC.InitSystem(true)
 					if err != nil {
 						t.Fatalf("k:%d,m:%d,bs:%d,N:%d,%s\n", k, m, bs, N, err.Error())
 					}
@@ -164,7 +165,7 @@ func TestEncodeDecodeNormal(t *testing.T) {
 							t.Errorf("k:%d,m:%d,bs:%d,N:%d,%s\n", k, m, bs, N, err.Error())
 						}
 
-						err = testEC.readConfig()
+						err = testEC.ReadConfig()
 						if err != nil {
 							t.Errorf("k:%d,m:%d,bs:%d,N:%d,%s\n", k, m, bs, N, err.Error())
 						}
@@ -172,16 +173,12 @@ func TestEncodeDecodeNormal(t *testing.T) {
 						if err != nil {
 							t.Errorf("k:%d,m:%d,bs:%d,N:%d encode fails when fileSize is %d, for %s", k, m, bs, N, fileSize, err.Error())
 						}
-						err = testEC.writeConfig()
-						if err != nil {
-							t.Errorf("k:%d,m:%d,bs:%d,N:%d,%s\n", k, m, bs, N, err.Error())
-						}
-						err = testEC.updateConfigReplica()
+						err = testEC.WriteConfig()
 						if err != nil {
 							t.Errorf("k:%d,m:%d,bs:%d,N:%d,%s\n", k, m, bs, N, err.Error())
 						}
 
-						err = testEC.readFile(inpath, outpath)
+						err = testEC.ReadFile(inpath, outpath)
 						if err != nil {
 							t.Errorf("k:%d,m:%d,bs:%d,N:%d read fails when fileSize is %d, for %s", k, m, bs, N, fileSize, err.Error())
 						}
@@ -207,19 +204,19 @@ func TestEncodeDecodeOneFailure(t *testing.T) {
 	//we generate temp data and encode it into real storage sytem
 	//after that, all temporary file should be deleted
 	testEC := &Erasure{
-		configFile: "conf.json",
+		ConfigFile: "conf.json",
 		// fileMap:         make(map[string]*FileInfo),
-		diskFilePath:    ".hdr.disks.path",
-		replicateFactor: 3,
-		conStripes:      100,
-		override:        true,
-		quiet:           true,
+		DiskFilePath:    "examples/.hdr.disks.path",
+		ReplicateFactor: 3,
+		ConStripes:      100,
+		Override:        true,
+		Quiet:           true,
 	}
 	rand.Seed(100000007)
 	tempFileSizes := generateRandomFileSize(1*KiB, 1*MiB, 100)
 	defer deleteTempFiles(tempFileSizes)
 	//1. read disk paths
-	err = testEC.readDiskPath()
+	err = testEC.ReadDiskPath()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -236,7 +233,7 @@ func TestEncodeDecodeOneFailure(t *testing.T) {
 				testEC.DiskNum = N
 				for _, bs := range blockSizesV1 {
 					testEC.BlockSize = bs
-					err = testEC.initSystem(true)
+					err = testEC.InitSystem(true)
 					if err != nil {
 						t.Fatalf("k:%d,m:%d,bs:%d,N:%d,%s\n", k, m, bs, N, err.Error())
 					}
@@ -251,7 +248,7 @@ func TestEncodeDecodeOneFailure(t *testing.T) {
 							t.Errorf("k:%d,m:%d,bs:%d,N:%d,%s\n", k, m, bs, N, err.Error())
 						}
 
-						err = testEC.readConfig()
+						err = testEC.ReadConfig()
 						if err != nil {
 							t.Errorf("k:%d,m:%d,bs:%d,N:%d,%s\n", k, m, bs, N, err.Error())
 						}
@@ -259,16 +256,11 @@ func TestEncodeDecodeOneFailure(t *testing.T) {
 						if err != nil {
 							t.Errorf("k:%d,m:%d,bs:%d,N:%d encode fails when fileSize is %d, for %s", k, m, bs, N, fileSize, err.Error())
 						}
-						err = testEC.writeConfig()
+						err = testEC.WriteConfig()
 						if err != nil {
 							t.Errorf("k:%d,m:%d,bs:%d,N:%d,%s\n", k, m, bs, N, err.Error())
 						}
-						err = testEC.updateConfigReplica()
-						if err != nil {
-							t.Errorf("k:%d,m:%d,bs:%d,N:%d,%s\n", k, m, bs, N, err.Error())
-						}
-
-						err = testEC.readFile(inpath, outpath)
+						err = testEC.ReadFile(inpath, outpath)
 						if err != nil {
 							t.Errorf("k:%d,m:%d,bs:%d,N:%d read fails when fileSize is %d, for %s", k, m, bs, N, fileSize, err.Error())
 						}
@@ -296,19 +288,19 @@ func TestEncodeDecodeTwoFailure(t *testing.T) {
 	//we generate temp data and encode it into real storage sytem
 	//after that, all temporary file should be deleted
 	testEC := &Erasure{
-		configFile: "conf.json",
+		ConfigFile: "conf.json",
 		// fileMap:         make(map[string]*FileInfo),
-		diskFilePath:    ".hdr.disks.path",
-		replicateFactor: 3,
-		conStripes:      100,
-		override:        true,
-		quiet:           true,
+		DiskFilePath:    "examples/.hdr.disks.path",
+		ReplicateFactor: 3,
+		ConStripes:      100,
+		Override:        true,
+		Quiet:           true,
 	}
 	rand.Seed(100000007)
 	tempFileSizes := generateRandomFileSize(1*KiB, 1*MiB, 100)
 	defer deleteTempFiles(tempFileSizes)
 	//1. read disk paths
-	err = testEC.readDiskPath()
+	err = testEC.ReadDiskPath()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -326,7 +318,7 @@ func TestEncodeDecodeTwoFailure(t *testing.T) {
 				testEC.DiskNum = N
 				for _, bs := range blockSizesV1 {
 					testEC.BlockSize = bs
-					err = testEC.initSystem(true)
+					err = testEC.InitSystem(true)
 					if err != nil {
 						t.Fatalf("k:%d,m:%d,bs:%d,N:%d,%s\n", k, m, bs, N, err.Error())
 					}
@@ -341,7 +333,7 @@ func TestEncodeDecodeTwoFailure(t *testing.T) {
 							t.Errorf("k:%d,m:%d,bs:%d,N:%d,%s\n", k, m, bs, N, err.Error())
 						}
 
-						err = testEC.readConfig()
+						err = testEC.ReadConfig()
 						if err != nil {
 							t.Errorf("k:%d,m:%d,bs:%d,N:%d,%s\n", k, m, bs, N, err.Error())
 						}
@@ -349,16 +341,12 @@ func TestEncodeDecodeTwoFailure(t *testing.T) {
 						if err != nil {
 							t.Errorf("k:%d,m:%d,bs:%d,N:%d encode fails when fileSize is %d, for %s", k, m, bs, N, fileSize, err.Error())
 						}
-						err = testEC.writeConfig()
-						if err != nil {
-							t.Errorf("k:%d,m:%d,bs:%d,N:%d,%s\n", k, m, bs, N, err.Error())
-						}
-						err = testEC.updateConfigReplica()
+						err = testEC.WriteConfig()
 						if err != nil {
 							t.Errorf("k:%d,m:%d,bs:%d,N:%d,%s\n", k, m, bs, N, err.Error())
 						}
 
-						err = testEC.readFile(inpath, outpath)
+						err = testEC.ReadFile(inpath, outpath)
 						if err != nil {
 							t.Errorf("k:%d,m:%d,bs:%d,N:%d read fails when fileSize is %d, for %s", k, m, bs, N, fileSize, err.Error())
 						}
@@ -380,18 +368,18 @@ func TestEncodeDecodeTwoFailure(t *testing.T) {
 // Test remove func
 func TestRemove(t *testing.T) {
 	testEC := &Erasure{
-		configFile:      "conf.json",
-		diskFilePath:    ".hdr.disks.path",
-		replicateFactor: 3,
-		conStripes:      100,
-		override:        true,
-		quiet:           true,
+		ConfigFile:      "conf.json",
+		DiskFilePath:    "examples/.hdr.disks.path",
+		ReplicateFactor: 3,
+		ConStripes:      100,
+		Override:        true,
+		Quiet:           true,
 	}
 	rand.Seed(100000007)
 	tempFileSizes := generateRandomFileSize(1*KiB, 1*MiB, 100)
 	defer deleteTempFiles(tempFileSizes)
 	//1. read disk paths
-	err = testEC.readDiskPath()
+	err = testEC.ReadDiskPath()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -406,7 +394,7 @@ func TestRemove(t *testing.T) {
 				testEC.DiskNum = N
 				for _, bs := range blockSizesV1 {
 					testEC.BlockSize = bs
-					err = testEC.initSystem(true)
+					err = testEC.InitSystem(true)
 					if err != nil {
 						t.Fatalf("k:%d,m:%d,bs:%d,N:%d,%s\n", k, m, bs, N, err.Error())
 					}
@@ -419,7 +407,7 @@ func TestRemove(t *testing.T) {
 							t.Errorf("k:%d,m:%d,bs:%d,N:%d,%s\n", k, m, bs, N, err.Error())
 						}
 
-						err = testEC.readConfig()
+						err = testEC.ReadConfig()
 						if err != nil {
 							t.Errorf("k:%d,m:%d,bs:%d,N:%d,%s\n", k, m, bs, N, err.Error())
 						}
@@ -427,19 +415,16 @@ func TestRemove(t *testing.T) {
 						if err != nil {
 							t.Errorf("k:%d,m:%d,bs:%d,N:%d encode fails when fileSize is %d, for %s", k, m, bs, N, fileSize, err.Error())
 						}
-						err = testEC.removeFile(inpath)
+						err = testEC.RemoveFile(inpath)
 						if err != nil {
 							t.Fatalf("k:%d,m:%d,bs:%d,N:%d,%s\n", k, m, bs, N, err.Error())
 						}
-						err = testEC.writeConfig()
+						err = testEC.WriteConfig()
 						if err != nil {
 							t.Errorf("k:%d,m:%d,bs:%d,N:%d,%s\n", k, m, bs, N, err.Error())
 						}
-						err = testEC.updateConfigReplica()
-						if err != nil {
-							t.Errorf("k:%d,m:%d,bs:%d,N:%d,%s\n", k, m, bs, N, err.Error())
-						}
-						if ok, err := testEC.checkIfFileExist(inpath); err != ErrFileBlobNotFound || ok {
+
+						if ok, err := testEC.checkIfFileExist(inpath); err != errFileBlobNotFound || ok {
 							t.Fatalf("k:%d,m:%d,bs:%d,N:%d,%s\n", k, m, bs, N, err.Error())
 
 						}
@@ -459,13 +444,13 @@ func benchmarkEncodeDecode(b *testing.B, dataShards, parityShards, diskNum int, 
 	b.SetBytes(fileSize)
 
 	testEC := &Erasure{
-		configFile: "conf.json",
+		ConfigFile: "conf.json",
 		// fileMap:         make(map[string]*FileInfo),
-		diskFilePath:    ".hdr.disks.path",
-		replicateFactor: 3,
-		conStripes:      100,
-		override:        true,
-		quiet:           true,
+		DiskFilePath:    "examples/.hdr.disks.path",
+		ReplicateFactor: 3,
+		ConStripes:      100,
+		Override:        true,
+		Quiet:           true,
 	}
 	defer deleteTempFiles([]int64{fileSize})
 	inpath := fmt.Sprintf("./test/temp-%d", fileSize)
@@ -476,7 +461,7 @@ func benchmarkEncodeDecode(b *testing.B, dataShards, parityShards, diskNum int, 
 	}
 	//repeat b.N times
 	for i := 0; i < b.N; i++ {
-		err = testEC.readDiskPath()
+		err = testEC.ReadDiskPath()
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -486,13 +471,13 @@ func benchmarkEncodeDecode(b *testing.B, dataShards, parityShards, diskNum int, 
 		testEC.M = parityShards
 		testEC.DiskNum = diskNum
 		testEC.BlockSize = blockSize
-		err = testEC.initSystem(true)
+		err = testEC.InitSystem(true)
 		if err != nil {
 			b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
 		}
 		// log.Printf("----k:%d,m:%d,bs:%d,N:%d----\n", k, m, bs, N)
 
-		err = testEC.readConfig()
+		err = testEC.ReadConfig()
 		if err != nil {
 			b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
 		}
@@ -500,16 +485,12 @@ func benchmarkEncodeDecode(b *testing.B, dataShards, parityShards, diskNum int, 
 		if err != nil {
 			b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
 		}
-		err = testEC.writeConfig()
-		if err != nil {
-			b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
-		}
-		err = testEC.updateConfigReplica()
+		err = testEC.WriteConfig()
 		if err != nil {
 			b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
 		}
 
-		err = testEC.readFile(inpath, outpath)
+		err = testEC.ReadFile(inpath, outpath)
 		if err != nil {
 			b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
 		}
@@ -526,13 +507,13 @@ func benchmarkEncodeDecodeWithFault(b *testing.B, dataShards, parityShards, disk
 	b.ResetTimer()
 	b.SetBytes(fileSize)
 	testEC := &Erasure{
-		configFile: "conf.json",
+		ConfigFile: "conf.json",
 		// fileMap:         make(map[string]*FileInfo),
-		diskFilePath:    ".hdr.disks.path",
-		replicateFactor: 3,
-		conStripes:      100,
-		override:        true,
-		quiet:           true,
+		DiskFilePath:    "examples/.hdr.disks.path",
+		ReplicateFactor: 3,
+		ConStripes:      100,
+		Override:        true,
+		Quiet:           true,
 	}
 	rand.Seed(100000007)
 	defer deleteTempFiles([]int64{fileSize})
@@ -545,7 +526,7 @@ func benchmarkEncodeDecodeWithFault(b *testing.B, dataShards, parityShards, disk
 	//repeat b.N times
 
 	for i := 0; i < b.N; i++ {
-		err = testEC.readDiskPath()
+		err = testEC.ReadDiskPath()
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -559,13 +540,13 @@ func benchmarkEncodeDecodeWithFault(b *testing.B, dataShards, parityShards, disk
 		testEC.DiskNum = diskNum
 
 		testEC.BlockSize = blockSize
-		err = testEC.initSystem(true)
+		err = testEC.InitSystem(true)
 		if err != nil {
 			b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
 		}
 		// log.Printf("----k:%d,m:%d,bs:%d,N:%d----\n", k, m, bs, N)
 
-		err = testEC.readConfig()
+		err = testEC.ReadConfig()
 		if err != nil {
 			b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
 		}
@@ -573,16 +554,12 @@ func benchmarkEncodeDecodeWithFault(b *testing.B, dataShards, parityShards, disk
 		if err != nil {
 			b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
 		}
-		err = testEC.writeConfig()
-		if err != nil {
-			b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
-		}
-		err = testEC.updateConfigReplica()
+		err = testEC.WriteConfig()
 		if err != nil {
 			b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
 		}
 
-		err = testEC.readFile(inpath, outpath)
+		err = testEC.ReadFile(inpath, outpath)
 		if err != nil {
 			b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
 		}
@@ -676,15 +653,15 @@ func BenchmarkEncodeDecode20x4x24x4096x20Mx4fault(b *testing.B) {
 // test performance when multiple users send encode/read requests.
 func benchmarkParallel(b *testing.B, dataShards, parityShards, diskNum int, blockSize, fileSize int64, conNum int) {
 	testEC := &Erasure{
-		configFile: "conf.json",
+		ConfigFile: "conf.json",
 		// fileMap:         make(map[string]*FileInfo),
-		diskFilePath:    ".hdr.disks.path",
-		replicateFactor: 3,
-		conStripes:      100,
-		override:        true,
-		quiet:           true,
+		DiskFilePath:    "examples/.hdr.disks.path",
+		ReplicateFactor: 3,
+		ConStripes:      100,
+		Override:        true,
+		Quiet:           true,
 	}
-	err = testEC.readDiskPath()
+	err = testEC.ReadDiskPath()
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -695,7 +672,7 @@ func benchmarkParallel(b *testing.B, dataShards, parityShards, diskNum int, bloc
 	testEC.DiskNum = diskNum
 
 	testEC.BlockSize = blockSize
-	err = testEC.initSystem(true)
+	err = testEC.InitSystem(true)
 	if err != nil {
 		b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
 	}
@@ -722,12 +699,12 @@ func benchmarkParallel(b *testing.B, dataShards, parityShards, diskNum int, bloc
 	b.ReportAllocs()
 	b.ResetTimer()
 	//start the benchmark goroutines
-	err = testEC.readConfig()
+	err = testEC.ReadConfig()
 	if err != nil {
 		b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
 	}
 	defer func() {
-		err = testEC.writeConfig()
+		err = testEC.WriteConfig()
 		if err != nil {
 			b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
 		}
@@ -741,12 +718,7 @@ func benchmarkParallel(b *testing.B, dataShards, parityShards, diskNum int, bloc
 				b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
 			}
 
-			err = testEC.updateConfigReplica()
-			if err != nil {
-				b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
-			}
-
-			err = testEC.readFile(inpath[i], outpath[i])
+			err = testEC.ReadFile(inpath[i], outpath[i])
 			if err != nil {
 				b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
 			}

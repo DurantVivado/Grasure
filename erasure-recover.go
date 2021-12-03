@@ -1,4 +1,4 @@
-package main
+package grasure
 
 import (
 	"io"
@@ -26,8 +26,8 @@ func (e *Erasure) getFileNum() int {
 //user should provide enough backup devices for transferring data
 //the data will be restored sequentially to {recoveredDiskPath} with their
 //predecessors' names.
-func (e *Erasure) recover() error {
-	if !e.quiet {
+func (e *Erasure) Recover() error {
+	if !e.Quiet {
 		log.Printf("Start recovering, totally %d files need recovery",
 			e.getFileNum())
 	} //first, make clear how many disks need to be recovered
@@ -43,10 +43,10 @@ func (e *Erasure) recover() error {
 		return nil
 	}
 	if failNum > e.DiskNum-e.K {
-		return ErrTooFewDisksAlive
+		return errTooFewDisksAlive
 	}
 	if failNum > len(e.diskInfos)-e.DiskNum {
-		return ErrNotEnoughBackupForRecovery
+		return errNotEnoughBackupForRecovery
 	}
 	//the failed disks are mapped to backup disks
 	replaceMap := make(map[int]int, failNum)
@@ -100,13 +100,13 @@ func (e *Erasure) recover() error {
 				erg.Go(func() error {
 					folderPath := filepath.Join(disk.diskPath, basefilename)
 					blobPath := filepath.Join(folderPath, "BLOB")
-					if e.override {
+					if e.Override {
 						if err := os.RemoveAll(folderPath); err != nil {
 							return err
 						}
 					}
 					if err := os.Mkdir(folderPath, 0666); err != nil {
-						return ErrDataDirExist
+						return errDataDirExist
 					}
 					rfs[i], err = os.Create(blobPath)
 					if err != nil {
@@ -137,15 +137,15 @@ func (e *Erasure) recover() error {
 			//for each stripe we rejoin the data
 			stripeNum := len(fd.Distribution)
 			dist := fd.Distribution
-			numBlob := ceilFracInt(stripeNum, e.conStripes)
+			numBlob := ceilFracInt(stripeNum, e.ConStripes)
 			stripeCnt := 0
 			nextStripe := 0
-			blobBuf := makeArr2DByte(e.conStripes, int(e.allStripeSize))
+			blobBuf := makeArr2DByte(e.ConStripes, int(e.allStripeSize))
 			for blob := 0; blob < numBlob; blob++ {
-				if stripeCnt+e.conStripes > stripeNum {
+				if stripeCnt+e.ConStripes > stripeNum {
 					nextStripe = stripeNum - stripeCnt
 				} else {
-					nextStripe = e.conStripes
+					nextStripe = e.ConStripes
 				}
 				eg := e.errgroupPool.Get().(*errgroup.Group)
 				for s := 0; s < nextStripe; s++ {
@@ -226,7 +226,6 @@ func (e *Erasure) recover() error {
 					})
 
 				}
-				// e.allBlobPool.Put(&blobBuf)
 				if err := eg.Wait(); err != nil {
 					return err
 				}
@@ -234,7 +233,7 @@ func (e *Erasure) recover() error {
 				stripeCnt += nextStripe
 
 			}
-			if !e.quiet {
+			if !e.Quiet {
 				log.Printf("reading %s!", filename)
 			}
 			return nil
@@ -248,7 +247,7 @@ func (e *Erasure) recover() error {
 	if err != nil {
 		return err
 	}
-	if !e.quiet {
+	if !e.Quiet {
 		log.Println("Finish recovering")
 	}
 	return nil
@@ -257,11 +256,11 @@ func (e *Erasure) updateDiskPath(replaceMap map[int]int) error {
 	// the last step: after recovering the files, we update `.hdr.disks.path`
 	// and write a copy
 	//1. rename the file
-	err := os.Rename(e.diskFilePath, e.diskFilePath+".old")
+	err := os.Rename(e.DiskFilePath, e.DiskFilePath+".old")
 	if err != nil {
 		return err
 	}
-	//2. update e.diskFilePath
+	//2. update e.DiskFilePath
 	newDiskInfos := []*DiskInfo{}
 	for i := range e.diskInfos[:e.DiskNum] {
 		if v, ok := replaceMap[i]; ok {
@@ -275,7 +274,7 @@ func (e *Erasure) updateDiskPath(replaceMap map[int]int) error {
 	}
 	e.diskInfos = newDiskInfos
 	//3.write to new file
-	f, err := os.OpenFile(e.diskFilePath, os.O_WRONLY|os.O_CREATE, 0666)
+	f, err := os.OpenFile(e.DiskFilePath, os.O_WRONLY|os.O_CREATE, 0666)
 	if err != nil {
 		return nil
 	}

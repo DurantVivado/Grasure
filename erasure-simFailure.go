@@ -1,4 +1,4 @@
-package main
+package grasure
 
 import (
 	"fmt"
@@ -8,7 +8,7 @@ import (
 )
 
 //simulate disk failure or bitrot
-func (e *Erasure) destroy(mode string, failNum int) {
+func (e *Erasure) Destroy(mode string, failNum int) {
 	if mode == "diskFail" {
 		if failNum == 0 {
 			return

@@ -1,4 +1,4 @@
-package main
+package grasure
 
 import (
 	"bufio"
@@ -17,10 +17,10 @@ import (
 //read the disk paths from diskFilePath
 //There should be exactly ONE disk path at each line
 //This func can NOT be called concurrently
-func (e *Erasure) readDiskPath() error {
+func (e *Erasure) ReadDiskPath() error {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
-	f, err := os.Open(e.diskFilePath)
+	f, err := os.Open(e.DiskFilePath)
 	if err != nil {
 		return err
 	}
@@ -43,8 +43,8 @@ func (e *Erasure) readDiskPath() error {
 
 //initiate the erasure-coded system, this func can NOT be called concurrently
 //if assume renders yes then the consulting part will be skipped
-func (e *Erasure) initSystem(assume bool) error {
-	if !e.quiet {
+func (e *Erasure) InitSystem(assume bool) error {
+	if !e.Quiet {
 		fmt.Println("Warning: you are intializing a new erasure-coded system, which means the previous data will also be reset.")
 	}
 	if !assume {
@@ -62,18 +62,18 @@ func (e *Erasure) initSystem(assume bool) error {
 		return reedsolomon.ErrMaxShardNum
 	}
 	if e.K+e.M > e.DiskNum {
-		return ErrTooFewDisksAlive
+		return errTooFewDisksAlive
 	}
 	//replicate the config files
 
-	if e.replicateFactor < 1 {
-		return ErrNegativeReplicateFactor
+	if e.ReplicateFactor < 1 {
+		return errNegativeReplicateFactor
 	}
 	err = e.resetSystem()
 	if err != nil {
 		return err
 	}
-	if !e.quiet {
+	if !e.Quiet {
 		fmt.Printf("System init!\n Erasure parameters: dataShards:%d, parityShards:%d,blocksize:%d,diskNum:%d\n",
 			e.K, e.M, e.BlockSize, e.DiskNum)
 	}
@@ -123,7 +123,7 @@ func (e *Erasure) resetSystem() error {
 		e.fileMap.Delete(key)
 		return true
 	})
-	err = e.writeConfig()
+	err = e.WriteConfig()
 	if err != nil {
 		return err
 	}
@@ -132,7 +132,7 @@ func (e *Erasure) resetSystem() error {
 	if err != nil {
 		return err
 	}
-	err = e.replicateConfig(e.replicateFactor)
+	err = e.replicateConfig(e.ReplicateFactor)
 	if err != nil {
 		return err
 	}
@@ -150,21 +150,21 @@ func (e *Erasure) printDiskStatus() {
 
 //read the config info in config file
 //Every time read file list in system warm-up
-func (e *Erasure) readConfig() error {
+func (e *Erasure) ReadConfig() error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	if ex, err := PathExist(e.configFile); !ex && err == nil {
+	if ex, err := PathExist(e.ConfigFile); !ex && err == nil {
 		// we try to recover the config file from the storage system
 		// which renders the last chance to heal
 		err = e.rebuildConfig()
 		if err != nil {
-			return ErrConfFileNotExist
+			return errConfFileNotExist
 		}
 	} else if err != nil {
 		return err
 	}
-	data, err := ioutil.ReadFile(e.configFile)
+	data, err := ioutil.ReadFile(e.ConfigFile)
 	if err != nil {
 		return err
 	}
@@ -174,10 +174,10 @@ func (e *Erasure) readConfig() error {
 
 		err = e.rebuildConfig()
 		if err != nil {
-			return ErrConfFileNotExist
+			return errConfFileNotExist
 		}
 
-		data, err := ioutil.ReadFile(e.configFile)
+		data, err := ioutil.ReadFile(e.ConfigFile)
 		if err != nil {
 			return err
 		}
@@ -239,7 +239,7 @@ func (e *Erasure) replicateConfig(k int) error {
 	for _, i := range selectDisk {
 		disk := e.diskInfos[i]
 		replicaPath := filepath.Join(disk.diskPath, "META")
-		_, err = copyFile(e.configFile, replicaPath)
+		_, err = copyFile(e.ConfigFile, replicaPath)
 		if err != nil {
 			log.Println(err.Error())
 		}
@@ -248,12 +248,12 @@ func (e *Erasure) replicateConfig(k int) error {
 	return nil
 }
 
-//write the erasure parameters into config files
-func (e *Erasure) writeConfig() error {
+//write the erasure parameters into config files, and update the replicas
+func (e *Erasure) WriteConfig() error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	f, err := os.OpenFile(e.configFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
+	f, err := os.OpenFile(e.ConfigFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
 	if err != nil {
 		return err
 	}
@@ -279,7 +279,10 @@ func (e *Erasure) writeConfig() error {
 	}
 	buf.Flush()
 	f.Sync()
-
+	err = e.updateConfigReplica()
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -292,7 +295,7 @@ func (e *Erasure) rebuildConfig() error {
 		if ok, err := PathExist(replicaPath); !ok && err == nil {
 			continue
 		}
-		_, err = copyFile(replicaPath, e.configFile)
+		_, err = copyFile(replicaPath, e.ConfigFile)
 		if err != nil {
 			return err
 		}
@@ -303,11 +306,9 @@ func (e *Erasure) rebuildConfig() error {
 
 //update the config file of all replica
 func (e *Erasure) updateConfigReplica() error {
-	e.mu.Lock()
-	defer e.mu.Unlock()
 
 	//we read file meta in the disk path and try to rebuild the config file
-	if replicateFactor < 1 {
+	if e.ReplicateFactor < 1 {
 		return nil
 	}
 	for i := range e.diskInfos[:e.DiskNum] {
@@ -316,7 +317,7 @@ func (e *Erasure) updateConfigReplica() error {
 		if ok, err := PathExist(replicaPath); !ok && err == nil {
 			continue
 		}
-		_, err = copyFile(e.configFile, replicaPath)
+		_, err = copyFile(e.ConfigFile, replicaPath)
 		if err != nil {
 			return err
 		}
@@ -325,7 +326,7 @@ func (e *Erasure) updateConfigReplica() error {
 }
 
 //delete specific file
-func (e *Erasure) removeFile(filename string) error {
+func (e *Erasure) RemoveFile(filename string) error {
 	baseFilename := filepath.Base(filename)
 	if _, ok := e.fileMap.Load(baseFilename); !ok {
 		return fmt.Errorf("the file %s does not exist in the file system",
@@ -356,7 +357,7 @@ func (e *Erasure) removeFile(filename string) error {
 	}
 	e.fileMap.Delete(baseFilename)
 	// delete(e.fileMap, filename)
-	if !e.quiet {
+	if !e.Quiet {
 		log.Printf("file %s successfully deleted.", baseFilename)
 	}
 	return nil
@@ -382,7 +383,7 @@ func (e *Erasure) checkIfFileExist(filename string) (bool, error) {
 
 			subpath := filepath.Join(path.diskPath, baseFilename)
 			if ok, err := PathExist(subpath); !ok && err == nil {
-				return ErrFileBlobNotFound
+				return errFileBlobNotFound
 			} else if err != nil {
 				return err
 			}

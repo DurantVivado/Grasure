@@ -1,4 +1,4 @@
-package main
+package grasure
 
 import (
 	"io"
@@ -12,12 +12,12 @@ import (
 )
 
 //read file on the system and return byte stream, include recovering
-func (e *Erasure) readFile(filename string, savepath string) error {
+func (e *Erasure) ReadFile(filename string, savepath string) error {
 	baseFileName := filepath.Base(filename)
 	intFi, ok := e.fileMap.Load(baseFileName)
 	fi := intFi.(*FileInfo)
 	if !ok {
-		return ErrFileNotFound
+		return errFileNotFound
 	}
 
 	fileSize := fi.FileSize
@@ -51,7 +51,7 @@ func (e *Erasure) readFile(filename string, savepath string) error {
 		})
 	}
 	if err := erg.Wait(); err != nil {
-		if !e.quiet {
+		if !e.Quiet {
 			log.Printf("%s", err.Error())
 		}
 	}
@@ -64,14 +64,14 @@ func (e *Erasure) readFile(filename string, savepath string) error {
 	}()
 	if int(alive) < e.K {
 		//the disk renders inrecoverable
-		return ErrTooFewDisksAlive
+		return errTooFewDisksAlive
 	}
 	if int(alive) == e.DiskNum {
-		if !e.quiet {
+		if !e.Quiet {
 			log.Println("start reading blocks")
 		}
 	} else {
-		if !e.quiet {
+		if !e.Quiet {
 			log.Println("start reconstructing blocks")
 		}
 	}
@@ -84,23 +84,23 @@ func (e *Erasure) readFile(filename string, savepath string) error {
 
 	//Since the file is striped, we have to reconstruct each stripe
 	//for each stripe we rejoin the data
-	numBlob := ceilFracInt(stripeNum, e.conStripes)
+	numBlob := ceilFracInt(stripeNum, e.ConStripes)
 	stripeCnt := 0
 	nextStripe := 0
 	//allocate stripe-size pool if and only if needed
 	// e.allBlobPool.New = func() interface{} {
-	// 	out := make([][]byte, e.conStripes)
+	// 	out := make([][]byte, e.ConStripes)
 	// 	for i := range out {
 	// 		out[i] = make([]byte, e.allStripeSize)
 	// 	}
 	// 	return &out
 	// }
-	blobBuf := makeArr2DByte(e.conStripes, int(e.allStripeSize))
+	blobBuf := makeArr2DByte(e.ConStripes, int(e.allStripeSize))
 	for blob := 0; blob < numBlob; blob++ {
-		if stripeCnt+e.conStripes > stripeNum {
+		if stripeCnt+e.ConStripes > stripeNum {
 			nextStripe = stripeNum - stripeCnt
 		} else {
-			nextStripe = e.conStripes
+			nextStripe = e.ConStripes
 		}
 		eg := e.errgroupPool.Get().(*errgroup.Group)
 		// blobBuf := *e.allBlobPool.Get().(*[][]byte)
@@ -190,7 +190,7 @@ func (e *Erasure) readFile(filename string, savepath string) error {
 		stripeCnt += nextStripe
 
 	}
-	if !e.quiet {
+	if !e.Quiet {
 		log.Printf("reading %s!", filename)
 	}
 	return nil

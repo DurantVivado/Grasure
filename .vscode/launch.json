@@ -15,11 +15,11 @@
             "program": "${fileDirname}",
             "args": [ 
                         //init mode
-                        // "-md","init", 
-                        // "-k", "9", 
-                        // "-m","3",
-                        // "-bs","4096",
-                        // "-dn", "16"
+                        "-md","init", 
+                        "-k", "9", 
+                        "-m","3",
+                        "-bs","4096",
+                        "-dn", "16"
                         
                         //encode mode
                         // "-md","encode", 
@@ -51,9 +51,9 @@
                         // "-f","LICENSE.txt",
 
                         //recover mode
-                        "-md", "recover",
-                         "-fn","4",
-                        "-o"
+                        // "-md", "recover",
+                        //  "-fn","4",
+                        // "-o"
                        
                         
                     ]
