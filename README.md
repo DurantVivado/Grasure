@@ -31,7 +31,7 @@ import:
 
 ## CLI Usage
 A complete demonstration of various CLI usage lies in `examples/buildAndRun.sh`. You may have a glimpse.
-Here we exlaborate the steps as following, in dir `./examples`:
+Here we elaborate the steps as following, in dir `./examples`:
 
 0. Build the project:
 ```
@@ -94,13 +94,13 @@ sha256sum {destination file path}
 
 7. To update a file in the storage:
 ```
-./main -md update 
+./main -md update -f {filebasename} -nf {local newfile path} -o
 ```
 
 8. Recover a disk(e.g. all the file blobs in failed disk(s)), and transfer it to backup disks. This turns to be time-consuming job. 
 The previous disk path file will be renamed to `.hdr.disks.path.old`. New disk config path will replace every failed path with the redundant one.
 ```
-./main -md recover -f {filebasename} -nf {local newfile path} -o
+./main -md recover 
 ```
 
 

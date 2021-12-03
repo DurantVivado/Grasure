@@ -8,8 +8,9 @@ import (
 	"path/filepath"
 
 	"golang.org/x/sync/errgroup"
-) //split and encode a file into parity blocks concurrently
+)
 
+//split and encode a file into parity blocks concurrently
 func (e *Erasure) EncodeFile(filename string) (*FileInfo, error) {
 	baseFileName := filepath.Base(filename)
 	if _, ok := e.fileMap.Load(baseFileName); ok && !e.Override {
