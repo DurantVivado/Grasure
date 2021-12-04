@@ -3,9 +3,15 @@ test*.file
 tmp/
 file.save
 cmd/
+input/
+output/
 grasure
+__debug_bin
 conf.json
 examples/test
+examples/main
 examples/output
 examples/.hdr.disks.path
+examples/.hdr.disks.path.old
 examples/config.json
+examples/main.json

@@ -22,10 +22,11 @@ type HDRInfo struct {
 }
 
 type DiskInfo struct {
-	diskPath  string //the disk path
-	available bool   //it's flag and when disk fails, it renders false.
-	numBlocks int    //it tells how many blocks a disk holds
-	capacity  int64  //the capacity of a disk
+	diskPath    string //the disk path
+	available   bool   //it's flag and when disk fails, it renders false.
+	numBlocks   int    //it tells how many blocks a disk holds
+	ifMetaExist bool   //it's a disk with meta file?
+	capacity    int64  //the capacity of a disk
 }
 
 type Erasure struct {
@@ -34,20 +35,20 @@ type Erasure struct {
 	BlockSize       int64                     `json:"blockSize"`    // the block size. default to 4KiB
 	DiskNum         int                       `json:"diskNum"`
 	FileMeta        []*FileInfo               `json:"fileLists"`
-	ConStripes      int                       //how many stripes are allowed to encode/decode concurrently
+	ConStripes      int                       `json:"-"` //how many stripes are allowed to encode/decode concurrently
 	ReplicateFactor int                       // the replication factor for config file
 	sEnc            reedsolomon.StreamEncoder // the reedsolomon streaming encoder, for streaming access
 	enc             reedsolomon.Encoder       // the reedsolomon encoder, for block access
 	dataStripeSize  int64                     // the data stripe size, equal to k*bs
 	allStripeSize   int64                     // the data plus parity stripe size, equal to (k+m)*bs
 	diskInfos       []*DiskInfo               // disk paths
-	ConfigFile      string                    // configure file
+	ConfigFile      string                    `json:"-"` // configure file
 	fileMap         sync.Map                  // File info lists
-	DiskFilePath    string                    // the path of file recording all disks path
-	Override        bool                      // whether or not to override former files or directories, default to false
+	DiskFilePath    string                    `json:"-"` // the path of file recording all disks path
+	Override        bool                      `json:"-"` // whether or not to override former files or directories, default to false
 	errgroupPool    sync.Pool                 // errgroup pool
 	mu              sync.RWMutex              // the read and write lock
-	Quiet           bool                      //whether or not to mute outputs
+	Quiet           bool                      `json:"-"` //whether or not to mute outputs
 	// dataBlobPool    sync.Pool                 // memory pool for conStripes data  access
 	// allBlobPool     sync.Pool                 // memory pool for conStripes stripe access
 }

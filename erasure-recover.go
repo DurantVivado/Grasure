@@ -22,14 +22,14 @@ func (e *Erasure) getFileNum() int {
 
 }
 
-//recover mainly deals with a disk-level disaster reconstruction
-//user should provide enough backup devices for transferring data
-//the data will be restored sequentially to {recoveredDiskPath} with their
-//predecessors' names.
-func (e *Erasure) Recover() error {
+//Recover mainly deals with a disk-level disaster reconstruction.
+//User should provide enough backup devices in `.hdr.disk.path` for data transferring.
+//a (oldPath, replacedPath) map is returned in the first placw
+func (e *Erasure) Recover() (map[string]string, error) {
+	totalFiles := e.getFileNum()
 	if !e.Quiet {
 		log.Printf("Start recovering, totally %d files need recovery",
-			e.getFileNum())
+			totalFiles)
 	} //first, make clear how many disks need to be recovered
 	//Second, match backup partners
 	//Third, concurrently recover the part of the files
@@ -40,20 +40,26 @@ func (e *Erasure) Recover() error {
 		}
 	}
 	if failNum == 0 {
-		return nil
+		return nil, nil
 	}
-	if failNum > e.DiskNum-e.K {
-		return errTooFewDisksAlive
+	//the failure number exceeds the fault tolerance
+	if failNum > e.M {
+		return nil, errTooFewDisksAlive
 	}
+	//the failure number doesn't exceed the fault tolerance
+	//but unluckily we don't have enough backups!
 	if failNum > len(e.diskInfos)-e.DiskNum {
-		return errNotEnoughBackupForRecovery
+		return nil, errNotEnoughBackupForRecovery
 	}
 	//the failed disks are mapped to backup disks
-	replaceMap := make(map[int]int, failNum)
+	replaceMap := make(map[int]int)
+	ReplaceMap := make(map[string]string)
 	diskFailList := make(map[int]bool, failNum)
 	j := e.DiskNum
+	// think what if backup also breaks down, future stuff
 	for i := 0; i < e.DiskNum; i++ {
 		if !e.diskInfos[i].available {
+			ReplaceMap[e.diskInfos[i].diskPath] = e.diskInfos[j].diskPath
 			replaceMap[i] = j
 			diskFailList[i] = true
 			j++
@@ -63,15 +69,26 @@ func (e *Erasure) Recover() error {
 	rfs := make([]*os.File, failNum) //restore fs
 	ifs := make([]*os.File, e.DiskNum)
 	erg := new(errgroup.Group)
+	defer func() {
+		for i := 0; i < failNum; i++ {
+			if rfs[i] != nil {
+				rfs[i].Close()
+			}
+		}
+		for i := 0; i < e.DiskNum; i++ {
+			if ifs[i] != nil {
+				ifs[i].Close()
+			}
+		}
+	}()
 	e.fileMap.Range(func(filename, fi interface{}) bool {
 		basefilename := filename.(string)
 		fd := fi.(*FileInfo)
 		//These files can be repaired concurrently
-		func() error {
+		erg.Go(func() error {
 			//read the current disks
 			erg := e.errgroupPool.Get().(*errgroup.Group)
 			defer e.errgroupPool.Put(erg)
-
 			for i, disk := range e.diskInfos[:e.DiskNum] {
 				i := i
 				disk := disk
@@ -119,18 +136,7 @@ func (e *Erasure) Recover() error {
 			if err := erg.Wait(); err != nil {
 				return err
 			}
-			defer func() {
-				for i := 0; i < failNum; i++ {
-					if rfs[i] != nil {
-						rfs[i].Close()
-					}
-				}
-				for i := 0; i < e.DiskNum; i++ {
-					if ifs[i] != nil {
-						ifs[i].Close()
-					}
-				}
-			}()
+
 			//recover the file and write to restore path
 			//we read the survival blocks
 			//Since the file is striped, we have to reconstruct each stripe
@@ -214,7 +220,14 @@ func (e *Erasure) Recover() error {
 									if err != nil {
 										return err
 									}
+									if e.diskInfos[diskId].ifMetaExist {
+										newMetapath := filepath.Join(e.diskInfos[restoreId].diskPath, "META")
+										if _, err := copyFile(e.ConfigFile, newMetapath); err != nil {
+											return err
+										}
+									}
 									return nil
+
 								})
 
 							}
@@ -237,20 +250,21 @@ func (e *Erasure) Recover() error {
 				log.Printf("reading %s!", filename)
 			}
 			return nil
-		}()
+		})
 		return true
 	})
+	//do not forget to recover the meta replicas
 	if err := erg.Wait(); err != nil {
-		return err
+		return nil, err
 	}
 	err = e.updateDiskPath(replaceMap)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if !e.Quiet {
 		log.Println("Finish recovering")
 	}
-	return nil
+	return ReplaceMap, nil
 }
 func (e *Erasure) updateDiskPath(replaceMap map[int]int) error {
 	// the last step: after recovering the files, we update `.hdr.disks.path`
@@ -261,20 +275,15 @@ func (e *Erasure) updateDiskPath(replaceMap map[int]int) error {
 		return err
 	}
 	//2. update e.DiskFilePath
-	newDiskInfos := []*DiskInfo{}
-	for i := range e.diskInfos[:e.DiskNum] {
-		if v, ok := replaceMap[i]; ok {
-			newDiskInfos = append(newDiskInfos, e.diskInfos[v])
-		} else {
-			newDiskInfos = append(newDiskInfos, e.diskInfos[i])
-		}
+	for k, v := range replaceMap {
+		e.diskInfos[k] = e.diskInfos[v]
 	}
-	for j := e.DiskNum + len(replaceMap); j < len(e.diskInfos); j++ {
-		newDiskInfos = append(newDiskInfos, e.diskInfos[j])
-	}
-	e.diskInfos = newDiskInfos
+	// A little trick on removal of center elements
+	fn := len(replaceMap)
+	e.diskInfos = e.diskInfos[:e.DiskNum+
+		copy(e.diskInfos[e.DiskNum:], e.diskInfos[e.DiskNum+fn:])]
 	//3.write to new file
-	f, err := os.OpenFile(e.DiskFilePath, os.O_WRONLY|os.O_CREATE, 0666)
+	f, err := os.OpenFile(e.DiskFilePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
 	if err != nil {
 		return nil
 	}

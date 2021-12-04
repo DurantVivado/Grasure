@@ -26,7 +26,8 @@ var errFileNotFound = errors.New("file not found")
 var errFailModeNotRecognized = errors.New("the fail mode is not recognizable, please specify in \"diskFail\" or \"bitRot\"")
 var errNegativeReplicateFactor = errors.New("the replicate factor MUST be non-negative")
 var errNotEnoughBackupForRecovery = errors.New("not enough disk for recovery, needs more backup devices")
-var errFileBlobNotFound = errors.New("file blob not found. please try to read it.")
+var errFileBlobNotFound = errors.New("file blob not found. please try to read it")
+var errDiskNumTooLarge = errors.New("diskNum is larger than provided")
 
 // errUnexpected - unexpected error, requires manual intervention.
 var errUnexpected = StorageErr("unexpected error, please report this issue at https://github.com/minio/minio/issues")

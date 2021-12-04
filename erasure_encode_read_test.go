@@ -7,8 +7,11 @@ import (
 	"log"
 	"math/rand"
 	"os"
+	"path/filepath"
 	"testing"
 )
+
+var testDiskFilePath = filepath.Join("examples", ".hdr.disks.path")
 
 //randomly generate file of different size and encode them into HDR system
 const (
@@ -43,14 +46,24 @@ var blockSizesV2 = []int64{
 	1 * MiB, 2 * MiB, 4 * MiB, 8 * MiB, 16 * MiB, 32 * MiB, 64 * MiB, 128 * MiB,
 	256 * MiB,
 }
-var bigFilePaths = []string{
-	"./test/file.1G",
-	"./test/file.4G",
-	"./test/file.8G",
-	"./test/file.16G",
-}
 
 //-------------------------TEST UNIT----------------------------
+func genTempDir() {
+	if ok, err := PathExist("input"); !ok && err == nil {
+		if err := os.Mkdir("input", 0644); err != nil {
+			log.Fatal(err)
+		}
+	} else if err != nil {
+		log.Fatal(err)
+	}
+	if ok, err := PathExist("output"); !ok && err == nil {
+		if err := os.Mkdir("output", 0644); err != nil {
+			log.Fatal(err)
+		}
+	} else if err != nil {
+		log.Fatal(err)
+	}
+}
 
 func generateRandomFileSize(minSize, maxSize int64, num int) []int64 {
 	out := make([]int64, num)
@@ -82,8 +95,8 @@ func generateRandomFileBySize(filename string, fileSize int64) error {
 
 func deleteTempFiles(tempFileSizes []int64) {
 	for _, fileSize := range tempFileSizes {
-		inpath := fmt.Sprintf("./test/temp-%d", fileSize)
-		outpath := fmt.Sprintf("./output/temp-%d", fileSize)
+		inpath := filepath.Join("input", fmt.Sprintf("temp-%d", fileSize))
+		outpath := filepath.Join("output", fmt.Sprintf("temp-%d", fileSize))
 		if ex, _ := PathExist(inpath); !ex {
 			continue
 		}
@@ -123,10 +136,11 @@ func deleteTempFileGroup(inpath, outpath []string) {
 func TestEncodeDecodeNormal(t *testing.T) {
 	//we generate temp data and encode it into real storage sytem
 	//after that, all temporary file should be deleted
+	genTempDir()
 	testEC := &Erasure{
 		ConfigFile: "conf.json",
 		// fileMap:         make(map[string]*FileInfo),
-		DiskFilePath:    "examples/.hdr.disks.path",
+		DiskFilePath:    testDiskFilePath,
 		ReplicateFactor: 3,
 		ConStripes:      100,
 		Override:        true,
@@ -158,8 +172,9 @@ func TestEncodeDecodeNormal(t *testing.T) {
 					log.Printf("----k:%d,m:%d,bs:%d,N:%d----\n", k, m, bs, N)
 
 					for _, fileSize := range tempFileSizes {
-						inpath := fmt.Sprintf("./test/temp-%d", fileSize)
-						outpath := fmt.Sprintf("./output/temp-%d", fileSize)
+						inpath := filepath.Join("input", fmt.Sprintf("temp-%d", fileSize))
+						outpath := filepath.Join("output", fmt.Sprintf("temp-%d", fileSize))
+
 						err = generateRandomFileBySize(inpath, fileSize)
 						if err != nil {
 							t.Errorf("k:%d,m:%d,bs:%d,N:%d,%s\n", k, m, bs, N, err.Error())
@@ -203,10 +218,11 @@ func TestEncodeDecodeNormal(t *testing.T) {
 func TestEncodeDecodeOneFailure(t *testing.T) {
 	//we generate temp data and encode it into real storage sytem
 	//after that, all temporary file should be deleted
+	genTempDir()
 	testEC := &Erasure{
 		ConfigFile: "conf.json",
 		// fileMap:         make(map[string]*FileInfo),
-		DiskFilePath:    "examples/.hdr.disks.path",
+		DiskFilePath:    testDiskFilePath,
 		ReplicateFactor: 3,
 		ConStripes:      100,
 		Override:        true,
@@ -241,8 +257,8 @@ func TestEncodeDecodeOneFailure(t *testing.T) {
 
 					for _, fileSize := range tempFileSizes {
 						//system-level paras
-						inpath := fmt.Sprintf("./test/temp-%d", fileSize)
-						outpath := fmt.Sprintf("./output/temp-%d", fileSize)
+						inpath := filepath.Join("input", fmt.Sprintf("temp-%d", fileSize))
+						outpath := filepath.Join("output", fmt.Sprintf("temp-%d", fileSize))
 						err = generateRandomFileBySize(inpath, fileSize)
 						if err != nil {
 							t.Errorf("k:%d,m:%d,bs:%d,N:%d,%s\n", k, m, bs, N, err.Error())
@@ -287,10 +303,11 @@ func TestEncodeDecodeOneFailure(t *testing.T) {
 func TestEncodeDecodeTwoFailure(t *testing.T) {
 	//we generate temp data and encode it into real storage sytem
 	//after that, all temporary file should be deleted
+	genTempDir()
 	testEC := &Erasure{
 		ConfigFile: "conf.json",
 		// fileMap:         make(map[string]*FileInfo),
-		DiskFilePath:    "examples/.hdr.disks.path",
+		DiskFilePath:    testDiskFilePath,
 		ReplicateFactor: 3,
 		ConStripes:      100,
 		Override:        true,
@@ -326,8 +343,8 @@ func TestEncodeDecodeTwoFailure(t *testing.T) {
 
 					for _, fileSize := range tempFileSizes {
 						//system-level paras
-						inpath := fmt.Sprintf("./test/temp-%d", fileSize)
-						outpath := fmt.Sprintf("./output/temp-%d", fileSize)
+						inpath := filepath.Join("input", fmt.Sprintf("temp-%d", fileSize))
+						outpath := filepath.Join("output", fmt.Sprintf("temp-%d", fileSize))
 						err = generateRandomFileBySize(inpath, fileSize)
 						if err != nil {
 							t.Errorf("k:%d,m:%d,bs:%d,N:%d,%s\n", k, m, bs, N, err.Error())
@@ -367,9 +384,10 @@ func TestEncodeDecodeTwoFailure(t *testing.T) {
 
 // Test remove func
 func TestRemove(t *testing.T) {
+	genTempDir()
 	testEC := &Erasure{
 		ConfigFile:      "conf.json",
-		DiskFilePath:    "examples/.hdr.disks.path",
+		DiskFilePath:    testDiskFilePath,
 		ReplicateFactor: 3,
 		ConStripes:      100,
 		Override:        true,
@@ -401,7 +419,7 @@ func TestRemove(t *testing.T) {
 					log.Printf("----k:%d,m:%d,bs:%d,N:%d----\n", k, m, bs, N)
 
 					for _, fileSize := range tempFileSizes {
-						inpath := fmt.Sprintf("./test/temp-%d", fileSize)
+						inpath := filepath.Join("input", fmt.Sprintf("temp-%d", fileSize))
 						err = generateRandomFileBySize(inpath, fileSize)
 						if err != nil {
 							t.Errorf("k:%d,m:%d,bs:%d,N:%d,%s\n", k, m, bs, N, err.Error())
@@ -442,19 +460,19 @@ func TestRemove(t *testing.T) {
 func benchmarkEncodeDecode(b *testing.B, dataShards, parityShards, diskNum int, blockSize, fileSize int64) {
 	b.ResetTimer()
 	b.SetBytes(fileSize)
-
+	genTempDir()
 	testEC := &Erasure{
 		ConfigFile: "conf.json",
 		// fileMap:         make(map[string]*FileInfo),
-		DiskFilePath:    "examples/.hdr.disks.path",
+		DiskFilePath:    testDiskFilePath,
 		ReplicateFactor: 3,
 		ConStripes:      100,
 		Override:        true,
 		Quiet:           true,
 	}
 	defer deleteTempFiles([]int64{fileSize})
-	inpath := fmt.Sprintf("./test/temp-%d", fileSize)
-	outpath := fmt.Sprintf("./output/temp-%d", fileSize)
+	inpath := filepath.Join("input", fmt.Sprintf("temp-%d", fileSize))
+	outpath := filepath.Join("output", fmt.Sprintf("temp-%d", fileSize))
 	err = generateRandomFileBySize(inpath, fileSize)
 	if err != nil {
 		b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
@@ -506,10 +524,11 @@ func benchmarkEncodeDecode(b *testing.B, dataShards, parityShards, diskNum int, 
 func benchmarkEncodeDecodeWithFault(b *testing.B, dataShards, parityShards, diskNum int, blockSize, fileSize int64, failNum int) {
 	b.ResetTimer()
 	b.SetBytes(fileSize)
+	genTempDir()
 	testEC := &Erasure{
 		ConfigFile: "conf.json",
 		// fileMap:         make(map[string]*FileInfo),
-		DiskFilePath:    "examples/.hdr.disks.path",
+		DiskFilePath:    testDiskFilePath,
 		ReplicateFactor: 3,
 		ConStripes:      100,
 		Override:        true,
@@ -517,8 +536,8 @@ func benchmarkEncodeDecodeWithFault(b *testing.B, dataShards, parityShards, disk
 	}
 	rand.Seed(100000007)
 	defer deleteTempFiles([]int64{fileSize})
-	inpath := fmt.Sprintf("./test/temp-%d", fileSize)
-	outpath := fmt.Sprintf("./output/temp-%d", fileSize)
+	inpath := filepath.Join("input", fmt.Sprintf("temp-%d", fileSize))
+	outpath := filepath.Join("output", fmt.Sprintf("temp-%d", fileSize))
 	err = generateRandomFileBySize(inpath, fileSize)
 	if err != nil {
 		b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
@@ -652,10 +671,11 @@ func BenchmarkEncodeDecode20x4x24x4096x20Mx4fault(b *testing.B) {
 
 // test performance when multiple users send encode/read requests.
 func benchmarkParallel(b *testing.B, dataShards, parityShards, diskNum int, blockSize, fileSize int64, conNum int) {
+	genTempDir()
 	testEC := &Erasure{
 		ConfigFile: "conf.json",
 		// fileMap:         make(map[string]*FileInfo),
-		DiskFilePath:    "examples/.hdr.disks.path",
+		DiskFilePath:    testDiskFilePath,
 		ReplicateFactor: 3,
 		ConStripes:      100,
 		Override:        true,
@@ -685,8 +705,8 @@ func benchmarkParallel(b *testing.B, dataShards, parityShards, diskNum int, bloc
 	outpath := make([]string, conNum)
 	//create c files and sent to channel
 	for i := 0; i < conNum; i++ {
-		inpath[i] = fmt.Sprintf("./test/temp%d-%d", i, fileSize)
-		outpath[i] = fmt.Sprintf("./output/temp%d-%d", i, fileSize)
+		inpath[i] = fmt.Sprintf("input/temp%d-%d", i, fileSize)
+		outpath[i] = fmt.Sprintf("output/temp%d-%d", i, fileSize)
 		err = generateRandomFileBySize(inpath[i], fileSize)
 		if err != nil {
 			b.Fatal(err)

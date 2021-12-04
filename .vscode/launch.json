@@ -7,19 +7,19 @@
         {
             "name": "Launch Package",
             "type": "go",
-            "cwd": "${workspaceFolder}",
+            "cwd": "${workspaceFolder}/examples",
             "request": "launch",
             "mode": "auto",
             // "port":2345,
             // "host":"127.0.0.1",
-            "program": "${fileDirname}",
+            "program": "./examples/main.go",
             "args": [ 
                         //init mode
-                        "-md","init", 
-                        "-k", "9", 
-                        "-m","3",
-                        "-bs","4096",
-                        "-dn", "16"
+                        // "-md","init", 
+                        // "-k", "9", 
+                        // "-m","3",
+                        // "-bs","4096",
+                        // "-dn", "16"
                         
                         //encode mode
                         // "-md","encode", 
@@ -51,9 +51,9 @@
                         // "-f","LICENSE.txt",
 
                         //recover mode
-                        // "-md", "recover",
-                        //  "-fn","4",
-                        // "-o"
+                        "-md", "recover",
+                         "-fn","4",
+                        "-o"
                        
                         
                     ]

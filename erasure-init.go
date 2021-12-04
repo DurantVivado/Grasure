@@ -26,7 +26,7 @@ func (e *Erasure) ReadDiskPath() error {
 	}
 	defer f.Close()
 	buf := bufio.NewReader(f)
-
+	e.diskInfos = make([]*DiskInfo, 0)
 	for {
 		line, _, err := buf.ReadLine()
 		if err == io.EOF {
@@ -35,7 +35,20 @@ func (e *Erasure) ReadDiskPath() error {
 		if err != nil {
 			return err
 		}
-		diskInfo := &DiskInfo{diskPath: string(line), available: true}
+		path := string(line)
+		if ok, err := PathExist(path); !ok && err == nil {
+			return &DiskError{path, "disk path not exist"}
+		} else if err != nil {
+			return err
+		}
+		metaPath := filepath.Join(path, "META")
+		flag := false
+		if ok, err := PathExist(metaPath); ok && err == nil {
+			flag = true
+		} else if err != nil {
+			return err
+		}
+		diskInfo := &DiskInfo{diskPath: string(line), available: true, ifMetaExist: flag}
 		e.diskInfos = append(e.diskInfos, diskInfo)
 	}
 	return nil
@@ -63,6 +76,9 @@ func (e *Erasure) InitSystem(assume bool) error {
 	}
 	if e.K+e.M > e.DiskNum {
 		return errTooFewDisksAlive
+	}
+	if e.DiskNum > len(e.diskInfos) {
+		return errDiskNumTooLarge
 	}
 	//replicate the config files
 
@@ -137,15 +153,6 @@ func (e *Erasure) resetSystem() error {
 		return err
 	}
 	return nil
-}
-
-//disk status
-func (e *Erasure) printDiskStatus() {
-	for i, disk := range e.diskInfos {
-
-		fmt.Printf("DiskId:%d, available:%tn,numBlocks:%d, storage:%d/%d (bytes)\n",
-			i, disk.available, disk.numBlocks, int64(disk.numBlocks)*e.BlockSize, disk.capacity)
-	}
 }
 
 //read the config info in config file
@@ -238,6 +245,7 @@ func (e *Erasure) replicateConfig(k int) error {
 	selectDisk := genRandomArr(e.DiskNum, 0)[:k]
 	for _, i := range selectDisk {
 		disk := e.diskInfos[i]
+		disk.ifMetaExist = true
 		replicaPath := filepath.Join(disk.diskPath, "META")
 		_, err = copyFile(e.ConfigFile, replicaPath)
 		if err != nil {
