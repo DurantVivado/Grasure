@@ -86,48 +86,11 @@ func (e *Erasure) Update(oldFile, newFile string) error {
 		}
 	}
 
-	// e.allBlobPool.New = func() interface{} {
-	// 	out := make([][]byte, e.ConStripes)
-	// 	for i := range out {
-	// 		out[i] = make([]byte, e.allStripeSize)
-	// 	}
-	// 	return &out
-	// }
-	// e.dataBlobPool.New = func() interface{} {
-	// 	out := make([][]byte, e.ConStripes)
-	// 	for i := range out {
-	// 		out[i] = make([]byte, e.dataStripeSize)
-	// 	}
-	// 	return &out
-	// }
 	oldStripeNum := int(ceilFracInt64(oldFileSize, e.dataStripeSize))
 	newStripeNum := int(ceilFracInt64(fi.FileSize, e.dataStripeSize))
 	// fmt.Println(oldStripeNum, newStripeNum)
 	numBlob := ceilFracInt(newStripeNum, e.ConStripes)
-	countSum := make([]int, diskNum)
-	if newStripeNum > oldStripeNum {
-		for i := 0; i < newStripeNum-oldStripeNum; i++ {
-			fi.Distribution = append(fi.Distribution, make([]int, e.K+e.M))
-			fi.blockToOffset = append(fi.blockToOffset, make([]int, e.K+e.M))
-		}
-		for i := 0; i < oldStripeNum; i++ {
-			for j := 0; j < e.K+e.M; j++ {
-				diskId := fi.Distribution[i][j]
-				countSum[diskId]++
-			}
-		}
-		for i := oldStripeNum; i < newStripeNum; i++ {
-			fi.Distribution[i] = genRandomArr(diskNum, 0)[0 : e.K+e.M]
-			for j := 0; j < e.K+e.M; j++ {
-				diskID := fi.Distribution[i][j]
-				fi.blockToOffset[i][j] = countSum[diskID]
-				countSum[diskID]++
-			}
-		}
-	} else {
-		fi.Distribution = fi.Distribution[0:newStripeNum]
-		fi.blockToOffset = fi.blockToOffset[0:newStripeNum]
-	}
+	adjustDist(e, fi, oldStripeNum, newStripeNum)
 
 	stripeCnt := 0
 	nextStripe := 0
@@ -297,8 +260,6 @@ func (e *Erasure) Update(oldFile, newFile string) error {
 			return err
 		}
 		e.errgroupPool.Put(eg)
-		// e.dataBlobPool.Put(&newBlobBuf)
-		// e.allBlobPool.Put(&oldBlobBuf)
 		stripeCnt += nextStripe
 	}
 
@@ -321,4 +282,31 @@ func compareStripe(oldStripe, newStripe [][]byte) ([]int, error) {
 		return nil, nil
 	}
 	return res, nil
+}
+
+func adjustDist(e *Erasure, fi *FileInfo, oldStripeNum, newStripeNum int) {
+	countSum := make([]int, e.DiskNum)
+	if newStripeNum > oldStripeNum {
+		for i := 0; i < newStripeNum-oldStripeNum; i++ {
+			fi.Distribution = append(fi.Distribution, make([]int, e.K+e.M))
+			fi.blockToOffset = append(fi.blockToOffset, make([]int, e.K+e.M))
+		}
+		for i := 0; i < oldStripeNum; i++ {
+			for j := 0; j < e.K+e.M; j++ {
+				diskId := fi.Distribution[i][j]
+				countSum[diskId]++
+			}
+		}
+		for i := oldStripeNum; i < newStripeNum; i++ {
+			fi.Distribution[i] = genRandomArr(e.DiskNum, 0)[0 : e.K+e.M]
+			for j := 0; j < e.K+e.M; j++ {
+				diskID := fi.Distribution[i][j]
+				fi.blockToOffset[i][j] = countSum[diskID]
+				countSum[diskID]++
+			}
+		}
+	} else {
+		fi.Distribution = fi.Distribution[0:newStripeNum]
+		fi.blockToOffset = fi.blockToOffset[0:newStripeNum]
+	}
 }
