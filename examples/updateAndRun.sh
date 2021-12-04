@@ -1,14 +1,14 @@
 #!/bin/bash
-file=./input/LICENSE
-go build -o grasure erasure-*.go main.go
+file=LICENSE
+go build -o main ./main.go ./flag.go 
 # init the system
-# sudo ./grasure -md init -k 2 -m 2 -bs 4096
+# sudo ./main -md init -k 2 -m 2 -dn 24 -bs 4096
 
 # A loopback system
-sudo ./grasure -md update -f $file
-sudo ./grasure -md read -f $file -fn 0 -conStripes 100 -sp ./output/$file
-srchash=(`sha256sum $file|tr ' ' ' '`)
-dsthash=(`sha256sum ./output/$file|tr ' ' ' '`)
+sudo ./main -md update -f input/$file
+sudo ./main -md read -f $file -fn 0 -conStripes 100 -sp output/$file
+srchash=(`sha256sum input/$file|tr ' ' ' '`)
+dsthash=(`sha256sum output/$file|tr ' ' ' '`)
 echo $srchash
 echo $dsthash
 if [ $srchash == $dsthash ];then 

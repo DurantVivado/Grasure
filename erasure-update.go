@@ -15,13 +15,15 @@ import (
 )
 
 //update a file according to a new file, the local `filename` will be used to update the file in the cloud with the same name
-func (e *Erasure) update(oldFile, newFile string) error {
+func (e *Erasure) Update(oldFile, newFile string) error {
 	// read old file info
+	fmt.Println("1")
 	baseName := filepath.Base(newFile)
-	fi, ok := e.fileMap[baseName]
+	intFi, ok := e.fileMap.Load(baseFileName)
 	if !ok {
 		return errFileNotFound
 	}
+	fi := intFi.(*FileInfo)
 	// update file info
 	nf, err := os.Open(newFile)
 	if err != nil {
@@ -37,11 +39,14 @@ func (e *Erasure) update(oldFile, newFile string) error {
 	}
 	fi.Hash = hashStr
 
+	fmt.Println("2")
+
 	// open file as io.Reader
 	alive := int32(0)
 	diskNum := len(e.diskInfos)
 	ifs := make([]*os.File, diskNum)
 	erg := new(errgroup.Group)
+	diskFailList := make(map[int]bool)
 	for i, disk := range e.diskInfos {
 		i := i
 		disk := disk
@@ -49,6 +54,7 @@ func (e *Erasure) update(oldFile, newFile string) error {
 			folderPath := filepath.Join(disk.diskPath, baseName)
 			blobPath := filepath.Join(folderPath, "BLOB")
 			if !disk.available {
+				diskFailList[i] = true
 				return &DiskError{disk.diskPath, " avilable flag set flase"}
 			}
 			ifs[i], err = os.OpenFile(blobPath, os.O_RDWR, 0666)
@@ -62,6 +68,7 @@ func (e *Erasure) update(oldFile, newFile string) error {
 			return nil
 		})
 	}
+	fmt.Println("3")
 	if err := erg.Wait(); err != nil {
 		log.Printf("read failed %s:", err.Error())
 	}
@@ -74,11 +81,15 @@ func (e *Erasure) update(oldFile, newFile string) error {
 		//the disk renders inrecoverable
 		return ErrTooFewDisks
 	}
-	// if int(alive) == e.K+e.M {
-	// 	log.Println("start reading blocks")
-	// } else {
-	// 	log.Println("start reconstructing blocks")
-	// }
+	if int(alive) == e.DiskNum {
+		if !e.Quiet {
+			log.Println("start reading blocks")
+		}
+	} else {
+		if !e.Quiet {
+			log.Println("start reconstructing blocks")
+		}
+	}
 
 	e.allBlobPool.New = func() interface{} {
 		out := make([][]byte, conStripes)

@@ -15,25 +15,15 @@
             "program": "${fileDirname}",
             "args": [ 
                         //init mode
-                        "-md","init", 
-<<<<<<< HEAD
-                        "-k", "12", 
-                        "-m","4",
-                        "-bs","1"
-                        
-                        //encode mode
-                        // "-md","encode", 
-                        // "-f","LICENSE",
-=======
-                        "-k", "9", 
-                        "-m","3",
-                        "-bs","4096",
-                        "-dn", "16"
+                        // "-md","init", 
+                        // "-k", "9", 
+                        // "-m","3",
+                        // "-bs","4096",
+                        // "-dn", "16"
                         
                         //encode mode
                         // "-md","encode", 
                         // "-f","test/Goprogramming.pdf",
->>>>>>> 6cac5d3c7d51a9a27e64b5d207ba4e5037f11e01
                         // "-conStripes","100",
                         // "-o"
                         // "-md","encode", 
@@ -53,9 +43,9 @@
                         // "-sp","output/file.128"
 
                         //update mode
-                        // "-md","update", 
-                        // "-f","LICENSE",
-                        // "-nf","LICENSE.txt",
+                        "-md","update", 
+                        "-f","input/LICENSE",
+                        "-nf","input/LICENSE",
 
                         //delete mode
                         // "-md","delete", 

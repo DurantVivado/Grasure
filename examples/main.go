@@ -45,7 +45,7 @@ func main() {
 	start := time.Now()
 	err = erasure.ReadDiskPath()
 	failOnErr(mode, err)
-
+	fmt.Println("!")
 	switch mode {
 	case "init":
 		err = erasure.InitSystem(false)
@@ -68,8 +68,10 @@ func main() {
 		failOnErr(mode, err)
 	case "update":
 		//update an old file according to a new file
+		fmt.Println("!")
 		err = erasure.ReadConfig()
 		failOnErr(mode, err)
+		fmt.Println("!")
 		err = erasure.Update(filePath, newFilePath)
 		failOnErr(mode, err)
 		err = erasure.WriteConfig()
