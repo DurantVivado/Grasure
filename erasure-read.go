@@ -1,11 +1,10 @@
-package main
+package grasure
 
 import (
 	"io"
 	"log"
 	"os"
 	"path/filepath"
-	"sync"
 	"sync/atomic"
 
 	"github.com/DurantVivado/reedsolomon"
@@ -13,11 +12,12 @@ import (
 )
 
 //read file on the system and return byte stream, include recovering
-func (e *Erasure) readFile(filename string, savepath string) error {
+func (e *Erasure) ReadFile(filename string, savepath string) error {
 	baseFileName := filepath.Base(filename)
-	fi, ok := e.fileMap[baseFileName]
+	intFi, ok := e.fileMap.Load(baseFileName)
+	fi := intFi.(*FileInfo)
 	if !ok {
-		return ErrFileNotFound
+		return errFileNotFound
 	}
 
 	fileSize := fi.FileSize
@@ -29,17 +29,14 @@ func (e *Erasure) readFile(filename string, savepath string) error {
 	ifs := make([]*os.File, e.DiskNum)
 	erg := new(errgroup.Group)
 	diskFailList := make(map[int]bool)
-	var mu sync.Mutex
-	for i, disk := range e.diskInfos {
+	for i, disk := range e.diskInfos[:e.DiskNum] {
 		i := i
 		disk := disk
 		erg.Go(func() error {
 			folderPath := filepath.Join(disk.diskPath, baseFileName)
 			blobPath := filepath.Join(folderPath, "BLOB")
 			if !disk.available {
-				mu.Lock()
 				diskFailList[i] = true
-				mu.Unlock()
 				return &DiskError{disk.diskPath, " available flag set false"}
 			}
 			ifs[i], err = os.Open(blobPath)
@@ -54,7 +51,9 @@ func (e *Erasure) readFile(filename string, savepath string) error {
 		})
 	}
 	if err := erg.Wait(); err != nil {
-		log.Printf("%s", err.Error())
+		if !e.Quiet {
+			log.Printf("%s", err.Error())
+		}
 	}
 	defer func() {
 		for i := 0; i < e.DiskNum; i++ {
@@ -65,13 +64,17 @@ func (e *Erasure) readFile(filename string, savepath string) error {
 	}()
 	if int(alive) < e.K {
 		//the disk renders inrecoverable
-		return ErrTooFewDisks
+		return errTooFewDisksAlive
 	}
-	// if int(alive) == e.DiskNum {
-	// 	log.Println("start reading blocks")
-	// } else {
-	// 	log.Println("start reconstructing blocks")
-	// }
+	if int(alive) == e.DiskNum {
+		if !e.Quiet {
+			log.Println("start reading blocks")
+		}
+	} else {
+		if !e.Quiet {
+			log.Println("start reconstructing blocks")
+		}
+	}
 	//for local save path
 	sf, err := os.OpenFile(savepath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0666)
 	if err != nil {
@@ -81,23 +84,23 @@ func (e *Erasure) readFile(filename string, savepath string) error {
 
 	//Since the file is striped, we have to reconstruct each stripe
 	//for each stripe we rejoin the data
-	numBlob := ceilFracInt(stripeNum, e.conStripes)
+	numBlob := ceilFracInt(stripeNum, e.ConStripes)
 	stripeCnt := 0
 	nextStripe := 0
 	//allocate stripe-size pool if and only if needed
 	// e.allBlobPool.New = func() interface{} {
-	// 	out := make([][]byte, e.conStripes)
+	// 	out := make([][]byte, e.ConStripes)
 	// 	for i := range out {
 	// 		out[i] = make([]byte, e.allStripeSize)
 	// 	}
 	// 	return &out
 	// }
-	blobBuf := makeArr2DByte(e.conStripes, int(e.allStripeSize))
+	blobBuf := makeArr2DByte(e.ConStripes, int(e.allStripeSize))
 	for blob := 0; blob < numBlob; blob++ {
-		if stripeCnt+e.conStripes > stripeNum {
+		if stripeCnt+e.ConStripes > stripeNum {
 			nextStripe = stripeNum - stripeCnt
 		} else {
-			nextStripe = e.conStripes
+			nextStripe = e.ConStripes
 		}
 		eg := e.errgroupPool.Get().(*errgroup.Group)
 		// blobBuf := *e.allBlobPool.Get().(*[][]byte)
@@ -187,7 +190,9 @@ func (e *Erasure) readFile(filename string, savepath string) error {
 		stripeCnt += nextStripe
 
 	}
-	// log.Printf("reading %s!", filename)
+	if !e.Quiet {
+		log.Printf("reading %s!", filename)
+	}
 	return nil
 }
 

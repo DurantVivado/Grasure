@@ -5,7 +5,7 @@ Implementing most popular erasured-based filesystem operations, it's readily use
 
 Project home: https://github.com/DurantVivado/Grasure
 
-Godoc: -
+Godoc: https://pkg.go.dev/github.com/DurantVivado/Grasure
 
 
 ## Project Architecture:
@@ -34,12 +34,15 @@ import:
 
 
 ## CLI Usage
-A complete demonstration of various CLI usage lies in `buildAndRun.sh`.
+A complete demonstration of various CLI usage lies in `examples/buildAndRun.sh`. You may have a glimpse.
+Here we elaborate the steps as following, in dir `./examples`:
+
 0. Build the project:
 ```
-go build -o grasure erasure-*.go main.go
+go build -o main ./main.go ./flag.go 
 ```
-1. New a file named `.hdr.disks.path` in project root, type the path of your local disks, e.g.,
+
+1. New a file named `.hdr.disks.path` in `./examples`, list the path of your local disks, e.g.,
 ```
 /home/server1/data/data1
 /home/server1/data/data2
@@ -58,13 +61,16 @@ go build -o grasure erasure-*.go main.go
 /home/server1/data/data15
 /home/server1/data/data16
 ```
-2.Initialise the system, you should explictly attach the number of data(k) and parity shards (m) as well as blocksize (in bytes), remember k+m must NOT be bigger than 256.
+
+2. Initialise the system, you should explictly attach the number of data(k) and parity shards (m) as well as blocksize (in bytes), remember k+m must NOT be bigger than 256.
 ```
-./grasure -md init -k 12 -m 4 -bs 4096
+./main -md init -k 12 -m 4 -bs 4096 -dn 16
 ```
+`bs` is the blockSize in bytes and `dn` is the diskNum you intend to use in `.hdr.disks.path`. Obviously, you should spare some disks for fault torlerance purpose.
+
 3. Encode one examplar file.
 ```
-./grasure -md encode -f {source file path} -conStripes 100 -o
+./main -md encode -f {source file path} -conStripes 100 -o
 ```
 
 4. decode(read) the examplar file.
@@ -85,8 +91,23 @@ sha256sum {source file path}
 ```
 sha256sum {destination file path}
 ```
-## API
-If you want to integrate Grasure into your own system. You can refer to examples in `./Examples`. Let's give a brief introduction.
+
+6. To delete the file in storage (currently irreversible, we are working on that):
+```
+./main -md delete -f {filebasename} -o
+```
+
+7. To update a file in the storage:
+```
+./main -md update -f {filebasename} -nf {local newfile path} -o
+```
+
+8. Recover a disk(e.g. all the file blobs in failed disk(s)), and transfer it to backup disks. This turns to be time-consuming job. 
+The previous disk path file will be renamed to `.hdr.disks.path.old`. New disk config path will replace every failed path with the redundant one.
+```
+./main -md recover 
+```
+
 
 6. update the examplar file.
 ```
@@ -158,6 +179,7 @@ It currently suppports `encode`, `read`, `update`, and more coming soon.
 |mode(md)|the mode of ec system, one of (encode, decode, update, scaling, recover)||
 |dataNum(k)|the number of data shards|12|
 |parityNum(m)|the number of parity shards(fault tolerance)|4|
+|diskNum(dn)|the number of disks (may be less than those listed in `.hdr.disk.path`)|4|
 |filePath(f)|upload: the local file path, download&update: the remote file basename||
 |savePath|the local save path (local path)|file.save|
 |newDataNum(new_k)|the new number of data shards|32|
@@ -169,7 +191,7 @@ It currently suppports `encode`, `read`, `update`, and more coming soon.
 |failMode(fmd)|simulate [diskFail] or [bitRot] mode"|diskFail|
 |failNum(fn)|simulate multiple disk failure, provides the fail number of disks|0|
 |conStripes(cs)|how many stripes are allowed to encode/decode concurrently|100|
-
+|quiet(q)|whether or not to mute outputs in terminal|false|
 ## Performance
 
 

@@ -1,4 +1,4 @@
-package main
+package grasure
 
 import (
 	"bufio"
@@ -6,7 +6,6 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"io"
-	"log"
 	"math/rand"
 	"os"
 	"os/signal"
@@ -19,7 +18,7 @@ import (
 
 //consult user to avoid maloperation
 func consultUserBeforeAction() (bool, error) {
-	// fmt.Println("If you are sure to proceed, type:\n [Y]es or [N]o.")
+	fmt.Println("If you are sure to proceed, type:\n [Y]es or [N]o.")
 	inputReader := bufio.NewReader(os.Stdin)
 	for {
 		ans, err := inputReader.ReadString('\n')
@@ -39,11 +38,6 @@ func consultUserBeforeAction() (bool, error) {
 }
 
 //an instant error dealer
-var failOnErr = func(mode string, e error) {
-	if e != nil {
-		log.Fatalf("%s: %s", mode, e.Error())
-	}
-}
 
 //look if path exists
 func PathExist(path string) (bool, error) {

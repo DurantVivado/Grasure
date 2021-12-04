@@ -1,11 +1,11 @@
 .hdr.disks.path
-.hdr.sys
 test*.file
 tmp/
 file.save
-garbageCode.go
-test/
 cmd/
-output/
 grasure
 conf.json
+examples/test
+examples/output
+examples/.hdr.disks.path
+examples/config.json

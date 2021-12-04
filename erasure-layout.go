@@ -1,4 +1,4 @@
-package main
+package grasure
 
 //Examplar random distribution layout generator
 //Two structure need specialized: fi.blockToOffset and fi.Distribution

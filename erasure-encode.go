@@ -1,17 +1,19 @@
-package main
+package grasure
 
 import (
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 
 	"golang.org/x/sync/errgroup"
-) //split and encode a file into parity blocks concurrently
+)
 
+//split and encode a file into parity blocks concurrently
 func (e *Erasure) EncodeFile(filename string) (*FileInfo, error) {
 	baseFileName := filepath.Base(filename)
-	if _, ok := e.fileMap[baseFileName]; ok && !override {
+	if _, ok := e.fileMap.Load(baseFileName); ok && !e.Override {
 		return nil, fmt.Errorf("the file %s has already been in the file system, if you wish to override, please attach `-o`",
 			baseFileName)
 	}
@@ -49,19 +51,19 @@ func (e *Erasure) EncodeFile(filename string) (*FileInfo, error) {
 	//first open relevant file resources
 	erg := new(errgroup.Group)
 	//save the blob
-	for i := range e.diskInfos {
+	for i := range e.diskInfos[:e.DiskNum] {
 		i := i
 		//we have to make sure the dist is appended to fi.Distribution in order
 		erg.Go(func() error {
 			folderPath := filepath.Join(e.diskInfos[i].diskPath, baseFileName)
 			//if override is specified, we override previous data
-			if override {
+			if e.Override {
 				if err := os.RemoveAll(folderPath); err != nil {
 					return err
 				}
 			}
 			if err := os.Mkdir(folderPath, 0666); err != nil {
-				return ErrDataDirExist
+				return errDataDirExist
 			}
 			// We decide the part name according to whether it belongs to data or parity
 			partPath := filepath.Join(folderPath, "BLOB")
@@ -76,13 +78,13 @@ func (e *Erasure) EncodeFile(filename string) (*FileInfo, error) {
 	if err := erg.Wait(); err != nil {
 		return nil, err
 	}
-	numBlob := ceilFracInt(stripeNum, e.conStripes)
+	numBlob := ceilFracInt(stripeNum, e.ConStripes)
 	stripeCnt := 0
 	//for every conStripe stripes, we set one goroutine
 	nextStripe := 0
 	//allocate the memory pool only when needed
 	// e.dataBlobPool.New = func() interface{} {
-	// 	out := make([][]byte, e.conStripes)
+	// 	out := make([][]byte, e.ConStripes)
 	// 	for i := range out {
 	// 		out[i] = make([]byte, e.dataStripeSize)
 	// 	}
@@ -92,12 +94,12 @@ func (e *Erasure) EncodeFile(filename string) (*FileInfo, error) {
 	//all described in erasure-layout.go
 
 	e.generateLayout(fi)
-	blobBuf := makeArr2DByte(e.conStripes, int(e.dataStripeSize))
+	blobBuf := makeArr2DByte(e.ConStripes, int(e.dataStripeSize))
 	for blob := 0; blob < numBlob; blob++ {
-		if stripeCnt+e.conStripes > stripeNum {
+		if stripeCnt+e.ConStripes > stripeNum {
 			nextStripe = stripeNum - stripeCnt
 		} else {
-			nextStripe = e.conStripes
+			nextStripe = e.ConStripes
 		}
 		eg := e.errgroupPool.Get().(*errgroup.Group)
 		// blobBuf := *e.dataBlobPool.Get().(*[][]byte)
@@ -153,9 +155,12 @@ func (e *Erasure) EncodeFile(filename string) (*FileInfo, error) {
 	}
 	//record the file meta
 	//transform map into array for json marshaling
-
-	e.fileMap[baseFileName] = fi
-	// log.Println(baseFileName, " successfully encoded. encoding size ", e.stripedFileSize(fileSize), "bytes")
+	e.fileMap.Store(baseFileName, fi)
+	// e.fileMap[baseFileName] = fi
+	if !e.Quiet {
+		log.Println(baseFileName, " successfully encoded. encoding size ",
+			e.stripedFileSize(fileSize), "bytes")
+	}
 	return fi, nil
 }
 
