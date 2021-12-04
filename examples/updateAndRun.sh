@@ -2,10 +2,10 @@
 file=LICENSE
 go build -o main ./main.go ./flag.go 
 # init the system
-# sudo ./main -md init -k 2 -m 2 -dn 24 -bs 4096
+# sudo ./main -md init -k 2 -m 2 -dn 24 -bs 1
 
 # A loopback system
-sudo ./main -md update -f input/$file
+sudo ./main -md update -f $file -nf input/$file
 sudo ./main -md read -f $file -fn 0 -conStripes 100 -sp output/$file
 srchash=(`sha256sum input/$file|tr ' ' ' '`)
 dsthash=(`sha256sum output/$file|tr ' ' ' '`)

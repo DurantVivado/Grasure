@@ -2,7 +2,7 @@
 file=LICENSE
 go build -o main ./main.go ./flag.go 
 # init the system
-sudo ./main -md init -k 12 -m 4 -dn 24 -bs 4096
+sudo ./main -md init -k 2 -m 2 -dn 24 -bs 1
 
 # A loopback system
 sudo ./main -md encode -f input/$file -conStripes 100 -o

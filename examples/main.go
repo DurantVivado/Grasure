@@ -45,7 +45,6 @@ func main() {
 	start := time.Now()
 	err = erasure.ReadDiskPath()
 	failOnErr(mode, err)
-	fmt.Println("!")
 	switch mode {
 	case "init":
 		err = erasure.InitSystem(false)
@@ -68,10 +67,8 @@ func main() {
 		failOnErr(mode, err)
 	case "update":
 		//update an old file according to a new file
-		fmt.Println("!")
 		err = erasure.ReadConfig()
 		failOnErr(mode, err)
-		fmt.Println("!")
 		err = erasure.Update(filePath, newFilePath)
 		failOnErr(mode, err)
 		err = erasure.WriteConfig()
@@ -146,6 +143,9 @@ func flag_init() {
 
 	flag.StringVar(&filePath, "f", "", "upload: the local file path, download&update: the remote file name")
 	flag.StringVar(&filePath, "filePath", "", "upload: the local file path, download&update: the remote file name")
+
+	flag.StringVar(&newFilePath, "nf", "", "update: the local file name")
+	flag.StringVar(&newFilePath, "newFilePath", "", "update: the local file name")
 
 	flag.StringVar(&savePath, "sp", "file.save", "the local saving path(local path)")
 	flag.StringVar(&savePath, "savePath", "file.save", "the local saving path(local path)")

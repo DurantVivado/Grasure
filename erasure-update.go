@@ -16,9 +16,8 @@ import (
 //update a file according to a new file, the local `filename` will be used to update the file in the cloud with the same name
 func (e *Erasure) Update(oldFile, newFile string) error {
 	// read old file info
-	fmt.Println("1")
-	baseName := filepath.Base(newFile)
-	intFi, ok := e.fileMap.Load(baseFileName)
+	baseName := filepath.Base(oldFile)
+	intFi, ok := e.fileMap.Load(baseName)
 	if !ok {
 		return errFileNotFound
 	}
@@ -37,8 +36,6 @@ func (e *Erasure) Update(oldFile, newFile string) error {
 		return err
 	}
 	fi.Hash = hashStr
-
-	fmt.Println("2")
 
 	// open file as io.Reader
 	alive := int32(0)
@@ -67,7 +64,6 @@ func (e *Erasure) Update(oldFile, newFile string) error {
 			return nil
 		})
 	}
-	fmt.Println("3")
 	if err := erg.Wait(); err != nil {
 		log.Printf("read failed %s:", err.Error())
 	}
@@ -78,7 +74,7 @@ func (e *Erasure) Update(oldFile, newFile string) error {
 	}()
 	if int(alive) < e.K {
 		//the disk renders inrecoverable
-		return ErrTooFewDisks
+		return errTooFewDisksAlive
 	}
 	if int(alive) == e.DiskNum {
 		if !e.Quiet {
@@ -90,24 +86,24 @@ func (e *Erasure) Update(oldFile, newFile string) error {
 		}
 	}
 
-	e.allBlobPool.New = func() interface{} {
-		out := make([][]byte, conStripes)
-		for i := range out {
-			out[i] = make([]byte, e.allStripeSize)
-		}
-		return &out
-	}
-	e.dataBlobPool.New = func() interface{} {
-		out := make([][]byte, conStripes)
-		for i := range out {
-			out[i] = make([]byte, e.dataStripeSize)
-		}
-		return &out
-	}
+	// e.allBlobPool.New = func() interface{} {
+	// 	out := make([][]byte, e.ConStripes)
+	// 	for i := range out {
+	// 		out[i] = make([]byte, e.allStripeSize)
+	// 	}
+	// 	return &out
+	// }
+	// e.dataBlobPool.New = func() interface{} {
+	// 	out := make([][]byte, e.ConStripes)
+	// 	for i := range out {
+	// 		out[i] = make([]byte, e.dataStripeSize)
+	// 	}
+	// 	return &out
+	// }
 	oldStripeNum := int(ceilFracInt64(oldFileSize, e.dataStripeSize))
 	newStripeNum := int(ceilFracInt64(fi.FileSize, e.dataStripeSize))
 	// fmt.Println(oldStripeNum, newStripeNum)
-	numBlob := ceilFracInt(newStripeNum, e.conStripes)
+	numBlob := ceilFracInt(newStripeNum, e.ConStripes)
 	countSum := make([]int, diskNum)
 	if newStripeNum > oldStripeNum {
 		for i := 0; i < newStripeNum-oldStripeNum; i++ {
@@ -136,15 +132,17 @@ func (e *Erasure) Update(oldFile, newFile string) error {
 	stripeCnt := 0
 	nextStripe := 0
 	dist := fi.Distribution
+	newBlobBuf := makeArr2DByte(e.ConStripes, int(e.dataStripeSize))
+	oldBlobBuf := makeArr2DByte(e.ConStripes, int(e.allStripeSize))
 	for blob := 0; blob < numBlob; blob++ {
-		if stripeCnt+e.conStripes > newStripeNum {
+		if stripeCnt+e.ConStripes > newStripeNum {
 			nextStripe = newStripeNum - stripeCnt
 		} else {
-			nextStripe = e.conStripes
+			nextStripe = e.ConStripes
 		}
 		eg := e.errgroupPool.Get().(*errgroup.Group)
-		newBlobBuf := *e.dataBlobPool.Get().(*[][]byte)
-		oldBlobBuf := *e.allBlobPool.Get().(*[][]byte)
+		// newBlobBuf := *e.dataBlobPool.Get().(*[][]byte)
+		// oldBlobBuf := *e.allBlobPool.Get().(*[][]byte)
 		for s := 0; s < nextStripe; s++ {
 			s := s
 			stripeNo := stripeCnt + s
@@ -213,7 +211,7 @@ func (e *Erasure) Update(oldFile, newFile string) error {
 					// we create the argments of Update
 					shards := make([][]byte, e.K+e.M)
 					for i := range shards {
-						shards[i] = make([]byte, blockSize)
+						shards[i] = make([]byte, e.BlockSize)
 					}
 					for i := range oldData {
 						if i >= e.K || sort.SearchInts(diffIdx, i) != len(diffIdx) {
@@ -299,8 +297,8 @@ func (e *Erasure) Update(oldFile, newFile string) error {
 			return err
 		}
 		e.errgroupPool.Put(eg)
-		e.dataBlobPool.Put(&newBlobBuf)
-		e.allBlobPool.Put(&oldBlobBuf)
+		// e.dataBlobPool.Put(&newBlobBuf)
+		// e.allBlobPool.Put(&oldBlobBuf)
 		stripeCnt += nextStripe
 	}
 
