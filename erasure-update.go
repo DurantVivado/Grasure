@@ -3,7 +3,6 @@ package grasure
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"io"
 	"log"
 	"os"
@@ -107,7 +106,7 @@ func (e *Erasure) Update(oldFile, newFile string) error {
 	}
 	oldStripeNum := int(ceilFracInt64(oldFileSize, e.dataStripeSize))
 	newStripeNum := int(ceilFracInt64(fi.FileSize, e.dataStripeSize))
-	fmt.Println(oldStripeNum, newStripeNum)
+	// fmt.Println(oldStripeNum, newStripeNum)
 	numBlob := ceilFracInt(newStripeNum, e.conStripes)
 	countSum := make([]int, diskNum)
 	if newStripeNum > oldStripeNum {
@@ -243,10 +242,8 @@ func (e *Erasure) Update(oldFile, newFile string) error {
 						}
 						erg.Go(func() error {
 							diskID := fi.Distribution[stripeNo][i]
-							if i < e.K {
-								fmt.Println("old ", string(newBlock))
-							}
-							_, err := ifs[diskID].WriteAt(newBlock, int64(stripeCnt+s)*e.BlockSize)
+							offset := fi.blockToOffset[stripeNo][i]
+							_, err := ifs[diskID].WriteAt(newBlock, int64(offset)*e.BlockSize)
 							if err != nil {
 								return err
 							}
@@ -262,8 +259,7 @@ func (e *Erasure) Update(oldFile, newFile string) error {
 				// if new filesize is greater than old filesize, we just encode the remaining data
 				// fmt.Println("new")
 				eg.Go(func() error {
-					stripeCnt := stripeNo
-					offset := int64(stripeCnt) * e.dataStripeSize
+					offset := int64(stripeNo) * e.dataStripeSize
 					_, err = nf.ReadAt(newBlobBuf[s], offset)
 					if err != nil && err != io.EOF {
 						return err
@@ -282,11 +278,8 @@ func (e *Erasure) Update(oldFile, newFile string) error {
 						i := i
 						erg.Go(func() error {
 							a := i
-							diskID := fi.Distribution[stripeCnt][a]
-							writeOffset := fi.blockToOffset[stripeCnt][a]
-							if i < e.K {
-								fmt.Println("new ", string(newData[a]))
-							}
+							diskID := fi.Distribution[stripeNo][a]
+							writeOffset := fi.blockToOffset[stripeNo][a]
 							_, err := ifs[diskID].WriteAt(newData[a], int64(writeOffset)*e.BlockSize)
 							if err != nil {
 								return err
