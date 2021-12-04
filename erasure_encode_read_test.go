@@ -60,7 +60,6 @@ func generateRandomFileSize(minSize, maxSize int64, num int) []int64 {
 	return out
 }
 func generateRandomFileBySize(filename string, fileSize int64) error {
-
 	if ex, err := PathExist(filename); ex && err == nil {
 		return nil
 	} else if err != nil {
@@ -82,8 +81,8 @@ func generateRandomFileBySize(filename string, fileSize int64) error {
 
 func deleteTempFiles(tempFileSizes []int64) {
 	for _, fileSize := range tempFileSizes {
-		inpath := fmt.Sprintf("./test/temp-%d", fileSize)
-		outpath := fmt.Sprintf("./output/temp-%d", fileSize)
+		inpath := fmt.Sprintf("./examples/test/temp-%d", fileSize)
+		outpath := fmt.Sprintf("./examples/output/temp-%d", fileSize)
 		if ex, _ := PathExist(inpath); !ex {
 			continue
 		}
@@ -158,8 +157,8 @@ func TestEncodeDecodeNormal(t *testing.T) {
 					log.Printf("----k:%d,m:%d,bs:%d,N:%d----\n", k, m, bs, N)
 
 					for _, fileSize := range tempFileSizes {
-						inpath := fmt.Sprintf("./test/temp-%d", fileSize)
-						outpath := fmt.Sprintf("./output/temp-%d", fileSize)
+						inpath := fmt.Sprintf("./examples/test/temp-%d", fileSize)
+						outpath := fmt.Sprintf("./examples/output/temp-%d", fileSize)
 						err = generateRandomFileBySize(inpath, fileSize)
 						if err != nil {
 							t.Errorf("k:%d,m:%d,bs:%d,N:%d,%s\n", k, m, bs, N, err.Error())

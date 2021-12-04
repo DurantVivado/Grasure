@@ -5,9 +5,9 @@ go build -o main ./main.go ./flag.go
 sudo ./main -md init -k 2 -m 2 -dn 24 -bs 1
 
 # A loopback system
-sudo ./main -md encode -f input/$file -conStripes 100 -o
+sudo ./main -md encode -f test/$file -conStripes 100 -o
 sudo ./main -md read -f $file -fn 0 -conStripes 100 -sp output/$file
-srchash=(`sha256sum input/$file|tr ' ' ' '`)
+srchash=(`sha256sum test/$file|tr ' ' ' '`)
 dsthash=(`sha256sum output/$file|tr ' ' ' '`)
 echo $srchash
 echo $dsthash

@@ -196,7 +196,7 @@ func hashStr(f *os.File) (string, error) {
 //fillRandom
 func fillRandom(p []byte) {
 	for i := 0; i < len(p); i += 7 {
-		val := rand.Int63()
+		val := rand.Int()
 		for j := 0; i+j < len(p) && j < 7; j++ {
 			p[i+j] = byte(val)
 			val >>= 8

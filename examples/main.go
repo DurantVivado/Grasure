@@ -27,8 +27,7 @@ func main() {
 	flag_init()
 	flag.Parse()
 	erasure := &grasure.Erasure{
-		ConfigFile: "conf.json",
-		// fileMap:         make(map[string]*FileInfo),
+		ConfigFile:      "conf.json",
 		DiskFilePath:    ".hdr.disks.path",
 		DiskNum:         diskNum,
 		K:               k,
@@ -78,7 +77,7 @@ func main() {
 		err = erasure.ReadConfig()
 		failOnErr(mode, err)
 		erasure.Destroy(failMode, failNum)
-		err = erasure.Recover()
+		_, err = erasure.Recover()
 		failOnErr(mode, err)
 
 	// case "scaling":
@@ -99,25 +98,26 @@ func main() {
 }
 
 var (
-	blockSize         int64
-	mode              string
-	k                 int
-	m                 int
-	diskNum           int
-	filePath          string
-	savePath          string
-	newFilePath       string
-	new_k             int
-	new_m             int
-	recoveredDiskPath string
-	failMode          string
-	failNum           int
-	override          bool
-	conWrites         bool
-	conReads          bool
-	conStripes        int
-	replicateFactor   int
-	quiet             bool
+	blockSize       int64
+	mode            string
+	k               int
+	m               int
+	diskNum         int
+	filePath        string
+	savePath        string
+	newFilePath     string
+	new_k           int
+	new_m           int
+	failMode        string
+	failNum         int
+	override        bool
+	conWrites       bool
+	conReads        bool
+	conStripes      int
+	replicateFactor int
+	quiet           bool
+
+	// recoveredDiskPath string
 )
 
 //the parameter lists, with fullname or abbreviation
@@ -144,8 +144,8 @@ func flag_init() {
 	flag.StringVar(&filePath, "f", "", "upload: the local file path, download&update: the remote file name")
 	flag.StringVar(&filePath, "filePath", "", "upload: the local file path, download&update: the remote file name")
 
-	flag.StringVar(&newFilePath, "nf", "", "update: the local file name")
-	flag.StringVar(&newFilePath, "newFilePath", "", "update: the local file name")
+	flag.StringVar(&newFilePath, "nf", "", "the local new file path")
+	flag.StringVar(&newFilePath, "newFilePath", "", "the local new file path")
 
 	flag.StringVar(&savePath, "sp", "file.save", "the local saving path(local path)")
 	flag.StringVar(&savePath, "savePath", "file.save", "the local saving path(local path)")
@@ -156,8 +156,8 @@ func flag_init() {
 	flag.IntVar(&new_m, "new_m", 8, "the new number of parity shards(2-4)")
 	flag.IntVar(&new_m, "newParityNum", 8, "the new number of parity shards(2-4)")
 
-	flag.StringVar(&recoveredDiskPath, "rDP", "/tmp/restore", "the data path for recovered disk, default to /tmp/data")
-	flag.StringVar(&recoveredDiskPath, "recoverDiskPath", "/tmp/restore", "the data path for recovered disk, default to /tmp/data")
+	// flag.StringVar(&recoveredDiskPath, "rDP", "/tmp/restore", "the data path for recovered disk, default to /tmp/data")
+	// flag.StringVar(&recoveredDiskPath, "recoverDiskPath", "/tmp/restore", "the data path for recovered disk, default to /tmp/data")
 
 	flag.BoolVar(&override, "o", false, "whether or not to override former files or directories, default to false")
 	flag.BoolVar(&override, "override", false, "whether or not to override former files or directories, default to false")
