@@ -66,25 +66,27 @@ func (e *Erasure) Recover() (map[string]string, error) {
 		}
 	}
 	//start recovering: traversing the files
-	rfs := make([]*os.File, failNum) //restore fs
-	ifs := make([]*os.File, e.DiskNum)
+
 	erg := new(errgroup.Group)
-	defer func() {
-		for i := 0; i < failNum; i++ {
-			if rfs[i] != nil {
-				rfs[i].Close()
-			}
-		}
-		for i := 0; i < e.DiskNum; i++ {
-			if ifs[i] != nil {
-				ifs[i].Close()
-			}
-		}
-	}()
+	// var ifpool, rfpool sync.Pool
+	// ifpool.New = func() interface{} {
+	// 	out := make([]*os.File, e.DiskNum)
+	// 	return &out
+	// }
+	// rfpool.New = func() interface{} {
+	// 	out := make([]*os.File, failNum)
+	// 	return &out
+	// }
 	e.fileMap.Range(func(filename, fi interface{}) bool {
 		basefilename := filename.(string)
 		fd := fi.(*FileInfo)
 		//These files can be repaired concurrently
+		// rfs := *rfpool.Get().(*[]*os.File) //restore fs
+		// ifs := *ifpool.Get().(*[]*os.File)
+		// defer rfpool.Put(&rfs)
+		// defer rfpool.Put(&ifs)
+		ifs := make([]*os.File, e.DiskNum)
+		rfs := make([]*os.File, failNum)
 		erg.Go(func() error {
 			//read the current disks
 			erg := e.errgroupPool.Get().(*errgroup.Group)
@@ -110,6 +112,13 @@ func (e *Erasure) Recover() (map[string]string, error) {
 			if err := erg.Wait(); err != nil {
 				return err
 			}
+			defer func() {
+				for i := 0; i < e.DiskNum; i++ {
+					if ifs[i] != nil {
+						ifs[i].Close()
+					}
+				}
+			}()
 			//open restore path IOs
 			for i, disk := range e.diskInfos[e.DiskNum : e.DiskNum+failNum] {
 				i := i
@@ -125,7 +134,7 @@ func (e *Erasure) Recover() (map[string]string, error) {
 					if err := os.Mkdir(folderPath, 0666); err != nil {
 						return errDataDirExist
 					}
-					rfs[i], err = os.Create(blobPath)
+					rfs[i], err = os.OpenFile(blobPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
 					if err != nil {
 						return err
 					}
@@ -136,7 +145,13 @@ func (e *Erasure) Recover() (map[string]string, error) {
 			if err := erg.Wait(); err != nil {
 				return err
 			}
-
+			defer func() {
+				for i := 0; i < failNum; i++ {
+					if rfs[i] != nil {
+						rfs[i].Close()
+					}
+				}
+			}()
 			//recover the file and write to restore path
 			//we read the survival blocks
 			//Since the file is striped, we have to reconstruct each stripe
@@ -235,7 +250,7 @@ func (e *Erasure) Recover() (map[string]string, error) {
 						if err := egp.Wait(); err != nil {
 							return err
 						}
-						return err
+						return nil
 					})
 
 				}
