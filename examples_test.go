@@ -1,0 +1,286 @@
+package grasure_test
+
+import (
+	"crypto/sha256"
+	"fmt"
+	"io"
+	"log"
+	"math/rand"
+	"os"
+
+	grasure "github.com/DurantVivado/Grasure"
+)
+
+func fillRandom(p []byte) {
+	for i := 0; i < len(p); i += 7 {
+		val := rand.Int63()
+		for j := 0; i+j < len(p) && j < 7; j++ {
+			p[i+j] = byte(val)
+			val >>= 8
+		}
+	}
+}
+
+//An intriguing example of how to encode a file into the system
+func ExampleFileEncoder() {
+	// Create some sample data
+	data := make([]byte, 250000)
+	filepath := "example.file"
+	fillRandom(data)
+	// write it into a file
+	f, err := os.OpenFile(filepath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
+	if err != nil {
+		log.Fatal(err)
+	}
+	_, err = f.Write(data)
+	if err != nil {
+		log.Fatal(err)
+	}
+	f.Close()
+	// define the struct Erasure
+	erasure := &grasure.Erasure{
+		DiskFilePath:    "examples/.hdr.disks.path",
+		ConfigFile:      "config.json",
+		DiskNum:         10,
+		K:               6,
+		M:               3,
+		BlockSize:       4096,
+		ReplicateFactor: 3,
+		ConStripes:      100,
+		Override:        true,
+	}
+	//read the disk paths
+	err = erasure.ReadDiskPath()
+	if err != nil {
+		log.Fatal(err)
+	}
+	//first init the system
+	err = erasure.InitSystem(true)
+	if err != nil {
+		log.Fatal(err)
+	}
+	//read the config file (auto-generated)
+	err = erasure.ReadConfig()
+	if err != nil {
+		log.Fatal(err)
+	}
+	//encode the file into system
+	_, err = erasure.EncodeFile(filepath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	//write the config
+	err = erasure.WriteConfig()
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("encode ok!")
+	//Output:
+	// Warning: you are intializing a new erasure-coded system, which means the previous data will also be reset.
+	// System init!
+	//  Erasure parameters: dataShards:6, parityShards:3,blocksize:4096,diskNum:10
+	// encode ok!
+}
+
+//A canonical example of how to read a file from the system
+func ExampleFileReader() {
+	filepath := "example.file"
+	savePath := "example.file.decode"
+	erasure := &grasure.Erasure{
+		DiskFilePath:    "examples/.hdr.disks.path",
+		ConfigFile:      "config.json",
+		DiskNum:         10,
+		K:               6,
+		M:               3,
+		BlockSize:       4096,
+		ReplicateFactor: 3,
+		ConStripes:      100,
+		Override:        true,
+	}
+	//read the disk paths
+	err := erasure.ReadDiskPath()
+	if err != nil {
+		log.Fatal(err)
+	}
+	// read the config file
+	err = erasure.ReadConfig()
+	if err != nil {
+		log.Fatal(err)
+	}
+	// read the file and save to savePath
+	err = erasure.ReadFile(filepath, savePath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	//check if two file are same
+	if ok, err := checkFileIfSame(filepath, savePath); !ok && err != nil {
+		log.Fatal(err)
+	} else if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("read ok!")
+	//Output:
+	// read ok!
+}
+
+//A heuristical example on read file in case of double failure
+func ExampleFileReader_Fault() {
+	filepath := "example.file"
+	savePath := "example.file.decode"
+	erasure := &grasure.Erasure{
+		DiskFilePath:    "examples/.hdr.disks.path",
+		ConfigFile:      "config.json",
+		DiskNum:         10,
+		K:               6,
+		M:               3,
+		BlockSize:       4096,
+		ReplicateFactor: 3,
+		ConStripes:      100,
+		Override:        true,
+	}
+	//read the disk paths
+	err := erasure.ReadDiskPath()
+	if err != nil {
+		log.Fatal(err)
+	}
+	// read the config file
+	err = erasure.ReadConfig()
+	if err != nil {
+		log.Fatal(err)
+	}
+	erasure.Destroy("diskFail", 2)
+	err = erasure.ReadFile(filepath, savePath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if ok, err := checkFileIfSame(filepath, savePath); !ok && err != nil {
+		log.Fatal(err)
+	} else if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("read ok!")
+	//Output:
+	// read ok!
+}
+
+//A curious example on removal of file, please encode the file into system first
+func ExampleRemoveFile() {
+	filepath := "example.file"
+	erasure := &grasure.Erasure{
+		DiskFilePath:    "examples/.hdr.disks.path",
+		ConfigFile:      "config.json",
+		DiskNum:         10,
+		K:               6,
+		M:               3,
+		BlockSize:       4096,
+		ReplicateFactor: 3,
+		ConStripes:      100,
+		Override:        true,
+	}
+	//read the disk paths
+	err := erasure.ReadDiskPath()
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = erasure.ReadConfig()
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = erasure.RemoveFile(filepath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = erasure.WriteConfig()
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("file removed")
+	//Output:
+	//file removed
+}
+
+//A fabulous example on recovery of disks
+func ExampleRecover() {
+	erasure := &grasure.Erasure{
+		DiskFilePath:    "examples/.hdr.disks.path",
+		ConfigFile:      "config.json",
+		DiskNum:         10,
+		K:               6,
+		M:               3,
+		BlockSize:       4096,
+		ReplicateFactor: 3,
+		ConStripes:      100,
+		Override:        true,
+	}
+	//read the disk paths
+	err := erasure.ReadDiskPath()
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = erasure.ReadConfig()
+	if err != nil {
+		log.Fatal(err)
+	}
+	erasure.Destroy("diskFail", 2)
+	_, err = erasure.Recover()
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = erasure.WriteConfig()
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("system recovered")
+	//Output:
+	//system recovered
+}
+
+func checkFileIfSame(dst, src string) (bool, error) {
+	if ok, err := pathExist(dst); err != nil || !ok {
+		return false, err
+	}
+	if ok, err := pathExist(src); err != nil || !ok {
+		return false, err
+	}
+	fdst, err := os.Open(dst)
+	if err != nil {
+		return false, err
+	}
+	defer fdst.Close()
+	fsrc, err := os.Open(src)
+	if err != nil {
+		return false, err
+	}
+	defer fsrc.Close()
+	hashDst, err := hashStr(fdst)
+	if err != nil {
+		return false, err
+	}
+	hashSrc, err := hashStr(fsrc)
+	if err != nil {
+		return false, err
+	}
+	return hashDst == hashSrc, nil
+}
+
+//get a file's hash (shasum256)
+func hashStr(f *os.File) (string, error) {
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return "", err
+	}
+	out := fmt.Sprintf("%x", h.Sum(nil))
+	return out, nil
+}
+
+//look if path exists
+func pathExist(path string) (bool, error) {
+	_, err := os.Stat(path)
+	if err == nil {
+		return true, nil
+	}
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	return false, err
+}

@@ -86,7 +86,8 @@ func main() {
 	// 	e.ReadConfig()
 	// 	scaling(new_k, new_m)
 	case "delete":
-
+		err = erasure.ReadConfig()
+		failOnErr(mode, err)
 		err = erasure.RemoveFile(filePath)
 		failOnErr(mode, err)
 		err = erasure.WriteConfig()

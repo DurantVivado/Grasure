@@ -24,7 +24,8 @@ func (e *Erasure) getFileNum() int {
 
 //Recover mainly deals with a disk-level disaster reconstruction.
 //User should provide enough backup devices in `.hdr.disk.path` for data transferring.
-//a (oldPath, replacedPath) map is returned in the first placw
+//
+//An (oldPath -> replacedPath) replace map is returned in the first placeholder.
 func (e *Erasure) Recover() (map[string]string, error) {
 	totalFiles := e.getFileNum()
 	if !e.Quiet {
@@ -79,7 +80,7 @@ func (e *Erasure) Recover() (map[string]string, error) {
 	// }
 	e.fileMap.Range(func(filename, fi interface{}) bool {
 		basefilename := filename.(string)
-		fd := fi.(*FileInfo)
+		fd := fi.(*fileInfo)
 		//These files can be repaired concurrently
 		// rfs := *rfpool.Get().(*[]*os.File) //restore fs
 		// ifs := *ifpool.Get().(*[]*os.File)
@@ -204,7 +205,7 @@ func (e *Erasure) Recover() (map[string]string, error) {
 							return err
 						}
 						//Split the blob into k+m parts
-						splitData, err := e.SplitStripe(blobBuf[s])
+						splitData, err := e.splitStripe(blobBuf[s])
 						if err != nil {
 							return err
 						}

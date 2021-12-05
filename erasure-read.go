@@ -11,11 +11,13 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-//read file on the system and return byte stream, include recovering
+//ReadFile reads ONE file  on the system and save it to local `savePath`.
+//
+//In case of any failure within fault tolerance, the file will be decoded first.
 func (e *Erasure) ReadFile(filename string, savepath string) error {
 	baseFileName := filepath.Base(filename)
 	intFi, ok := e.fileMap.Load(baseFileName)
-	fi := intFi.(*FileInfo)
+	fi := intFi.(*fileInfo)
 	if !ok {
 		return errFileNotFound
 	}
@@ -37,7 +39,7 @@ func (e *Erasure) ReadFile(filename string, savepath string) error {
 			blobPath := filepath.Join(folderPath, "BLOB")
 			if !disk.available {
 				diskFailList[i] = true
-				return &DiskError{disk.diskPath, " available flag set false"}
+				return &diskError{disk.diskPath, " available flag set false"}
 			}
 			ifs[i], err = os.Open(blobPath)
 			if err != nil {
@@ -135,7 +137,7 @@ func (e *Erasure) ReadFile(filename string, savepath string) error {
 					return err
 				}
 				//Split the blob into k+m parts
-				splitData, err := e.SplitStripe(blobBuf[s])
+				splitData, err := e.splitStripe(blobBuf[s])
 				if err != nil {
 					return err
 				}
@@ -196,7 +198,7 @@ func (e *Erasure) ReadFile(filename string, savepath string) error {
 	return nil
 }
 
-func (e *Erasure) SplitStripe(data []byte) ([][]byte, error) {
+func (e *Erasure) splitStripe(data []byte) ([][]byte, error) {
 	if len(data) == 0 {
 		return nil, reedsolomon.ErrShortData
 	}

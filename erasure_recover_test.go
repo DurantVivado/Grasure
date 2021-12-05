@@ -15,7 +15,7 @@ func TestRecover(t *testing.T) {
 	genTempDir()
 	testEC := &Erasure{
 		ConfigFile: "conf.json",
-		// fileMap:         make(map[string]*FileInfo),
+		// fileMap:         make(map[string]*fileInfo),
 		DiskFilePath:    testDiskFilePath,
 		ReplicateFactor: 3,
 		ConStripes:      100,
@@ -120,7 +120,7 @@ func benchmarkRecover(b *testing.B, dataShards, parityShards, diskNum, failNum i
 	genTempDir()
 	testEC := &Erasure{
 		ConfigFile: "conf.json",
-		// fileMap:         make(map[string]*FileInfo),
+		// fileMap:         make(map[string]*fileInfo),
 		DiskFilePath:    testDiskFilePath,
 		ReplicateFactor: 3,
 		ConStripes:      100,

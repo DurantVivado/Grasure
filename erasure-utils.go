@@ -40,7 +40,7 @@ func consultUserBeforeAction() (bool, error) {
 //an instant error dealer
 
 //look if path exists
-func PathExist(path string) (bool, error) {
+func pathExist(path string) (bool, error) {
 	_, err := os.Stat(path)
 	if err == nil {
 		return true, nil
@@ -156,10 +156,10 @@ func makeArr2DInt(row, col int) [][]int {
 //check if two file are completely same
 //warning: use io.copy
 func checkFileIfSame(dst, src string) (bool, error) {
-	if ok, err := PathExist(dst); err != nil || !ok {
+	if ok, err := pathExist(dst); err != nil || !ok {
 		return false, err
 	}
-	if ok, err := PathExist(src); err != nil || !ok {
+	if ok, err := pathExist(src); err != nil || !ok {
 		return false, err
 	}
 	fdst, err := os.Open(dst)

@@ -5,9 +5,14 @@ import (
 	"log"
 )
 
-//simulate disk failure or bitrot, it can be called multiple times after system init
-// it's a simulation, no real data will be lost
-//failNum = min(failNum, DiskNum)
+//Destroy simulates disk failure or bitrot:
+//
+//for `diskFail mode`, `failNum` random disks are marked as unavailable;
+//
+// for `bitRot`, `failNum` random blocks of the file corrupts;
+//
+// Since it's a simulation, no real data will be lost.
+// Note that failNum = min(failNum, DiskNum).
 func (e *Erasure) Destroy(mode string, failNum int) {
 	if mode == "diskFail" {
 		if failNum <= 0 {
@@ -24,11 +29,12 @@ func (e *Erasure) Destroy(mode string, failNum int) {
 		if !e.Quiet {
 			log.Println("simulate failure on:")
 		}
+
 		shuff := genRandomArr(e.DiskNum, 0)
 		for i := 0; i < failNum; i++ {
 
 			if !e.Quiet {
-				fmt.Println(e.diskInfos[shuff[i]].diskPath)
+				log.Println(e.diskInfos[shuff[i]].diskPath)
 			}
 			e.diskInfos[shuff[i]].available = false
 		}

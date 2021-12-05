@@ -49,14 +49,14 @@ var blockSizesV2 = []int64{
 
 //-------------------------TEST UNIT----------------------------
 func genTempDir() {
-	if ok, err := PathExist("input"); !ok && err == nil {
+	if ok, err := pathExist("input"); !ok && err == nil {
 		if err := os.Mkdir("input", 0644); err != nil {
 			log.Fatal(err)
 		}
 	} else if err != nil {
 		log.Fatal(err)
 	}
-	if ok, err := PathExist("output"); !ok && err == nil {
+	if ok, err := pathExist("output"); !ok && err == nil {
 		if err := os.Mkdir("output", 0644); err != nil {
 			log.Fatal(err)
 		}
@@ -74,7 +74,7 @@ func generateRandomFileSize(minSize, maxSize int64, num int) []int64 {
 }
 func generateRandomFileBySize(filename string, fileSize int64) error {
 
-	if ex, err := PathExist(filename); ex && err == nil {
+	if ex, err := pathExist(filename); ex && err == nil {
 		return nil
 	} else if err != nil {
 		return err
@@ -97,14 +97,14 @@ func deleteTempFiles(tempFileSizes []int64) {
 	for _, fileSize := range tempFileSizes {
 		inpath := filepath.Join("input", fmt.Sprintf("temp-%d", fileSize))
 		outpath := filepath.Join("output", fmt.Sprintf("temp-%d", fileSize))
-		if ex, _ := PathExist(inpath); !ex {
+		if ex, _ := pathExist(inpath); !ex {
 			continue
 		}
 		err = os.Remove(inpath)
 		if err != nil {
 			log.Fatal(err)
 		}
-		if ex, _ := PathExist(outpath); !ex {
+		if ex, _ := pathExist(outpath); !ex {
 			continue
 		}
 		err = os.Remove(outpath)
@@ -116,14 +116,14 @@ func deleteTempFiles(tempFileSizes []int64) {
 
 func deleteTempFileGroup(inpath, outpath []string) {
 	for i := range inpath {
-		if ex, _ := PathExist(inpath[i]); !ex {
+		if ex, _ := pathExist(inpath[i]); !ex {
 			continue
 		}
 		err = os.Remove(inpath[i])
 		if err != nil {
 			log.Fatal(err)
 		}
-		if ex, _ := PathExist(outpath[i]); !ex {
+		if ex, _ := pathExist(outpath[i]); !ex {
 			continue
 		}
 		err = os.Remove(outpath[i])
@@ -139,7 +139,7 @@ func TestEncodeDecodeNormal(t *testing.T) {
 	genTempDir()
 	testEC := &Erasure{
 		ConfigFile: "conf.json",
-		// fileMap:         make(map[string]*FileInfo),
+		// fileMap:         make(map[string]*fileInfo),
 		DiskFilePath:    testDiskFilePath,
 		ReplicateFactor: 3,
 		ConStripes:      100,
@@ -221,7 +221,7 @@ func TestEncodeDecodeOneFailure(t *testing.T) {
 	genTempDir()
 	testEC := &Erasure{
 		ConfigFile: "conf.json",
-		// fileMap:         make(map[string]*FileInfo),
+		// fileMap:         make(map[string]*fileInfo),
 		DiskFilePath:    testDiskFilePath,
 		ReplicateFactor: 3,
 		ConStripes:      100,
@@ -306,7 +306,7 @@ func TestEncodeDecodeTwoFailure(t *testing.T) {
 	genTempDir()
 	testEC := &Erasure{
 		ConfigFile: "conf.json",
-		// fileMap:         make(map[string]*FileInfo),
+		// fileMap:         make(map[string]*fileInfo),
 		DiskFilePath:    testDiskFilePath,
 		ReplicateFactor: 3,
 		ConStripes:      100,
@@ -463,7 +463,7 @@ func benchmarkEncodeDecode(b *testing.B, dataShards, parityShards, diskNum int, 
 	genTempDir()
 	testEC := &Erasure{
 		ConfigFile: "conf.json",
-		// fileMap:         make(map[string]*FileInfo),
+		// fileMap:         make(map[string]*fileInfo),
 		DiskFilePath:    testDiskFilePath,
 		ReplicateFactor: 3,
 		ConStripes:      100,
@@ -527,7 +527,7 @@ func benchmarkEncodeDecodeWithFault(b *testing.B, dataShards, parityShards, disk
 	genTempDir()
 	testEC := &Erasure{
 		ConfigFile: "conf.json",
-		// fileMap:         make(map[string]*FileInfo),
+		// fileMap:         make(map[string]*fileInfo),
 		DiskFilePath:    testDiskFilePath,
 		ReplicateFactor: 3,
 		ConStripes:      100,
@@ -674,7 +674,7 @@ func benchmarkParallel(b *testing.B, dataShards, parityShards, diskNum int, bloc
 	genTempDir()
 	testEC := &Erasure{
 		ConfigFile: "conf.json",
-		// fileMap:         make(map[string]*FileInfo),
+		// fileMap:         make(map[string]*fileInfo),
 		DiskFilePath:    testDiskFilePath,
 		ReplicateFactor: 3,
 		ConStripes:      100,
