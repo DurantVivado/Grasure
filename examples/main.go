@@ -77,7 +77,7 @@ func main() {
 		err = erasure.ReadConfig()
 		failOnErr(mode, err)
 		erasure.Destroy(failMode, failNum)
-		_, err = erasure.Recover()
+		err = erasure.Recover()
 		failOnErr(mode, err)
 
 	// case "scaling":

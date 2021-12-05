@@ -3,6 +3,7 @@ package grasure
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"os"
@@ -41,9 +42,10 @@ func (e *Erasure) Update(oldFile, newFile string) error {
 	alive := int32(0)
 	diskNum := len(e.diskInfos)
 	ifs := make([]*os.File, diskNum)
+	// wfs := make([]*os.File, diskNum)
 	erg := new(errgroup.Group)
 	diskFailList := make(map[int]bool)
-	for i, disk := range e.diskInfos {
+	for i, disk := range e.diskInfos[:e.DiskNum] {
 		i := i
 		disk := disk
 		erg.Go(func() error {
@@ -53,11 +55,18 @@ func (e *Erasure) Update(oldFile, newFile string) error {
 				diskFailList[i] = true
 				return &DiskError{disk.diskPath, " avilable flag set flase"}
 			}
-			ifs[i], err = os.OpenFile(blobPath, os.O_RDWR, 0666)
+			ifs[i], err = os.OpenFile(blobPath, os.O_RDWR|os.O_TRUNC, 0666)
 			if err != nil {
+				fmt.Println("Open error")
 				disk.available = false
 				return err
 			}
+			// wfs[i], err = os.OpenFile(blobPath, os.O_WRONLY|os.O_TRUNC, 0666)
+			// if err != nil {
+			// 	fmt.Println("OpenFile error")
+			// 	disk.available = false
+			// 	return err
+			// }
 
 			disk.available = true
 			atomic.AddInt32(&alive, 1)
@@ -65,11 +74,14 @@ func (e *Erasure) Update(oldFile, newFile string) error {
 		})
 	}
 	if err := erg.Wait(); err != nil {
-		log.Printf("read failed %s:", err.Error())
+		// if !e.Quiet {
+		log.Printf("read failed %s", err.Error())
+		// }
 	}
 	defer func() {
 		for i := range e.diskInfos {
 			ifs[i].Close()
+			// wfs[i].Close()
 		}
 	}()
 	if int(alive) < e.K {
@@ -261,6 +273,10 @@ func (e *Erasure) Update(oldFile, newFile string) error {
 		}
 		e.errgroupPool.Put(eg)
 		stripeCnt += nextStripe
+	}
+
+	if !e.Quiet {
+		log.Println(baseName, " successfully updated.")
 	}
 
 	return nil

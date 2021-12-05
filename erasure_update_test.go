@@ -1,6 +1,7 @@
 package grasure
 
 import (
+	"bufio"
 	"fmt"
 	"log"
 	"math/rand"
@@ -16,44 +17,46 @@ var updateMode = []int{
 
 // mode: 1 exchange; 2 append; 3 delete
 func changeRandom(filePath string, fileSize, num, mode int) error {
-	if ex, err := PathExist(filePath); ex && err == nil {
-		return nil
-	} else if err != nil {
-		return err
-	}
-	f, err := os.OpenFile(filePath, os.O_RDWR, 0666)
+	f, err := os.Open(filePath)
 	if err != nil {
 		return err
 	}
-	defer f.Close()
-	p := make([]byte, fileSize)
-	_, err = f.Read(p)
-	if err != nil {
-		return err
-	}
-	num = min(num, len(p))
+	buf := bufio.NewReader(f)
+	data := make([]byte, fileSize)
+	buf.Read(data)
+
 	switch mode {
-	case 1: // exchange
+	case 1:
 		for i := 0; i < num; i++ {
-			index := rand.Int() % len(p)
+			index := rand.Int() % len(data)
 			newbyte := rand.Int()
-			p[index] = byte(newbyte)
+			data[index] = byte(newbyte)
 		}
-	case 2: // append
+	case 2:
 		for i := 0; i < num; i++ {
 			newbyte := rand.Int()
-			p = append(p, byte(newbyte))
+			data = append(data, byte(newbyte))
 		}
-	case 3: // delete
+	case 3:
 		for i := 0; i < num; i++ {
-			index := rand.Int() % len(p)
-			p = append(p[:index], p[index+1:]...)
+			index := rand.Int() % len(data)
+			data = append(data[:index], data[index+1:]...)
 		}
 	}
-	_, err = f.Write(p)
+
+	fw, err := os.OpenFile(filePath, os.O_RDWR|os.O_TRUNC, 0666)
 	if err != nil {
 		return err
 	}
+	defer fw.Close()
+
+	w := bufio.NewWriter(fw)
+	w.WriteString(string(data))
+	if err != nil {
+		panic(err)
+	}
+	w.Flush()
+
 	return nil
 }
 
@@ -102,7 +105,7 @@ func TestUpdateNormal(t *testing.T) {
 						if err != nil {
 							t.Errorf("k:%d,m:%d,bs:%d,N:%d,%s\n", k, m, bs, N, err.Error())
 						}
-						fmt.Println("3")
+
 						err = testEC.ReadConfig()
 						if err != nil {
 							t.Errorf("k:%d,m:%d,bs:%d,N:%d,%s\n", k, m, bs, N, err.Error())
@@ -116,26 +119,24 @@ func TestUpdateNormal(t *testing.T) {
 							t.Errorf("k:%d,m:%d,bs:%d,N:%d,%s\n", k, m, bs, N, err.Error())
 						}
 
-						for _, mode := range updateMode {
-							changeRandom(inpath, int(fileSize), int(fileSize)/2, mode)
-
-							err = testEC.Update(inpath, inpath)
-							if err != nil {
-								t.Errorf("k:%d,m:%d,bs:%d,N:%d,mode:%d update fails when fileSize is %d, for %s", k, m, bs, N, mode, fileSize, err.Error())
-							}
-
-							err = testEC.ReadFile(inpath, outpath)
-							if err != nil {
-								t.Errorf("k:%d,m:%d,bs:%d,N:%d,mode:%d read fails when fileSize is %d, for %s", k, m, bs, N, mode, fileSize, err.Error())
-							}
-
-							//evaluate the results
-							if ok, err := checkFileIfSame(inpath, outpath); !ok && err != nil {
-								t.Fatalf("k:%d,m:%d,bs:%d,N:%d,mode:%d read fails when fileSize is %d, for hash check fail", k, m, bs, N, mode, fileSize)
-							} else if err != nil {
-								t.Fatalf("k:%d,m:%d,bs:%d,N:%d,mode:%d read fails when fileSize is %d, for %s", k, m, bs, N, mode, fileSize, err.Error())
-							}
+						// for _, mode := range updateMode {
+						changeRandom(inpath, int(fileSize), int(fileSize)/2, 1)
+						err = testEC.Update(inpath, inpath)
+						if err != nil {
+							t.Errorf("k:%d,m:%d,bs:%d,N:%d,mode:%d update fails when fileSize is %d, for %s", k, m, bs, N, 1, fileSize, err.Error())
 						}
+						err = testEC.ReadFile(inpath, outpath)
+						if err != nil {
+							t.Errorf("k:%d,m:%d,bs:%d,N:%d,mode:%d read fails when fileSize is %d, for %s", k, m, bs, N, 1, fileSize, err.Error())
+						}
+
+						//evaluate the results
+						if ok, err := checkFileIfSame(inpath, outpath); !ok && err != nil {
+							t.Fatalf("k:%d,m:%d,bs:%d,N:%d,mode:%d read fails when fileSize is %d, for hash check fail", k, m, bs, N, 1, fileSize)
+						} else if err != nil {
+							t.Fatalf("k:%d,m:%d,bs:%d,N:%d,mode:%d read fails when fileSize is %d, for %s", k, m, bs, N, 1, fileSize, err.Error())
+						}
+						// }
 
 					}
 				}

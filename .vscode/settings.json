@@ -16,7 +16,7 @@
         "go.autocompleteUnimportedPackages": true,
         "go.formatTool": "gofmt",
         "go.goroot": "/usr/local/go",    
-        "go.gopath": "/home/grasure/go", 
+        "go.gopath": "/home/wl/go", 
         "go.gocodeAutoBuild": true
     
         

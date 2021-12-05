@@ -1,6 +1,6 @@
 #!/bin/bash
 file=LICENSE
-go build -o main ./main.go ./flag.go 
+go build -o main ./main.go
 # init the system
 # sudo ./main -md init -k 2 -m 2 -dn 24 -bs 1
 
