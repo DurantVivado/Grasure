@@ -54,7 +54,7 @@ func main() {
 		err = erasure.ReadConfig()
 		failOnErr(mode, err)
 		erasure.Destroy(failMode, failNum)
-		err = erasure.ReadFile(filePath, savePath)
+		err = erasure.ReadFile(filePath, savePath, degrade)
 		failOnErr(mode, err)
 
 	case "encode":
@@ -118,7 +118,7 @@ var (
 	conStripes      int
 	replicateFactor int
 	quiet           bool
-
+	degrade         bool
 	// recoveredDiskPath string
 )
 
@@ -181,5 +181,8 @@ func flag_init() {
 
 	flag.BoolVar(&quiet, "q", false, "if true mute outputs otherwise print them")
 	flag.BoolVar(&quiet, "quiet", false, "if true mute outputs otherwise print them")
+
+	flag.BoolVar(&degrade, "dg", false, "whether degraded read is enabled. In this way, only data shards are recovered.")
+	flag.BoolVar(&degrade, "degrade", false, "whether degraded read is enabled. In this way, only data shards are recovered.")
 
 }
