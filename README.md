@@ -1,4 +1,4 @@
-[![Go Reference](https://pkg.go.dev/badge/github.com/DurantVivado/Grasure.svg)](https://pkg.go.dev/github.com/DurantVivado/Grasure.svg) 
+[![Go Reference](https://pkg.go.dev/badge/github.com/DurantVivado/Grasure.svg)](https://pkg.go.dev/github.com/DurantVivado/Grasure) 
 # Grasure
 
 Universal Erasure Coding Architecture in Go
