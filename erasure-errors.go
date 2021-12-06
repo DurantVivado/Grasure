@@ -15,19 +15,34 @@ func (e *diskError) Error() string {
 }
 
 //Error definitions
+
 var errConfFileNotExist = errors.New("the conf file not exist")
+
 var errEmptyData = errors.New("the file to encode is empty")
+
 var errDataDirExist = errors.New("data directory already exists")
+
 var errTooFewDisksAlive = errors.New("too few survival disks, i.e., k+m < N")
+
 var errNotInitialized = errors.New("system not initialized, please initialize with `-mode init` first")
+
 var errSurvivalNotEnoughForDecoding = errors.New("the failed block number exceeds fault tolerance, data renders unrecoverable")
+
 var errFileIncompleted = errors.New("file hash check fails, file renders incompleted")
+
 var errFileNotFound = errors.New("file not found")
+
 var errFailModeNotRecognized = errors.New("the fail mode is not recognizable, please specify in \"diskFail\" or \"bitRot\"")
+
 var errNegativeReplicateFactor = errors.New("the replicate factor MUST be non-negative")
+
 var errNotEnoughBackupForRecovery = errors.New("not enough disk for recovery, needs more backup devices")
+
 var errFileBlobNotFound = errors.New("file blob not found. please try to read it")
+
 var errDiskNumTooLarge = errors.New("diskNum is larger than provided")
+
+var errTooFewBlockAliveInStripe = errors.New("not enough blocks for reading in a stripe")
 
 // errUnexpected - unexpected error, requires manual intervention.
 var errUnexpected = storageErr("unexpected error, please report this issue at https://github.com/minio/minio/issues")

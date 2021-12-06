@@ -30,7 +30,7 @@ import:
 [reedsolomon library](https://github.com/klauspost/reedsolomon)
 
 
-## CLI Usage
+## Usage
 A complete demonstration of various CLI usage lies in `examples/buildAndRun.sh`. You may have a glimpse.
 Here we elaborate the steps as following, in dir `./examples`:
 
@@ -165,7 +165,7 @@ It currently suppports `encode`, `read`, `update`, and more coming soon.
 
 
 ## CLI parameters
-
+the command-line parameters of `./examples/main.go` are listed as below.
 |parameter(alias)|description|default|
 |--|--|--|
 |blockSize(bs)|the block size in bytes|4096|

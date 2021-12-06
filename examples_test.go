@@ -21,6 +21,52 @@ func fillRandom(p []byte) {
 	}
 }
 
+func prepareDir(diskNum int) error {
+	//1. diskConfigFile
+	f, err := os.Create(".hdr.disks.path")
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	//create some directories as file storage
+	for i := 0; i < diskNum; i++ {
+		path := fmt.Sprintf("disk%d", i)
+		if err := os.RemoveAll(path); err != nil {
+			return err
+		}
+		if err := os.Mkdir(path, 0644); err != nil {
+			return err
+		}
+		_, err := f.WriteString(path + "\n")
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+
+}
+func delDir(diskNum int) error {
+	//1. diskConfigFile
+	//create some directories as file storage
+	for i := 0; i < diskNum; i++ {
+		path := fmt.Sprintf("disk%d", i)
+		if err := os.RemoveAll(path); err != nil {
+			return err
+		}
+	}
+	if err := os.Remove(".hdr.disks.path"); err != nil {
+		return err
+	}
+	if err := os.Remove("example.file"); err != nil {
+		return err
+	}
+	if err := os.Remove("example.file.decode"); err != nil {
+		return err
+	}
+	return nil
+
+}
+
 //An intriguing example of how to encode a file into the system
 func ExampleErasure_EncodeFile() {
 	// Create some sample data
@@ -39,7 +85,7 @@ func ExampleErasure_EncodeFile() {
 	f.Close()
 	// define the struct Erasure
 	erasure := &grasure.Erasure{
-		DiskFilePath:    "examples/.hdr.disks.path",
+		DiskFilePath:    ".hdr.disks.path",
 		ConfigFile:      "config.json",
 		DiskNum:         10,
 		K:               6,
@@ -48,6 +94,10 @@ func ExampleErasure_EncodeFile() {
 		ReplicateFactor: 3,
 		ConStripes:      100,
 		Override:        true,
+	}
+	err = prepareDir(13)
+	if err != nil {
+		log.Fatal(err)
 	}
 	//read the disk paths
 	err = erasure.ReadDiskPath()
@@ -87,7 +137,7 @@ func ExampleErasure_ReadFile_1() {
 	filepath := "example.file"
 	savePath := "example.file.decode"
 	erasure := &grasure.Erasure{
-		DiskFilePath:    "examples/.hdr.disks.path",
+		DiskFilePath:    ".hdr.disks.path",
 		ConfigFile:      "config.json",
 		DiskNum:         10,
 		K:               6,
@@ -108,7 +158,7 @@ func ExampleErasure_ReadFile_1() {
 		log.Fatal(err)
 	}
 	// read the file and save to savePath
-	err = erasure.ReadFile(filepath, savePath)
+	err = erasure.ReadFile(filepath, savePath, false)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -128,7 +178,7 @@ func ExampleErasure_ReadFile_2() {
 	filepath := "example.file"
 	savePath := "example.file.decode"
 	erasure := &grasure.Erasure{
-		DiskFilePath:    "examples/.hdr.disks.path",
+		DiskFilePath:    ".hdr.disks.path",
 		ConfigFile:      "config.json",
 		DiskNum:         10,
 		K:               6,
@@ -149,7 +199,7 @@ func ExampleErasure_ReadFile_2() {
 		log.Fatal(err)
 	}
 	erasure.Destroy("diskFail", 2)
-	err = erasure.ReadFile(filepath, savePath)
+	err = erasure.ReadFile(filepath, savePath, false)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -167,7 +217,7 @@ func ExampleErasure_ReadFile_2() {
 func ExampleErasure_RemoveFile() {
 	filepath := "example.file"
 	erasure := &grasure.Erasure{
-		DiskFilePath:    "examples/.hdr.disks.path",
+		DiskFilePath:    ".hdr.disks.path",
 		ConfigFile:      "config.json",
 		DiskNum:         10,
 		K:               6,
@@ -202,7 +252,7 @@ func ExampleErasure_RemoveFile() {
 //A fabulous example on recovery of disks
 func ExampleErasure_Recover() {
 	erasure := &grasure.Erasure{
-		DiskFilePath:    "examples/.hdr.disks.path",
+		DiskFilePath:    ".hdr.disks.path",
 		ConfigFile:      "config.json",
 		DiskNum:         10,
 		K:               6,
