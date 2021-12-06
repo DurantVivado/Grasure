@@ -22,7 +22,7 @@ func fillRandom(p []byte) {
 }
 
 //An intriguing example of how to encode a file into the system
-func ExampleFileEncoder() {
+func ExampleErasure_EncodeFile() {
 	// Create some sample data
 	data := make([]byte, 250000)
 	filepath := "example.file"
@@ -82,8 +82,8 @@ func ExampleFileEncoder() {
 	// encode ok!
 }
 
-//A canonical example of how to read a file from the system
-func ExampleFileReader() {
+//A canonical example of how to read a file normally from the system
+func ExampleErasure_ReadFile_1() {
 	filepath := "example.file"
 	savePath := "example.file.decode"
 	erasure := &grasure.Erasure{
@@ -124,7 +124,7 @@ func ExampleFileReader() {
 }
 
 //A heuristical example on read file in case of double failure
-func ExampleFileReader_Fault() {
+func ExampleErasure_ReadFile_2() {
 	filepath := "example.file"
 	savePath := "example.file.decode"
 	erasure := &grasure.Erasure{
@@ -164,7 +164,7 @@ func ExampleFileReader_Fault() {
 }
 
 //A curious example on removal of file, please encode the file into system first
-func ExampleRemoveFile() {
+func ExampleErasure_RemoveFile() {
 	filepath := "example.file"
 	erasure := &grasure.Erasure{
 		DiskFilePath:    "examples/.hdr.disks.path",
@@ -200,7 +200,7 @@ func ExampleRemoveFile() {
 }
 
 //A fabulous example on recovery of disks
-func ExampleRecover() {
+func ExampleErasure_Recover() {
 	erasure := &grasure.Erasure{
 		DiskFilePath:    "examples/.hdr.disks.path",
 		ConfigFile:      "config.json",
