@@ -120,7 +120,7 @@ func TestUpdateNormal(t *testing.T) {
 						}
 
 						// for _, mode := range updateMode {
-						changeRandom(inpath, int(fileSize), int(fileSize)/2, 1)
+						changeRandom(inpath, int(fileSize), int(fileSize)/10, 1)
 						err = testEC.Update(inpath, inpath)
 						if err != nil {
 							t.Errorf("k:%d,m:%d,bs:%d,N:%d,mode:%d update fails when fileSize is %d, for %s", k, m, bs, N, 1, fileSize, err.Error())
