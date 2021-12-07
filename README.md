@@ -10,7 +10,7 @@ Godoc: https://pkg.go.dev/github.com/DurantVivado/Grasure
 
 
 ## Project Architecture:
-- `main.go` contains the main func. For each run,  operate among "encode", "read", "update", "scaling", "delete", ...
+<!-- - `main.go` contains the main func. For each run,  operate among "encode", "read", "update", "scaling", "delete", ... -->
 
 - `erasure-global.go` contains the system-level interfaces and global structs and variables
 
@@ -25,6 +25,10 @@ Godoc: https://pkg.go.dev/github.com/DurantVivado/Grasure
 - `erasure-read.go` contains operation for striped file reading, if some parts are lost, we try to recover.
 
 - `erasure-errors.go` contains the definitions for various possible errors.
+
+- `erasure-recover.go` deals with multi-disk recovery, concerning both data and meta data.
+
+- `erasure-update.go` contains operation for striped file updating, if some parts are lost, we try to recover first.
 
 import:
 [reedsolomon library](https://github.com/klauspost/reedsolomon)

@@ -8,8 +8,14 @@
         "go.buildTags": "",
         "go.buildFlags": [],
         "go.testTimeout": "7200s",
-        "go.testFlags": ["-v"],
-        "go.lintFlags": [],
+        "go.testFlags": [
+            "-v",
+            "-cpuprofile", "profiles/cpu.profile",
+            "-memprofile",  "profiles/mem.profile",
+            "-blockprofile", "profiles/blk.profile"
+        ],
+            
+         "go.lintFlags": [],
         "go.vetFlags": [],
         "go.coverOnSave": false,
         "go.useCodeSnippetsOnFunctionSuggest": true,

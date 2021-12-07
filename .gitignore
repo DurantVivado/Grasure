@@ -8,10 +8,12 @@ output/
 grasure
 __debug_bin
 conf.json
+Grasure.test
 examples/test
 examples/main
 examples/output
 examples/.hdr.disks.path
-examples/.hdr.disks.path.old
+examples/*.old
 examples/config.json
 examples/main.json
+examples/*.pprof
