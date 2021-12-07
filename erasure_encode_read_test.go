@@ -81,8 +81,8 @@ func generateRandomFileBySize(filename string, fileSize int64) error {
 
 func deleteTempFiles(tempFileSizes []int64) {
 	for _, fileSize := range tempFileSizes {
-		inpath := fmt.Sprintf("./examples/test/temp-%d", fileSize)
-		outpath := fmt.Sprintf("./examples/output/temp-%d", fileSize)
+		inpath := fmt.Sprintf("./test/temp-%d", fileSize)
+		outpath := fmt.Sprintf("./output/temp-%d", fileSize)
 		if ex, _ := PathExist(inpath); !ex {
 			continue
 		}

@@ -25,6 +25,8 @@ func changeRandom(filePath string, fileSize, num, mode int) error {
 	data := make([]byte, fileSize)
 	buf.Read(data)
 
+	num = min(num, fileSize)
+
 	switch mode {
 	case 1:
 		for i := 0; i < num; i++ {
@@ -38,9 +40,11 @@ func changeRandom(filePath string, fileSize, num, mode int) error {
 			data = append(data, byte(newbyte))
 		}
 	case 3:
-		for i := 0; i < num; i++ {
-			index := rand.Int() % len(data)
-			data = append(data[:index], data[index+1:]...)
+		index := rand.Int() % len(data)
+		if len(data)-index > num {
+			data = append(data[:index], data[index+num:]...)
+		} else {
+			data = data[num:]
 		}
 	}
 
@@ -60,7 +64,7 @@ func changeRandom(filePath string, fileSize, num, mode int) error {
 	return nil
 }
 
-func TestUpdateNormal(t *testing.T) {
+func TestUpdateNormalExchange(t *testing.T) {
 	// we generate temp data and encode it into real storage sytem
 	// then change the file content randomly, and update it
 	// after that, all temporary file should be deleted
@@ -119,8 +123,7 @@ func TestUpdateNormal(t *testing.T) {
 							t.Errorf("k:%d,m:%d,bs:%d,N:%d,%s\n", k, m, bs, N, err.Error())
 						}
 
-						// for _, mode := range updateMode {
-						changeRandom(inpath, int(fileSize), int(fileSize)/10, 1)
+						changeRandom(inpath, int(fileSize), int(fileSize/20), 1)
 						err = testEC.Update(inpath, inpath)
 						if err != nil {
 							t.Errorf("k:%d,m:%d,bs:%d,N:%d,mode:%d update fails when fileSize is %d, for %s", k, m, bs, N, 1, fileSize, err.Error())
@@ -136,8 +139,6 @@ func TestUpdateNormal(t *testing.T) {
 						} else if err != nil {
 							t.Fatalf("k:%d,m:%d,bs:%d,N:%d,mode:%d read fails when fileSize is %d, for %s", k, m, bs, N, 1, fileSize, err.Error())
 						}
-						// }
-
 					}
 				}
 			}
@@ -145,7 +146,10 @@ func TestUpdateNormal(t *testing.T) {
 	}
 }
 
-func TestUpdateOneFailure(t *testing.T) {
+func TestUpdateNormalAppend(t *testing.T) {
+	// we generate temp data and encode it into real storage sytem
+	// then change the file content randomly, and update it
+	// after that, all temporary file should be deleted
 	testEC := &Erasure{
 		ConfigFile: "conf.json",
 		// fileMap:         make(map[string]*FileInfo),
@@ -164,8 +168,6 @@ func TestUpdateOneFailure(t *testing.T) {
 		t.Fatal(err)
 	}
 	totalDisk := len(testEC.diskInfos)
-	//simulate one disk failure
-	testEC.diskInfos[0].available = false
 	// for each tuple (k, m, N, bs) we testify update
 	// functions for numerous files
 	for _, k := range dataShards {
@@ -189,7 +191,7 @@ func TestUpdateOneFailure(t *testing.T) {
 						if err != nil {
 							t.Errorf("k:%d,m:%d,bs:%d,N:%d,%s\n", k, m, bs, N, err.Error())
 						}
-						fmt.Println("3")
+
 						err = testEC.ReadConfig()
 						if err != nil {
 							t.Errorf("k:%d,m:%d,bs:%d,N:%d,%s\n", k, m, bs, N, err.Error())
@@ -203,27 +205,22 @@ func TestUpdateOneFailure(t *testing.T) {
 							t.Errorf("k:%d,m:%d,bs:%d,N:%d,%s\n", k, m, bs, N, err.Error())
 						}
 
-						for _, mode := range updateMode {
-							changeRandom(inpath, int(fileSize), int(fileSize)/2, mode)
-
-							err = testEC.Update(inpath, inpath)
-							if err != nil {
-								t.Errorf("k:%d,m:%d,bs:%d,N:%d,mode:%d update fails when fileSize is %d, for %s", k, m, bs, N, mode, fileSize, err.Error())
-							}
-
-							err = testEC.ReadFile(inpath, outpath)
-							if err != nil {
-								t.Errorf("k:%d,m:%d,bs:%d,N:%d,mode:%d read fails when fileSize is %d, for %s", k, m, bs, N, mode, fileSize, err.Error())
-							}
-
-							//evaluate the results
-							if ok, err := checkFileIfSame(inpath, outpath); !ok && err != nil {
-								t.Fatalf("k:%d,m:%d,bs:%d,N:%d,mode:%d read fails when fileSize is %d, for hash check fail", k, m, bs, N, mode, fileSize)
-							} else if err != nil {
-								t.Fatalf("k:%d,m:%d,bs:%d,N:%d,mode:%d read fails when fileSize is %d, for %s", k, m, bs, N, mode, fileSize, err.Error())
-							}
+						changeRandom(inpath, int(fileSize), int(fileSize/20), 2)
+						err = testEC.Update(inpath, inpath)
+						if err != nil {
+							t.Errorf("k:%d,m:%d,bs:%d,N:%d,mode:%d update fails when fileSize is %d, for %s", k, m, bs, N, 2, fileSize, err.Error())
+						}
+						err = testEC.ReadFile(inpath, outpath)
+						if err != nil {
+							t.Errorf("k:%d,m:%d,bs:%d,N:%d,mode:%d read fails when fileSize is %d, for %s", k, m, bs, N, 2, fileSize, err.Error())
 						}
 
+						//evaluate the results
+						if ok, err := checkFileIfSame(inpath, outpath); !ok && err != nil {
+							t.Fatalf("k:%d,m:%d,bs:%d,N:%d,mode:%d read fails when fileSize is %d, for hash check fail", k, m, bs, N, 2, fileSize)
+						} else if err != nil {
+							t.Fatalf("k:%d,m:%d,bs:%d,N:%d,mode:%d read fails when fileSize is %d, for %s", k, m, bs, N, 2, fileSize, err.Error())
+						}
 					}
 				}
 			}
@@ -231,7 +228,10 @@ func TestUpdateOneFailure(t *testing.T) {
 	}
 }
 
-func TestUpdateTwoFailure(t *testing.T) {
+func TestUpdateNormalDelete(t *testing.T) {
+	// we generate temp data and encode it into real storage sytem
+	// then change the file content randomly, and update it
+	// after that, all temporary file should be deleted
 	testEC := &Erasure{
 		ConfigFile: "conf.json",
 		// fileMap:         make(map[string]*FileInfo),
@@ -250,9 +250,6 @@ func TestUpdateTwoFailure(t *testing.T) {
 		t.Fatal(err)
 	}
 	totalDisk := len(testEC.diskInfos)
-	//simulate two disks failure
-	testEC.diskInfos[0].available = false
-	testEC.diskInfos[1].available = false
 	// for each tuple (k, m, N, bs) we testify update
 	// functions for numerous files
 	for _, k := range dataShards {
@@ -276,7 +273,7 @@ func TestUpdateTwoFailure(t *testing.T) {
 						if err != nil {
 							t.Errorf("k:%d,m:%d,bs:%d,N:%d,%s\n", k, m, bs, N, err.Error())
 						}
-						fmt.Println("3")
+
 						err = testEC.ReadConfig()
 						if err != nil {
 							t.Errorf("k:%d,m:%d,bs:%d,N:%d,%s\n", k, m, bs, N, err.Error())
@@ -290,27 +287,22 @@ func TestUpdateTwoFailure(t *testing.T) {
 							t.Errorf("k:%d,m:%d,bs:%d,N:%d,%s\n", k, m, bs, N, err.Error())
 						}
 
-						for _, mode := range updateMode {
-							changeRandom(inpath, int(fileSize), int(fileSize)/2, mode)
-
-							err = testEC.Update(inpath, inpath)
-							if err != nil {
-								t.Errorf("k:%d,m:%d,bs:%d,N:%d,mode:%d update fails when fileSize is %d, for %s", k, m, bs, N, mode, fileSize, err.Error())
-							}
-
-							err = testEC.ReadFile(inpath, outpath)
-							if err != nil {
-								t.Errorf("k:%d,m:%d,bs:%d,N:%d,mode:%d read fails when fileSize is %d, for %s", k, m, bs, N, mode, fileSize, err.Error())
-							}
-
-							//evaluate the results
-							if ok, err := checkFileIfSame(inpath, outpath); !ok && err != nil {
-								t.Fatalf("k:%d,m:%d,bs:%d,N:%d,mode:%d read fails when fileSize is %d, for hash check fail", k, m, bs, N, mode, fileSize)
-							} else if err != nil {
-								t.Fatalf("k:%d,m:%d,bs:%d,N:%d,mode:%d read fails when fileSize is %d, for %s", k, m, bs, N, mode, fileSize, err.Error())
-							}
+						changeRandom(inpath, int(fileSize), int(fileSize/20), 3)
+						err = testEC.Update(inpath, inpath)
+						if err != nil {
+							t.Errorf("k:%d,m:%d,bs:%d,N:%d,mode:%d update fails when fileSize is %d, for %s", k, m, bs, N, 3, fileSize, err.Error())
+						}
+						err = testEC.ReadFile(inpath, outpath)
+						if err != nil {
+							t.Errorf("k:%d,m:%d,bs:%d,N:%d,mode:%d read fails when fileSize is %d, for %s", k, m, bs, N, 3, fileSize, err.Error())
 						}
 
+						//evaluate the results
+						if ok, err := checkFileIfSame(inpath, outpath); !ok && err != nil {
+							t.Fatalf("k:%d,m:%d,bs:%d,N:%d,mode:%d read fails when fileSize is %d, for hash check fail", k, m, bs, N, 3, fileSize)
+						} else if err != nil {
+							t.Fatalf("k:%d,m:%d,bs:%d,N:%d,mode:%d read fails when fileSize is %d, for %s", k, m, bs, N, 3, fileSize, err.Error())
+						}
 					}
 				}
 			}
@@ -367,88 +359,10 @@ func benchmarkUpdate(b *testing.B, dataShards, parityShards, diskNum int, blockS
 		if err != nil {
 			b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
 		}
-		for _, mode := range updateMode {
-			changeRandom(inpath, int(fileSize), int(fileSize)/2, mode)
-
-			err = testEC.Update(inpath, inpath)
-			if err != nil {
-				b.Fatalf("k:%d,m:%d,bs:%d,N:%d,mode:%d update fails when fileSize is %d, for %s", dataShards, parityShards, blockSize, diskNum, mode, fileSize, err.Error())
-			}
-
-			err = testEC.ReadFile(inpath, outpath)
-			if err != nil {
-				b.Fatalf("k:%d,m:%d,bs:%d,N:%d,mode:%d read fails when fileSize is %d, for %s", dataShards, parityShards, blockSize, diskNum, mode, fileSize, err.Error())
-			}
-
-			//evaluate the results
-			if ok, err := checkFileIfSame(inpath, outpath); !ok && err != nil {
-				b.Fatalf("k:%d,m:%d,bs:%d,N:%d,mode:%d read fails when fileSize is %d, for hash check fail", dataShards, parityShards, blockSize, diskNum, mode, fileSize)
-			} else if err != nil {
-				b.Fatalf("k:%d,m:%d,bs:%d,N:%d,mode:%d read fails when fileSize is %d, for %s", dataShards, parityShards, blockSize, diskNum, mode, fileSize, err.Error())
-			}
-		}
-
-	}
-}
-
-func benchmarkUpdateWithFault(b *testing.B, dataShards, parityShards, diskNum int, blockSize, fileSize int64, failNum int) {
-	b.ResetTimer()
-	b.SetBytes(fileSize)
-	testEC := &Erasure{
-		ConfigFile: "conf.json",
-		// fileMap:         make(map[string]*FileInfo),
-		DiskFilePath:    "examples/.hdr.disks.path",
-		ReplicateFactor: 3,
-		ConStripes:      100,
-		Override:        true,
-		Quiet:           true,
-	}
-	rand.Seed(100000007)
-	defer deleteTempFiles([]int64{fileSize})
-	inpath := fmt.Sprintf("./test/temp-%d", fileSize)
-	outpath := fmt.Sprintf("./output/temp-%d", fileSize)
-	err = generateRandomFileBySize(inpath, fileSize)
-	if err != nil {
-		b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
-	}
-	//repeat b.N times
-
-	for i := 0; i < b.N; i++ {
-		err = testEC.ReadDiskPath()
-		if err != nil {
-			b.Fatal(err)
-		}
-		for j := 0; j < failNum; j++ {
-			testEC.diskInfos[j].available = false
-		}
-		// for each tuple (k,m,N,bs) we testify  encoding
-		// and decoding functions for numerous files
-		testEC.K = dataShards
-		testEC.M = parityShards
-		testEC.DiskNum = diskNum
-
-		testEC.BlockSize = blockSize
-		err = testEC.InitSystem(true)
-		if err != nil {
-			b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
-		}
-		// log.Printf("----k:%d,m:%d,bs:%d,N:%d----\n", k, m, bs, N)
-
-		err = testEC.ReadConfig()
-		if err != nil {
-			b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
-		}
-		_, err := testEC.EncodeFile(inpath)
-		if err != nil {
-			b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
-		}
-		err = testEC.WriteConfig()
-		if err != nil {
-			b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
-		}
 
 		mode := 1
-		changeRandom(inpath, int(fileSize), int(fileSize)/2, mode)
+		// for _, mode := range updateMode {
+		changeRandom(inpath, int(fileSize), int(fileSize)/10, mode)
 
 		err = testEC.Update(inpath, inpath)
 		if err != nil {
@@ -466,6 +380,8 @@ func benchmarkUpdateWithFault(b *testing.B, dataShards, parityShards, diskNum in
 		} else if err != nil {
 			b.Fatalf("k:%d,m:%d,bs:%d,N:%d,mode:%d read fails when fileSize is %d, for %s", dataShards, parityShards, blockSize, diskNum, mode, fileSize, err.Error())
 		}
+		// }
+
 	}
 }
 
@@ -477,28 +393,12 @@ func BenchmarkUpdate2x2x4x1024x1M(b *testing.B) {
 	benchmarkUpdate(b, 2, 2, 4, 1024, 1*MiB)
 }
 
-func BenchmarkUpdate2x2x4x1024x1Mx1fault(b *testing.B) {
-	benchmarkUpdateWithFault(b, 2, 2, 4, 1024, 1*MiB, 1)
-}
-
-func BenchmarkUpdate2x2x4x1024x1Mx2fault(b *testing.B) {
-	benchmarkUpdateWithFault(b, 2, 2, 4, 1024, 1*MiB, 2)
-}
-
 func BenchmarkUpdate2x3x6x4096x1M(b *testing.B) {
 	benchmarkUpdate(b, 2, 3, 6, 4096, 1*MiB)
 }
 
 func BenchmarkUpdate4x2x6x1024x1M(b *testing.B) {
 	benchmarkUpdate(b, 4, 2, 6, 1024, 1*MiB)
-}
-
-func BenchmarkUpdate4x2x6x1024x1Mx1fault(b *testing.B) {
-	benchmarkUpdateWithFault(b, 4, 2, 6, 1024, 1*MiB, 1)
-}
-
-func BenchmarkUpdate4x2x6x1024x1Mx2fault(b *testing.B) {
-	benchmarkUpdateWithFault(b, 4, 2, 6, 1024, 1*MiB, 2)
 }
 
 func BenchmarkUpdate4x3x8x4096x1M(b *testing.B) {
@@ -512,13 +412,7 @@ func BenchmarkUpdate5x3x10x4096x5M(b *testing.B) {
 func BenchmarkUpdate6x3x9x8192x10M(b *testing.B) {
 	benchmarkUpdate(b, 6, 3, 9, 4096, 10*MiB)
 }
-func BenchmarkUpdate6x3x9x8192x10Mx2fault(b *testing.B) {
-	benchmarkUpdateWithFault(b, 6, 3, 9, 4096, 10*MiB, 2)
-}
 
-func BenchmarkUpdate6x3x9x8192x10Mx3fault(b *testing.B) {
-	benchmarkUpdateWithFault(b, 6, 3, 9, 4096, 10*MiB, 3)
-}
 func BenchmarkUpdate8x4x16x16384x10M(b *testing.B) {
 	benchmarkUpdate(b, 8, 4, 16, 16384, 10*MiB)
 }
@@ -541,14 +435,6 @@ func BenchmarkUpdate16x4x24x8192x10M(b *testing.B) {
 
 func BenchmarkUpdate20x4x24x4096x20M(b *testing.B) {
 	benchmarkUpdate(b, 20, 4, 24, 4096, 20*MiB)
-}
-
-func BenchmarkUpdate20x4x24x4096x20Mx2fault(b *testing.B) {
-	benchmarkUpdateWithFault(b, 20, 4, 24, 4096, 20*MiB, 2)
-}
-
-func BenchmarkUpdate20x4x24x4096x20Mx4fault(b *testing.B) {
-	benchmarkUpdateWithFault(b, 20, 4, 24, 4096, 20*MiB, 4)
 }
 
 func benchmarkUpdateParallel(b *testing.B, dataShards, parityShards, diskNum int, blockSize, fileSize int64, conNum int) {

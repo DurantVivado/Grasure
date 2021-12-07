@@ -3,7 +3,6 @@ package grasure
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"io"
 	"log"
 	"os"
@@ -43,7 +42,7 @@ func (e *Erasure) Update(oldFile, newFile string) error {
 	diskNum := len(e.diskInfos)
 	ifs := make([]*os.File, diskNum)
 	erg := new(errgroup.Group)
-	diskFailList := make(map[int]bool)
+	diskFail := false
 	for i, disk := range e.diskInfos[:e.DiskNum] {
 		i := i
 		disk := disk
@@ -51,12 +50,11 @@ func (e *Erasure) Update(oldFile, newFile string) error {
 			folderPath := filepath.Join(disk.diskPath, baseName)
 			blobPath := filepath.Join(folderPath, "BLOB")
 			if !disk.available {
-				diskFailList[i] = true
+				diskFail = true
 				return &DiskError{disk.diskPath, " avilable flag set flase"}
 			}
 			ifs[i], err = os.OpenFile(blobPath, os.O_RDWR|os.O_TRUNC, 0666)
 			if err != nil {
-				fmt.Println("Open error")
 				disk.available = false
 				return err
 			}
@@ -69,6 +67,9 @@ func (e *Erasure) Update(oldFile, newFile string) error {
 	if err := erg.Wait(); err != nil {
 		if !e.Quiet {
 			log.Printf("read failed %s", err.Error())
+		}
+		if diskFail {
+			return err
 		}
 	}
 	defer func() {
