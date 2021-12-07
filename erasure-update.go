@@ -42,7 +42,6 @@ func (e *Erasure) Update(oldFile, newFile string) error {
 	alive := int32(0)
 	diskNum := len(e.diskInfos)
 	ifs := make([]*os.File, diskNum)
-	// wfs := make([]*os.File, diskNum)
 	erg := new(errgroup.Group)
 	diskFailList := make(map[int]bool)
 	for i, disk := range e.diskInfos[:e.DiskNum] {
@@ -61,12 +60,6 @@ func (e *Erasure) Update(oldFile, newFile string) error {
 				disk.available = false
 				return err
 			}
-			// wfs[i], err = os.OpenFile(blobPath, os.O_WRONLY|os.O_TRUNC, 0666)
-			// if err != nil {
-			// 	fmt.Println("OpenFile error")
-			// 	disk.available = false
-			// 	return err
-			// }
 
 			disk.available = true
 			atomic.AddInt32(&alive, 1)
@@ -74,14 +67,13 @@ func (e *Erasure) Update(oldFile, newFile string) error {
 		})
 	}
 	if err := erg.Wait(); err != nil {
-		// if !e.Quiet {
-		log.Printf("read failed %s", err.Error())
-		// }
+		if !e.Quiet {
+			log.Printf("read failed %s", err.Error())
+		}
 	}
 	defer func() {
 		for i := range e.diskInfos {
 			ifs[i].Close()
-			// wfs[i].Close()
 		}
 	}()
 	if int(alive) < e.K {
