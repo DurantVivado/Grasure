@@ -32,34 +32,30 @@
                         // "-o"
                         
                         //read mode, just input basename of file
-                        // "-md","read", 
-                        // "-f","LICENSE",
-                        // "-conStripes","100",
-<<<<<<< HEAD
-                        // "-fn","2",
-                        // "-sp","output/LICENSE",
-=======
-                        // "-fn","3",
-                        // "-sp","output/Goprogramming.pdf",
->>>>>>> 9b1b0f47d88b6185915f25812e72ccf476c312f8
+                        "-md","read", 
+                        "-f","Goprogramming.pdf",
+                        "-conStripes","100",
+                        "-fmd","bitRot",
+                        "-fn","2",
+                        "-sp","output/Goprogramming.pdf",
                         // "-md","read", 
                         // "-f","file.128",
                         // "-conStripes","100",
                         // "-sp","output/file.128"
 
                         //update mode
-                        "-md","update", 
-                        "-f","input/LICENSE",
-                        "-nf","input/LICENSE",
+                        // "-md","update", 
+                        // "-f","input/LICENSE",
+                        // "-nf","input/LICENSE",
 
                         //delete mode
                         // "-md","delete", 
                         // "-f","LICENSE.txt",
 
                         //recover mode
-                        "-md", "recover",
-                         "-fn","4",
-                        "-o"
+                        // "-md", "recover",
+                        //  "-fn","4",
+                        // "-o"
                        
                         
                     ]

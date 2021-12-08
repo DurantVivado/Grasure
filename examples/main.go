@@ -23,20 +23,24 @@ var failOnErr = func(mode string, e error) {
 		log.Fatalf("%s: %s", mode, e.Error())
 	}
 }
+
+const profileEnable = true
+
 var err error
 
 func main() {
 	flag_init()
 	flag.Parse()
-
-	pf, err := os.OpenFile(mode+".cpu.pprof", os.O_CREATE|os.O_RDWR, 0666)
-	if err != nil {
-		failOnErr(mode, err)
+	if profileEnable {
+		pf, err := os.OpenFile(mode+".cpu.pprof", os.O_CREATE|os.O_RDWR, 0666)
+		if err != nil {
+			failOnErr(mode, err)
+		}
+		defer pf.Close()
+		pprof.StartCPUProfile(pf)
+		defer pprof.StopCPUProfile()
+		defer profile.Start(profile.MemProfile, profile.MemProfileRate(1)).Stop()
 	}
-	defer pf.Close()
-	pprof.StartCPUProfile(pf)
-	defer pprof.StopCPUProfile()
-	defer profile.Start(profile.MemProfile, profile.MemProfileRate(1)).Stop()
 	erasure := &grasure.Erasure{
 		ConfigFile:      "conf.json",
 		DiskFilePath:    ".hdr.disks.path",
@@ -91,7 +95,7 @@ func main() {
 		_, err = erasure.Recover()
 		failOnErr(mode, err)
 
-	// case "scaling":
+	// case "scale":
 	// 	//scaling the system, ALERT: this is a system-level operation and irreversible
 	// 	e.ReadConfig()
 	// 	scaling(new_k, new_m)

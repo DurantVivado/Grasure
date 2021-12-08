@@ -18,10 +18,10 @@ import (
 func (e *Erasure) ReadFile(filename string, savepath string, degrade bool) error {
 	baseFileName := filepath.Base(filename)
 	intFi, ok := e.fileMap.Load(baseFileName)
-	fi := intFi.(*fileInfo)
 	if !ok {
 		return errFileNotFound
 	}
+	fi := intFi.(*fileInfo)
 
 	fileSize := fi.FileSize
 	stripeNum := int(ceilFracInt64(fileSize, e.dataStripeSize))
@@ -31,7 +31,7 @@ func (e *Erasure) ReadFile(filename string, savepath string, degrade bool) error
 	alive := int32(0)
 	ifs := make([]*os.File, e.DiskNum)
 	erg := new(errgroup.Group)
-	diskFailList := make(map[int]bool)
+
 	for i, disk := range e.diskInfos[:e.DiskNum] {
 		i := i
 		disk := disk
@@ -39,9 +39,6 @@ func (e *Erasure) ReadFile(filename string, savepath string, degrade bool) error
 			folderPath := filepath.Join(disk.diskPath, baseFileName)
 			blobPath := filepath.Join(folderPath, "BLOB")
 			if !disk.available {
-				e.mu.Lock()
-				diskFailList[i] = true
-				e.mu.Unlock()
 				return &diskError{disk.diskPath, " available flag set false"}
 			}
 			ifs[i], err = os.Open(blobPath)
@@ -118,11 +115,14 @@ func (e *Erasure) ReadFile(filename string, savepath string, degrade bool) error
 				defer e.errgroupPool.Put(erg)
 				//read all blocks in parallel
 				//We only have to read k blocks to rec
+				failList := make(map[int]bool)
 				for i := 0; i < e.K+e.M; i++ {
 					i := i
 					diskId := dist[stripeNo][i]
 					disk := e.diskInfos[diskId]
-					if !disk.available {
+					blkStat := fi.blockInfos[stripeNo][i]
+					if !disk.available || blkStat.bstat != blkOK {
+						failList[diskId] = true
 						continue
 					}
 					erg.Go(func() error {
@@ -153,7 +153,7 @@ func (e *Erasure) ReadFile(filename string, savepath string, degrade bool) error
 				}
 				if !ok {
 					// fmt.Println("reconstruct data of stripe:", stripeNo)
-					err = e.enc.ReconstructWithList(splitData, &diskFailList, &(fi.Distribution[stripeNo]), degrade)
+					err = e.enc.ReconstructWithList(splitData, &failList, &(fi.Distribution[stripeNo]), degrade)
 					if err != nil {
 						return err
 					}

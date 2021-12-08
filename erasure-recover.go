@@ -186,10 +186,10 @@ func (e *Erasure) Recover() (map[string]string, error) {
 							i := i
 							diskId := dist[stripeNo][i]
 							disk := e.diskInfos[diskId]
+							if !disk.available {
+								continue
+							}
 							erg.Go(func() error {
-								if !disk.available {
-									return nil
-								}
 								//we also need to know the block's accurate offset with respect to disk
 								offset := fd.blockToOffset[stripeNo][i]
 								_, err := ifs[diskId].ReadAt(blobBuf[s][int64(i)*e.BlockSize:int64(i+1)*e.BlockSize],
