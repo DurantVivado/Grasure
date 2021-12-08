@@ -72,7 +72,7 @@ func TestRecover(t *testing.T) {
 					}
 					// oops, serveral disks shut down one by one
 					for fn := 1; fn <= m+1; fn++ {
-						testEC.Destroy("diskFail", fn)
+						testEC.Destroy("diskFail", fn, "")
 						//Don't worry, I'll fix with that
 						rm, err := testEC.Recover()
 						if err != nil {
@@ -174,23 +174,11 @@ func benchmarkRecover(b *testing.B, dataShards, parityShards, diskNum, failNum i
 	b.SetBytes(totalFileSize)
 	// oops, serveral disks shut down one by one
 	for i := 0; i < b.N; i++ {
-		testEC.Destroy("diskFail", failNum)
+		testEC.Destroy("diskFail", failNum, "")
 		//Don't worry, I'll fix with that
-		rm, err := testEC.Recover()
+		_, err := testEC.Recover()
 		if err != nil {
 			b.Fatal(err)
-		}
-		// check if the resumed blobs are consistent with former ones
-		for old, new := range rm {
-			for _, fileSize := range tempFileSizes {
-				oldPath := filepath.Join(old, fmt.Sprintf("temp-%d", fileSize), "BLOB")
-				newPath := filepath.Join(new, fmt.Sprintf("temp-%d", fileSize), "BLOB")
-				if ok, err := checkFileIfSame(newPath, oldPath); !ok && err != nil {
-					b.Fatal(err)
-				} else if err != nil {
-					b.Fatal(err)
-				}
-			}
 		}
 		//restore diskConfigFile to previous content
 		if err := os.Rename(testDiskFilePath+".old", testDiskFilePath); err != nil {
@@ -261,23 +249,11 @@ func benchmarkRecoverReadK(b *testing.B, dataShards, parityShards, diskNum, fail
 	b.SetBytes(totalFileSize)
 	// oops, serveral disks shut down one by one
 	for i := 0; i < b.N; i++ {
-		testEC.Destroy("diskFail", failNum)
+		testEC.Destroy("diskFail", failNum, "")
 		//Don't worry, I'll fix with that
-		rm, err := testEC.RecoverReadK()
+		_, err := testEC.RecoverReadK()
 		if err != nil {
 			b.Fatal(err)
-		}
-		// check if the resumed blobs are consistent with former ones
-		for old, new := range rm {
-			for _, fileSize := range tempFileSizes {
-				oldPath := filepath.Join(old, fmt.Sprintf("temp-%d", fileSize), "BLOB")
-				newPath := filepath.Join(new, fmt.Sprintf("temp-%d", fileSize), "BLOB")
-				if ok, err := checkFileIfSame(newPath, oldPath); !ok && err != nil {
-					b.Fatal(err)
-				} else if err != nil {
-					b.Fatal(err)
-				}
-			}
 		}
 		//restore diskConfigFile to previous content
 		if err := os.Rename(testDiskFilePath+".old", testDiskFilePath); err != nil {

@@ -198,7 +198,7 @@ func ExampleErasure_ReadFile_2() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	erasure.Destroy("diskFail", 2)
+	erasure.Destroy("diskFail", 2, "")
 	err = erasure.ReadFile(filepath, savePath, false)
 	if err != nil {
 		log.Fatal(err)
@@ -271,7 +271,7 @@ func ExampleErasure_Recover() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	erasure.Destroy("diskFail", 2)
+	erasure.Destroy("diskFail", 2, "")
 	_, err = erasure.Recover()
 	if err != nil {
 		log.Fatal(err)

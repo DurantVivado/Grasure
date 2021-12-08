@@ -7,13 +7,13 @@ import (
 
 //Destroy simulates disk failure or bitrot:
 //
-//for `diskFail mode`, `failNum` random disks are marked as unavailable;
+//for `diskFail mode`, `failNum` random disks are marked as unavailable, `failName` is ignored.
 //
-// for `bitRot`, `failNum` random blocks of the file corrupts;
+// for `bitRot`, `failNum` random blocks in a stripe of the file corrupts;
 //
 // Since it's a simulation, no real data will be lost.
 // Note that failNum = min(failNum, DiskNum).
-func (e *Erasure) Destroy(mode string, failNum int) {
+func (e *Erasure) Destroy(mode string, failNum int, fileName string) {
 	if mode == "diskFail" {
 		if failNum <= 0 {
 			return
@@ -39,7 +39,14 @@ func (e *Erasure) Destroy(mode string, failNum int) {
 			e.diskInfos[shuff[i]].available = false
 		}
 	} else if mode == "bitRot" {
+		//in thismode, not a full blob is missing. Instead, several blocks
+		// corrupts known as bit rot, which is omnipresent is today's storage facilities.
+		//if fileName is "", we corrupt all the files, else corrupt specific file
+		if fileName != "" {
 
+		} else {
+
+		}
 	}
 }
 

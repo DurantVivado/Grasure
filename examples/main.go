@@ -64,7 +64,7 @@ func main() {
 		//read a file
 		err = erasure.ReadConfig()
 		failOnErr(mode, err)
-		erasure.Destroy(failMode, failNum)
+		erasure.Destroy(failMode, failNum, filePath)
 		err = erasure.ReadFile(filePath, savePath, degrade)
 		failOnErr(mode, err)
 
@@ -88,7 +88,7 @@ func main() {
 		//recover all the blocks of a disk and put the recovered result to new path
 		err = erasure.ReadConfig()
 		failOnErr(mode, err)
-		erasure.Destroy(failMode, failNum)
+		erasure.Destroy(failMode, failNum, "")
 		_, err = erasure.Recover()
 		failOnErr(mode, err)
 

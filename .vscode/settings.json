@@ -1,4 +1,4 @@
-// settings.json 文件内容如下：主要是goroot和gopath
+// settings.json 
 {
         "files.autoSave": "onFocusChange",
         
