@@ -1,6 +1,7 @@
 .hdr.disks.path
 test*.file
 tmp/
+conf.json
 file.save
 cmd/
 input/
