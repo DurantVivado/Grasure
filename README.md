@@ -1,3 +1,4 @@
+[![Go Reference](https://pkg.go.dev/badge/github.com/DurantVivado/Grasure.svg)](https://pkg.go.dev/github.com/DurantVivado/Grasure) 
 # Grasure
 
 Universal Erasure Coding Architecture in Go
@@ -9,7 +10,7 @@ Godoc: https://pkg.go.dev/github.com/DurantVivado/Grasure
 
 
 ## Project Architecture:
-- `main.go` contains the main func. For each run,  operate among "encode", "read", "update", "scaling", "delete", ...
+<!-- - `main.go` contains the main func. For each run,  operate among "encode", "read", "update", "scaling", "delete", ... -->
 
 - `erasure-global.go` contains the system-level interfaces and global structs and variables
 
@@ -29,11 +30,15 @@ Godoc: https://pkg.go.dev/github.com/DurantVivado/Grasure
 - `erasure-errors.go` contains the definitions for various possible errors.
 >>>>>>> 774227feac6f28285a1e4a58ab7f043b0f4399b9
 
+- `erasure-recover.go` deals with multi-disk recovery, concerning both data and meta data.
+
+- `erasure-update.go` contains operation for striped file updating, if some parts are lost, we try to recover first.
+
 import:
 [reedsolomon library](https://github.com/klauspost/reedsolomon)
 
 
-## CLI Usage
+## Usage
 A complete demonstration of various CLI usage lies in `examples/buildAndRun.sh`. You may have a glimpse.
 Here we elaborate the steps as following, in dir `./examples`:
 
@@ -172,7 +177,7 @@ It currently suppports `encode`, `read`, `update`, and more coming soon.
 
 
 ## CLI parameters
-
+the command-line parameters of `./examples/main.go` are listed as below.
 |parameter(alias)|description|default|
 |--|--|--|
 |blockSize(bs)|the block size in bytes|4096|

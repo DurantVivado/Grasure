@@ -21,7 +21,7 @@ func (e *Erasure) Update(oldFile, newFile string) error {
 	if !ok {
 		return errFileNotFound
 	}
-	fi := intFi.(*FileInfo)
+	fi := intFi.(*fileInfo)
 	// update file info
 	nf, err := os.Open(newFile)
 	if err != nil {
@@ -51,7 +51,7 @@ func (e *Erasure) Update(oldFile, newFile string) error {
 			blobPath := filepath.Join(folderPath, "BLOB")
 			if !disk.available {
 				diskFail = true
-				return &DiskError{disk.diskPath, " avilable flag set flase"}
+				return &diskError{disk.diskPath, " avilable flag set flase"}
 			}
 			ifs[i], err = os.OpenFile(blobPath, os.O_RDWR|os.O_TRUNC, 0666)
 			if err != nil {
@@ -141,7 +141,7 @@ func (e *Erasure) Update(oldFile, newFile string) error {
 						return err
 					}
 					//Split the blob into k+m parts
-					oldData, err := e.SplitStripe(oldBlobBuf[s])
+					oldData, err := e.splitStripe(oldBlobBuf[s])
 					if err != nil {
 						return err
 					}
@@ -293,7 +293,7 @@ func compareStripe(oldStripe, newStripe [][]byte) ([]int, error) {
 	return res, nil
 }
 
-func adjustDist(e *Erasure, fi *FileInfo, oldStripeNum, newStripeNum int) {
+func adjustDist(e *Erasure, fi *fileInfo, oldStripeNum, newStripeNum int) {
 	countSum := make([]int, e.DiskNum)
 	if newStripeNum > oldStripeNum {
 		for i := 0; i < newStripeNum-oldStripeNum; i++ {

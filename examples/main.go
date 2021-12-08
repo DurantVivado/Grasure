@@ -10,9 +10,12 @@ package main
 import (
 	"flag"
 	"log"
+	"os"
+	"runtime/pprof"
 	"time"
 
 	grasure "github.com/DurantVivado/Grasure"
+	"github.com/pkg/profile"
 )
 
 var failOnErr = func(mode string, e error) {
@@ -23,9 +26,17 @@ var failOnErr = func(mode string, e error) {
 var err error
 
 func main() {
-
 	flag_init()
 	flag.Parse()
+
+	pf, err := os.OpenFile(mode+".cpu.pprof", os.O_CREATE|os.O_RDWR, 0666)
+	if err != nil {
+		failOnErr(mode, err)
+	}
+	defer pf.Close()
+	pprof.StartCPUProfile(pf)
+	defer pprof.StopCPUProfile()
+	defer profile.Start(profile.MemProfile, profile.MemProfileRate(1)).Stop()
 	erasure := &grasure.Erasure{
 		ConfigFile:      "conf.json",
 		DiskFilePath:    ".hdr.disks.path",
@@ -53,7 +64,7 @@ func main() {
 		err = erasure.ReadConfig()
 		failOnErr(mode, err)
 		erasure.Destroy(failMode, failNum)
-		err = erasure.ReadFile(filePath, savePath)
+		err = erasure.ReadFile(filePath, savePath, degrade)
 		failOnErr(mode, err)
 
 	case "encode":
@@ -85,7 +96,8 @@ func main() {
 	// 	e.ReadConfig()
 	// 	scaling(new_k, new_m)
 	case "delete":
-
+		err = erasure.ReadConfig()
+		failOnErr(mode, err)
 		err = erasure.RemoveFile(filePath)
 		failOnErr(mode, err)
 		err = erasure.WriteConfig()
@@ -116,7 +128,7 @@ var (
 	conStripes      int
 	replicateFactor int
 	quiet           bool
-
+	degrade         bool
 	// recoveredDiskPath string
 )
 
@@ -179,5 +191,8 @@ func flag_init() {
 
 	flag.BoolVar(&quiet, "q", false, "if true mute outputs otherwise print them")
 	flag.BoolVar(&quiet, "quiet", false, "if true mute outputs otherwise print them")
+
+	flag.BoolVar(&degrade, "dg", false, "whether degraded read is enabled. In this way, only data shards are recovered.")
+	flag.BoolVar(&degrade, "degrade", false, "whether degraded read is enabled. In this way, only data shards are recovered.")
 
 }

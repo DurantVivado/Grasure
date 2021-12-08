@@ -11,11 +11,14 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-//read file on the system and return byte stream, include recovering
-func (e *Erasure) ReadFile(filename string, savepath string) error {
+//ReadFile reads ONE file  on the system and save it to local `savePath`.
+//
+//In case of any failure within fault tolerance, the file will be decoded first.
+//`degrade` indicates whether degraded read is enabled.
+func (e *Erasure) ReadFile(filename string, savepath string, degrade bool) error {
 	baseFileName := filepath.Base(filename)
 	intFi, ok := e.fileMap.Load(baseFileName)
-	fi := intFi.(*FileInfo)
+	fi := intFi.(*fileInfo)
 	if !ok {
 		return errFileNotFound
 	}
@@ -36,8 +39,10 @@ func (e *Erasure) ReadFile(filename string, savepath string) error {
 			folderPath := filepath.Join(disk.diskPath, baseFileName)
 			blobPath := filepath.Join(folderPath, "BLOB")
 			if !disk.available {
+				e.mu.Lock()
 				diskFailList[i] = true
-				return &DiskError{disk.diskPath, " available flag set false"}
+				e.mu.Unlock()
+				return &diskError{disk.diskPath, " available flag set false"}
 			}
 			ifs[i], err = os.Open(blobPath)
 			if err != nil {
@@ -95,7 +100,6 @@ func (e *Erasure) ReadFile(filename string, savepath string) error {
 	// 	}
 	// 	return &out
 	// }
-	blobBuf := makeArr2DByte(e.ConStripes, int(e.allStripeSize))
 	for blob := 0; blob < numBlob; blob++ {
 		if stripeCnt+e.ConStripes > stripeNum {
 			nextStripe = stripeNum - stripeCnt
@@ -103,6 +107,7 @@ func (e *Erasure) ReadFile(filename string, savepath string) error {
 			nextStripe = e.ConStripes
 		}
 		eg := e.errgroupPool.Get().(*errgroup.Group)
+		blobBuf := makeArr2DByte(e.ConStripes, int(e.allStripeSize))
 		// blobBuf := *e.allBlobPool.Get().(*[][]byte)
 		for s := 0; s < nextStripe; s++ {
 			s := s
@@ -112,14 +117,16 @@ func (e *Erasure) ReadFile(filename string, savepath string) error {
 				erg := e.errgroupPool.Get().(*errgroup.Group)
 				defer e.errgroupPool.Put(erg)
 				//read all blocks in parallel
+				//We only have to read k blocks to rec
 				for i := 0; i < e.K+e.M; i++ {
 					i := i
 					diskId := dist[stripeNo][i]
 					disk := e.diskInfos[diskId]
+					if !disk.available {
+						continue
+					}
 					erg.Go(func() error {
-						if !disk.available {
-							return nil
-						}
+
 						//we also need to know the block's accurate offset with respect to disk
 						offset := fi.blockToOffset[stripeNo][i]
 						_, err := ifs[diskId].ReadAt(blobBuf[s][int64(i)*e.BlockSize:int64(i+1)*e.BlockSize],
@@ -135,7 +142,7 @@ func (e *Erasure) ReadFile(filename string, savepath string) error {
 					return err
 				}
 				//Split the blob into k+m parts
-				splitData, err := e.SplitStripe(blobBuf[s])
+				splitData, err := e.splitStripe(blobBuf[s])
 				if err != nil {
 					return err
 				}
@@ -146,7 +153,7 @@ func (e *Erasure) ReadFile(filename string, savepath string) error {
 				}
 				if !ok {
 					// fmt.Println("reconstruct data of stripe:", stripeNo)
-					err = e.enc.ReconstructWithList(splitData, &diskFailList, &(fi.Distribution[stripeNo]), false)
+					err = e.enc.ReconstructWithList(splitData, &diskFailList, &(fi.Distribution[stripeNo]), degrade)
 					if err != nil {
 						return err
 					}
@@ -191,12 +198,12 @@ func (e *Erasure) ReadFile(filename string, savepath string) error {
 
 	}
 	if !e.Quiet {
-		log.Printf("reading %s!", filename)
+		log.Printf("reading %s...", filename)
 	}
 	return nil
 }
 
-func (e *Erasure) SplitStripe(data []byte) ([][]byte, error) {
+func (e *Erasure) splitStripe(data []byte) ([][]byte, error) {
 	if len(data) == 0 {
 		return nil, reedsolomon.ErrShortData
 	}

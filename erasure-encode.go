@@ -10,8 +10,10 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-//split and encode a file into parity blocks concurrently
-func (e *Erasure) EncodeFile(filename string) (*FileInfo, error) {
+//EncodeFile takes filepath as input and encodes the file into data and parity blocks concurrently.
+//
+// It returns `*fileInfo` and an error. Specify `blocksize` and `conStripe` for better performance.
+func (e *Erasure) EncodeFile(filename string) (*fileInfo, error) {
 	baseFileName := filepath.Base(filename)
 	if _, ok := e.fileMap.Load(baseFileName); ok && !e.Override {
 		return nil, fmt.Errorf("the file %s has already been in the file system, if you wish to override, please attach `-o`",
@@ -28,7 +30,7 @@ func (e *Erasure) EncodeFile(filename string) (*FileInfo, error) {
 		return nil, err
 	}
 	f.Seek(0, 0)
-	fi := &FileInfo{}
+	fi := &fileInfo{}
 	fi.Hash = hashStr
 	fi.FileName = baseFileName
 	fileInfo, err := f.Stat()
@@ -112,7 +114,7 @@ func (e *Erasure) EncodeFile(filename string) (*FileInfo, error) {
 					return err
 				}
 				//split and encode the data
-				encodeData, err := e.EncodeData(blobBuf[s])
+				encodeData, err := e.encodeData(blobBuf[s])
 				if err != nil {
 					return err
 				}
@@ -165,7 +167,7 @@ func (e *Erasure) EncodeFile(filename string) (*FileInfo, error) {
 }
 
 //split and encode data
-func (e *Erasure) EncodeData(data []byte) ([][]byte, error) {
+func (e *Erasure) encodeData(data []byte) ([][]byte, error) {
 	if len(data) == 0 {
 		return make([][]byte, e.K+e.M), nil
 	}

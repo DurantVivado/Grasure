@@ -128,7 +128,7 @@ func TestUpdateNormalExchange(t *testing.T) {
 						if err != nil {
 							t.Errorf("k:%d,m:%d,bs:%d,N:%d,mode:%d update fails when fileSize is %d, for %s", k, m, bs, N, 1, fileSize, err.Error())
 						}
-						err = testEC.ReadFile(inpath, outpath)
+						err = testEC.ReadFile(inpath, outpath, false)
 						if err != nil {
 							t.Errorf("k:%d,m:%d,bs:%d,N:%d,mode:%d read fails when fileSize is %d, for %s", k, m, bs, N, 1, fileSize, err.Error())
 						}
@@ -210,7 +210,7 @@ func TestUpdateNormalAppend(t *testing.T) {
 						if err != nil {
 							t.Errorf("k:%d,m:%d,bs:%d,N:%d,mode:%d update fails when fileSize is %d, for %s", k, m, bs, N, 2, fileSize, err.Error())
 						}
-						err = testEC.ReadFile(inpath, outpath)
+						err = testEC.ReadFile(inpath, outpath, false)
 						if err != nil {
 							t.Errorf("k:%d,m:%d,bs:%d,N:%d,mode:%d read fails when fileSize is %d, for %s", k, m, bs, N, 2, fileSize, err.Error())
 						}
@@ -292,7 +292,7 @@ func TestUpdateNormalDelete(t *testing.T) {
 						if err != nil {
 							t.Errorf("k:%d,m:%d,bs:%d,N:%d,mode:%d update fails when fileSize is %d, for %s", k, m, bs, N, 3, fileSize, err.Error())
 						}
-						err = testEC.ReadFile(inpath, outpath)
+						err = testEC.ReadFile(inpath, outpath, false)
 						if err != nil {
 							t.Errorf("k:%d,m:%d,bs:%d,N:%d,mode:%d read fails when fileSize is %d, for %s", k, m, bs, N, 3, fileSize, err.Error())
 						}
@@ -369,7 +369,7 @@ func benchmarkUpdate(b *testing.B, dataShards, parityShards, diskNum int, blockS
 			b.Fatalf("k:%d,m:%d,bs:%d,N:%d,mode:%d update fails when fileSize is %d, for %s", dataShards, parityShards, blockSize, diskNum, mode, fileSize, err.Error())
 		}
 
-		err = testEC.ReadFile(inpath, outpath)
+		err = testEC.ReadFile(inpath, outpath, false)
 		if err != nil {
 			b.Fatalf("k:%d,m:%d,bs:%d,N:%d,mode:%d read fails when fileSize is %d, for %s", dataShards, parityShards, blockSize, diskNum, mode, fileSize, err.Error())
 		}
@@ -512,7 +512,7 @@ func benchmarkUpdateParallel(b *testing.B, dataShards, parityShards, diskNum int
 				b.Fatalf("k:%d,m:%d,bs:%d,N:%d,mode:%d update fails when fileSize is %d, for %s", dataShards, parityShards, blockSize, diskNum, mode, fileSize, err.Error())
 			}
 
-			err = testEC.ReadFile(inpath[i], outpath[i])
+			err = testEC.ReadFile(inpath[i], outpath[i], false)
 			if err != nil {
 				b.Fatalf("k:%d,m:%d,bs:%d,N:%d,mode:%d read fails when fileSize is %d, for %s", dataShards, parityShards, blockSize, diskNum, mode, fileSize, err.Error())
 			}

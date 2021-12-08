@@ -7,12 +7,12 @@
         {
             "name": "Launch Package",
             "type": "go",
-            "cwd": "${workspaceFolder}",
+            "cwd": "${workspaceFolder}/examples",
             "request": "launch",
             "mode": "auto",
             // "port":2345,
             // "host":"127.0.0.1",
-            "program": "${fileDirname}",
+            "program": "./examples/main.go",
             "args": [ 
                         //init mode
                         // "-md","init", 
@@ -35,8 +35,13 @@
                         // "-md","read", 
                         // "-f","LICENSE",
                         // "-conStripes","100",
+<<<<<<< HEAD
                         // "-fn","2",
                         // "-sp","output/LICENSE",
+=======
+                        // "-fn","3",
+                        // "-sp","output/Goprogramming.pdf",
+>>>>>>> 9b1b0f47d88b6185915f25812e72ccf476c312f8
                         // "-md","read", 
                         // "-f","file.128",
                         // "-conStripes","100",
@@ -52,9 +57,9 @@
                         // "-f","LICENSE.txt",
 
                         //recover mode
-                        // "-md", "recover",
-                        //  "-fn","4",
-                        // "-o"
+                        "-md", "recover",
+                         "-fn","4",
+                        "-o"
                        
                         
                     ]

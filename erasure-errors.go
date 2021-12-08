@@ -5,112 +5,128 @@ import (
 	"fmt"
 )
 
-type DiskError struct {
+type diskError struct {
 	diskPath string
 	cause    string
 }
 
-func (e *DiskError) Error() string {
+func (e *diskError) Error() string {
 	return fmt.Sprintf("disk %s is not available for :%s", e.diskPath, e.cause)
 }
 
 //Error definitions
+
 var errConfFileNotExist = errors.New("the conf file not exist")
+
 var errEmptyData = errors.New("the file to encode is empty")
+
 var errDataDirExist = errors.New("data directory already exists")
+
 var errTooFewDisksAlive = errors.New("too few survival disks, i.e., k+m < N")
+
 var errNotInitialized = errors.New("system not initialized, please initialize with `-mode init` first")
+
 var errSurvivalNotEnoughForDecoding = errors.New("the failed block number exceeds fault tolerance, data renders unrecoverable")
+
 var errFileIncompleted = errors.New("file hash check fails, file renders incompleted")
+
 var errFileNotFound = errors.New("file not found")
+
 var errFailModeNotRecognized = errors.New("the fail mode is not recognizable, please specify in \"diskFail\" or \"bitRot\"")
+
 var errNegativeReplicateFactor = errors.New("the replicate factor MUST be non-negative")
+
 var errNotEnoughBackupForRecovery = errors.New("not enough disk for recovery, needs more backup devices")
-var errFileBlobNotFound = errors.New("file blob not found. please try to read it.")
+
+var errFileBlobNotFound = errors.New("file blob not found. please try to read it")
+
+var errDiskNumTooLarge = errors.New("diskNum is larger than provided")
+
+var errTooFewBlockAliveInStripe = errors.New("not enough blocks for reading in a stripe")
 
 // errUnexpected - unexpected error, requires manual intervention.
-var errUnexpected = StorageErr("unexpected error, please report this issue at https://github.com/minio/minio/issues")
+var errUnexpected = storageErr("unexpected error, please report this issue at https://github.com/minio/minio/issues")
 
 // errCorruptedFormat - corrupted backend format.
-var errCorruptedFormat = StorageErr("corrupted backend format, specified disk mount has unexpected previous content")
+var errCorruptedFormat = storageErr("corrupted backend format, specified disk mount has unexpected previous content")
 
 // errUnformattedDisk - unformatted disk found.
-var errUnformattedDisk = StorageErr("unformatted disk found")
+var errUnformattedDisk = storageErr("unformatted disk found")
 
 // errInconsistentDisk - inconsistent disk found.
-var errInconsistentDisk = StorageErr("inconsistent disk found")
+var errInconsistentDisk = storageErr("inconsistent disk found")
 
 // errUnsupporteDisk - when disk does not support O_DIRECT flag.
-var errUnsupportedDisk = StorageErr("disk does not support O_DIRECT")
+var errUnsupportedDisk = storageErr("disk does not support O_DIRECT")
 
 // errDiskFull - cannot create volume or files when disk is full.
-var errDiskFull = StorageErr("disk path full")
+var errDiskFull = storageErr("disk path full")
 
 // errDiskNotDir - cannot use storage disk if its not a directory
-var errDiskNotDir = StorageErr("disk is not directory or mountpoint")
+var errDiskNotDir = storageErr("disk is not directory or mountpoint")
 
 // errDiskNotFound - cannot find the underlying configured disk anymore.
-var errDiskNotFound = StorageErr("disk not found")
+var errDiskNotFound = storageErr("disk not found")
 
 // errFaultyRemoteDisk - remote disk is faulty.
-var errFaultyRemoteDisk = StorageErr("remote disk is faulty")
+var errFaultyRemoteDisk = storageErr("remote disk is faulty")
 
 // errFaultyDisk - disk is faulty.
-var errFaultyDisk = StorageErr("disk is faulty")
+var errFaultyDisk = storageErr("disk is faulty")
 
 // errDiskAccessDenied - we don't have write permissions on disk.
-var errDiskAccessDenied = StorageErr("disk access denied")
+var errDiskAccessDenied = storageErr("disk access denied")
 
 // errFileNotFound - cannot find the file.
 
 // errFileNotFound - cannot find requested file version.
-var errFileVersionNotFound = StorageErr("file version not found")
+var errFileVersionNotFound = storageErr("file version not found")
 
 // errTooManyOpenFiles - too many open files.
-var errTooManyOpenFiles = StorageErr("too many open files, please increase 'ulimit -n'")
+var errTooManyOpenFiles = storageErr("too many open files, please increase 'ulimit -n'")
 
 // errFileNameTooLong - given file name is too long than supported length.
-var errFileNameTooLong = StorageErr("file name too long")
+var errFileNameTooLong = storageErr("file name too long")
 
 // errVolumeExists - cannot create same volume again.
-var errVolumeExists = StorageErr("volume already exists")
+var errVolumeExists = storageErr("volume already exists")
 
 // errIsNotRegular - not of regular file type.
-var errIsNotRegular = StorageErr("not of regular file type")
+var errIsNotRegular = storageErr("not of regular file type")
 
 // errPathNotFound - cannot find the path.
-var errPathNotFound = StorageErr("path not found")
+var errPathNotFound = storageErr("path not found")
 
 // errVolumeNotFound - cannot find the volume.
-var errVolumeNotFound = StorageErr("volume not found")
+var errVolumeNotFound = storageErr("volume not found")
 
 // errVolumeNotEmpty - volume not empty.
-var errVolumeNotEmpty = StorageErr("volume is not empty")
+var errVolumeNotEmpty = storageErr("volume is not empty")
 
 // errVolumeAccessDenied - cannot access volume, insufficient permissions.
-var errVolumeAccessDenied = StorageErr("volume access denied")
+var errVolumeAccessDenied = storageErr("volume access denied")
 
 // errFileAccessDenied - cannot access file, insufficient permissions.
-var errFileAccessDenied = StorageErr("file access denied")
+var errFileAccessDenied = storageErr("file access denied")
 
 // errFileCorrupt - file has an unexpected size, or is not readable
-var errFileCorrupt = StorageErr("file is corrupted")
+var errFileCorrupt = storageErr("file is corrupted")
 
 // errBitrotHashAlgoInvalid - the algo for bit-rot hash
 // verification is empty or invalid.
-var errBitrotHashAlgoInvalid = StorageErr("bit-rot hash algorithm is invalid")
+var errBitrotHashAlgoInvalid = storageErr("bit-rot hash algorithm is invalid")
 
 // errCrossDeviceLink - rename across devices not allowed.
-var errCrossDeviceLink = StorageErr("Rename across devices not allowed, please fix your backend configuration")
+var errCrossDeviceLink = storageErr("Rename across devices not allowed, please fix your backend configuration")
 
 // errMinDiskSize - cannot create volume or files when disk size is less than threshold.
-var errMinDiskSize = StorageErr("The disk size is less than 900MiB threshold")
+var errMinDiskSize = storageErr("The disk size is less than 900MiB threshold")
 
 // errLessData - returned when less data available than what was requested.
-var errLessData = StorageErr("less data available than what was requested")
+var errLessData = storageErr("less data available than what was requested")
 
 // errMoreData = returned when more data was sent by the caller than what it was supposed to.
-var errMoreData = StorageErr("more data was sent than what was advertised")
+var errMoreData = storageErr("more data was sent than what was advertised")
 
 // indicates readDirFn to return without further applying the fn()
 var errDoneForNow = errors.New("done for now")
@@ -119,10 +135,10 @@ var errDoneForNow = errors.New("done for now")
 // to proceed to next entry.
 var errSkipFile = errors.New("skip this file")
 
-// StorageErr represents error generated by xlStorage call.
-type StorageErr string
+// storageErr represents error generated by xlStorage call.
+type storageErr string
 
-func (h StorageErr) error() string {
+func (h storageErr) error() string {
 	return string(h)
 }
 

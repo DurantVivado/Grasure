@@ -1,3 +1,7 @@
+// Package grasure is an Universal Erasure Coding Architecture in Go
+//
+// For usage and examples, see https://github.com/DurantVivado/Grasure
+//
 package grasure
 
 import (
@@ -6,59 +10,97 @@ import (
 	"github.com/DurantVivado/reedsolomon"
 )
 
-type CustomerAPI interface {
-	Read(filename string) ([]byte, error)
-	Write(filename string) (bool, error)
-	ReadAll(filename []string) ([][]byte, error)
-	WriteAll(filename []string) (bool, error)
-	Delete(filename string) (bool, error)
-	Change(filename string) (bool, error) //change file's meta
-}
-type HDRInfo struct {
-	Used    uint64
-	Free    uint64
-	Total   uint64
-	filenum int
-}
+// type CustomerAPI interface {
+// 	Read(filename string) ([]byte, error)
+// 	Write(filename string) (bool, error)
+// 	ReadAll(filename []string) ([][]byte, error)
+// 	WriteAll(filename []string) (bool, error)
+// 	Delete(filename string) (bool, error)
+// 	Change(filename string) (bool, error) //change file's meta
+// }
+// type HDRInfo struct {
+// 	Used    uint64
+// 	Free    uint64
+// 	Total   uint64
+// 	filenum int
+// }
 
-type DiskInfo struct {
-	diskPath  string //the disk path
-	available bool   //it's flag and when disk fails, it renders false.
-	numBlocks int    //it tells how many blocks a disk holds
-	capacity  int64  //the capacity of a disk
+type diskInfo struct {
+	diskPath    string //the disk path
+	available   bool   //it's flag and when disk fails, it renders false.
+	numBlocks   int    //it tells how many blocks a disk holds
+	ifMetaExist bool   //it's a disk with meta file?
+	capacity    int64  //the capacity of a disk
 }
 
 type Erasure struct {
-	K               int                       `json:"dataShards"`   // the number of data blocks in a stripe
-	M               int                       `json:"parityShards"` // the number of parity blocks in a stripe
-	BlockSize       int64                     `json:"blockSize"`    // the block size. default to 4KiB
-	DiskNum         int                       `json:"diskNum"`
-	FileMeta        []*FileInfo               `json:"fileLists"`
-	ConStripes      int                       //how many stripes are allowed to encode/decode concurrently
-	ReplicateFactor int                       // the replication factor for config file
-	sEnc            reedsolomon.StreamEncoder // the reedsolomon streaming encoder, for streaming access
-	enc             reedsolomon.Encoder       // the reedsolomon encoder, for block access
-	dataStripeSize  int64                     // the data stripe size, equal to k*bs
-	allStripeSize   int64                     // the data plus parity stripe size, equal to (k+m)*bs
-	diskInfos       []*DiskInfo               // disk paths
-	ConfigFile      string                    // configure file
-	fileMap         sync.Map                  // File info lists
-	DiskFilePath    string                    // the path of file recording all disks path
-	Override        bool                      // whether or not to override former files or directories, default to false
-	errgroupPool    sync.Pool                 // errgroup pool
-	mu              sync.RWMutex              // the read and write lock
-	Quiet           bool                      //whether or not to mute outputs
+	// the number of data blocks in a stripe
+	K int `json:"dataShards"`
+
+	// the number of parity blocks in a stripe
+	M int `json:"parityShards"`
+
+	// the block size. default to 4KiB
+	BlockSize int64 `json:"blockSize"`
+
+	// the disk number, only the first diskNum disks are used in diskPathFile
+	DiskNum int `json:"diskNum"`
+
+	//FileMeta lists, indicating fileName, fileSize, fileHash, fileDist...
+	FileMeta []*fileInfo `json:"fileLists"`
+
+	//how many stripes are allowed to encode/decode concurrently
+	ConStripes int `json:"-"`
+
+	// the replication factor for config file
+	ReplicateFactor int
+
+	// the reedsolomon streaming encoder, for streaming access
+	sEnc reedsolomon.StreamEncoder
+
+	// the reedsolomon encoder, for block access
+	enc reedsolomon.Encoder
+
+	// the data stripe size, equal to k*bs
+	dataStripeSize int64
+
+	// the data plus parity stripe size, equal to (k+m)*bs
+	allStripeSize int64
+
+	// diskInfo lists
+	diskInfos []*diskInfo
+
+	// configuration file path
+	ConfigFile string `json:"-"`
+
+	//file map
+	fileMap sync.Map
+
+	// the path of file recording all disks path
+	DiskFilePath string `json:"-"`
+
+	// whether or not to override former files or directories, default to false
+	Override bool `json:"-"`
+
+	// errgroup pool
+	errgroupPool sync.Pool
+
+	// mutex
+	mu sync.RWMutex
+
+	//whether or not to mute outputs
+	Quiet bool `json:"-"`
 	// dataBlobPool    sync.Pool                 // memory pool for conStripes data  access
 	// allBlobPool     sync.Pool                 // memory pool for conStripes stripe access
 }
-type FileInfo struct {
+type fileInfo struct {
 	FileName      string  `json:"fileName"` //file name
 	FileSize      int64   `json:"fileSize"` //file size
 	Hash          string  `json:"fileHash"` //hash value (SHA256 by default)
 	Distribution  [][]int `json:"fileDist"` //distribution forms a block->disk mapping
 	blockToOffset [][]int //blockToOffset has the same row and column number as Distribution but points to the block offset relative to a disk.
 
-	// metaInfo     *os.FileInfo //system-level file info
+	// metaInfo     *os.fileInfo //system-level file info
 }
 
 //global system-level variables
