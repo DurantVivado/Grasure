@@ -110,9 +110,6 @@ The previous disk path file will be renamed to `.hdr.disks.path.old`. New disk c
 ```
 
 
-6. update the examplar file.
-```
-./grasure -md update -f {source file path}
 ## Storage System Structure
 We display the structure of storage system using `tree` command. As shown below, each `file` is encoded and split into `k`+`m` parts then saved in `N` disks. Every part named `BLOB` is placed into a folder with the same basename of `file`. And the system's metadata (e.g., filename, filesize, filehash and file distribution) is recorded in META. Concerning reliability, we replicate the `META` file K-fold.(K is uppercased and not equal to aforementioned `k`). It functions as the  general erasure-coding experiment settings and easily integrated into other systems.
 It currently suppports `encode`, `read`, `update`, and more coming soon.
