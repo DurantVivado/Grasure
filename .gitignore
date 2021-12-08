@@ -17,3 +17,4 @@ examples/*.old
 examples/config.json
 examples/main.json
 examples/*.pprof
+profiles/*.pprof

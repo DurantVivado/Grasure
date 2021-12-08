@@ -24,7 +24,11 @@ Godoc: https://pkg.go.dev/github.com/DurantVivado/Grasure
 
 - `erasure-read.go` contains operation for striped file reading, if some parts are lost, we try to recover.
 
+<<<<<<< HEAD
+- `erasure-update.go` contains operation for striped file updating, if some parts are lost, we try to recover.
+=======
 - `erasure-errors.go` contains the definitions for various possible errors.
+>>>>>>> 774227feac6f28285a1e4a58ab7f043b0f4399b9
 
 - `erasure-recover.go` deals with multi-disk recovery, concerning both data and meta data.
 
@@ -74,10 +78,11 @@ go build -o main ./main.go ./flag.go
 ./main -md encode -f {source file path} -conStripes 100 -o
 ```
 
-4. Decode(read) the examplar file.
+4. decode(read) the examplar file.
 ```
-./main -md read -f {source file basename} -conStripes 100 -sp {destination file path} -fn {fail disk number}
+./grasure -md read -f {source file basename} -conStripes 100 -sp {destination file path} 
 ```
+
 here `conStripes` denotes how many stripes are allowed to operate concurrently, default value is 100. 
 `sp` means save path.
 
@@ -109,6 +114,9 @@ The previous disk path file will be renamed to `.hdr.disks.path.old`. New disk c
 ```
 
 
+6. update the examplar file.
+```
+./grasure -md update -f {source file path}
 ## Storage System Structure
 We display the structure of storage system using `tree` command. As shown below, each `file` is encoded and split into `k`+`m` parts then saved in `N` disks. Every part named `BLOB` is placed into a folder with the same basename of `file`. And the system's metadata (e.g., filename, filesize, filehash and file distribution) is recorded in META. Concerning reliability, we replicate the `META` file K-fold.(K is uppercased and not equal to aforementioned `k`). It functions as the  general erasure-coding experiment settings and easily integrated into other systems.
 It currently suppports `encode`, `read`, `update`, and more coming soon.

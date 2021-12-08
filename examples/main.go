@@ -55,7 +55,6 @@ func main() {
 	start := time.Now()
 	err = erasure.ReadDiskPath()
 	failOnErr(mode, err)
-
 	switch mode {
 	case "init":
 		err = erasure.InitSystem(false)
@@ -78,12 +77,12 @@ func main() {
 		failOnErr(mode, err)
 	case "update":
 		//update an old file according to a new file
-		// err = erasure.ReadConfig()
-		// failOnErr(mode, err)
-		// err = erasure.Update(filePath, newFilePath)
-		// failOnErr(mode, err)
-		// err = erasure.WriteConfig()
-		// failOnErr(mode, err)
+		err = erasure.ReadConfig()
+		failOnErr(mode, err)
+		err = erasure.Update(filePath, newFilePath)
+		failOnErr(mode, err)
+		err = erasure.WriteConfig()
+		failOnErr(mode, err)
 	case "recover":
 		//recover all the blocks of a disk and put the recovered result to new path
 		err = erasure.ReadConfig()
