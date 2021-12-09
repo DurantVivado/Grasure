@@ -24,8 +24,10 @@ func (e *Erasure) Scale(new_k, new_m int) error {
 	if new_k == e.K && new_m == e.M {
 		return nil
 	}
-	//step 1: modify the config file
+	//step 1: modify the struct
+
 	//step 2: migrate data as well as replicas
 	//step 3: reorganize layout to conform to randomized distribution
+	//step 4: write the new config and update replicas
 	return nil
 }

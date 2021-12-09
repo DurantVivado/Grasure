@@ -24,10 +24,10 @@ const (
 )
 
 var dataShards = []int{
-	2, 3, 4, 5, 6, 8, 9, 12, 14, 16, 18, 20,
+	18, 20,
 }
 var parityShards = []int{
-	1, 2, 3, 4,
+	2, 3, 4,
 }
 
 var fileSizesV1 = []int64{
@@ -331,7 +331,7 @@ func TestEncodeDecodeTwoFailure(t *testing.T) {
 	// and decoding functions for numerous files
 	for _, k := range dataShards {
 		testEC.K = k
-		for _, m := range parityShards[1:] {
+		for _, m := range parityShards {
 			testEC.M = m
 			for N := k + m; N <= min(k+m+4, totalDisk); N++ {
 				testEC.DiskNum = N
@@ -411,7 +411,7 @@ func TestEncodeDecodeBitRot(t *testing.T) {
 	// and decoding functions for numerous files
 	for _, k := range dataShards {
 		testEC.K = k
-		for _, m := range parityShards[1:] {
+		for _, m := range parityShards {
 			testEC.M = m
 			for N := k + m; N <= min(k+m+4, totalDisk); N++ {
 				testEC.DiskNum = N
@@ -422,10 +422,7 @@ func TestEncodeDecodeBitRot(t *testing.T) {
 						t.Fatalf("k:%d,m:%d,bs:%d,N:%d,%s\n", k, m, bs, N, err.Error())
 					}
 					log.Printf("----k:%d,m:%d,bs:%d,N:%d----\n", k, m, bs, N)
-					err = testEC.ReadConfig()
-					if err != nil {
-						t.Errorf("k:%d,m:%d,bs:%d,N:%d,%s\n", k, m, bs, N, err.Error())
-					}
+
 					for _, fileSize := range tempFileSizes {
 						//system-level paras
 						inpath := filepath.Join("input", fmt.Sprintf("temp-%d", fileSize))
@@ -434,16 +431,15 @@ func TestEncodeDecodeBitRot(t *testing.T) {
 						if err != nil {
 							t.Errorf("k:%d,m:%d,bs:%d,N:%d,%s\n", k, m, bs, N, err.Error())
 						}
-
+						err = testEC.ReadConfig()
+						if err != nil {
+							t.Errorf("k:%d,m:%d,bs:%d,N:%d,%s\n", k, m, bs, N, err.Error())
+						}
 						_, err := testEC.EncodeFile(inpath)
 						if err != nil {
 							t.Errorf("k:%d,m:%d,bs:%d,N:%d encode fails when fileSize is %d, for %s", k, m, bs, N, fileSize, err.Error())
 						}
 						err = testEC.WriteConfig()
-						if err != nil {
-							t.Errorf("k:%d,m:%d,bs:%d,N:%d,%s\n", k, m, bs, N, err.Error())
-						}
-						err = testEC.ReadConfig()
 						if err != nil {
 							t.Errorf("k:%d,m:%d,bs:%d,N:%d,%s\n", k, m, bs, N, err.Error())
 						}
@@ -587,7 +583,7 @@ func TestEncodeDecodeTwoFailureDegraded(t *testing.T) {
 	// and decoding functions for numerous files
 	for _, k := range dataShards {
 		testEC.K = k
-		for _, m := range parityShards[1:] {
+		for _, m := range parityShards {
 			testEC.M = m
 			for N := k + m; N <= min(k+m+4, totalDisk); N++ {
 				testEC.DiskNum = N

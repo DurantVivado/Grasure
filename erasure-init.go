@@ -216,14 +216,14 @@ func (e *Erasure) ReadConfig() error {
 	for _, f := range e.FileMeta {
 		stripeNum := len(f.Distribution)
 		f.blockToOffset = makeArr2DInt(stripeNum, e.K+e.M)
-		f.blockInfos = make([][]*blockInfo, stripeNum)
+		// f.blockInfos = make([][]*blockInfo, stripeNum)
 		countSum := make([]int, e.DiskNum)
 		for row := range f.Distribution {
-			f.blockInfos[row] = make([]*blockInfo, e.K+e.M)
+			// f.blockInfos[row] = make([]*blockInfo, e.K+e.M)
 			for line := range f.Distribution[row] {
 				diskId := f.Distribution[row][line]
 				f.blockToOffset[row][line] = countSum[diskId]
-				f.blockInfos[row][line] = &blockInfo{bstat: blkOK}
+				// f.blockInfos[row][line] = &blockInfo{bstat: blkOK}
 				countSum[diskId]++
 			}
 		}

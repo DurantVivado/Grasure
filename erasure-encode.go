@@ -158,6 +158,13 @@ func (e *Erasure) EncodeFile(filename string) (*fileInfo, error) {
 	//record the file meta
 	//transform map into array for json marshaling
 	e.fileMap.Store(baseFileName, fi)
+	fi.blockInfos = make([][]*blockInfo, stripeNum)
+	for row := range fi.Distribution {
+		fi.blockInfos[row] = make([]*blockInfo, e.K+e.M)
+		for line := range fi.Distribution[row] {
+			fi.blockInfos[row][line] = &blockInfo{bstat: blkOK}
+		}
+	}
 	// e.fileMap[baseFileName] = fi
 	if !e.Quiet {
 		log.Println(baseFileName, " successfully encoded. encoding size ",
