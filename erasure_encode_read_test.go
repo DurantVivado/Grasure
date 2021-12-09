@@ -413,7 +413,7 @@ func TestEncodeDecodeBitRot(t *testing.T) {
 		testEC.K = k
 		for _, m := range parityShards {
 			testEC.M = m
-			for N := k + m; N <= min(k+m+4, totalDisk); N++ {
+			for N := k + m + 1; N <= min(k+m+4, totalDisk); N++ {
 				testEC.DiskNum = N
 				for _, bs := range blockSizesV1 {
 					testEC.BlockSize = bs
