@@ -72,7 +72,7 @@ func main() {
 		failOnErr(mode, err)
 
 	case "encode":
-		//We are entering the encoding mode, and for brevity,we only encode one filePath
+		//encode a file
 		err = erasure.ReadConfig()
 		failOnErr(mode, err)
 		_, err := erasure.EncodeFile(filePath)
@@ -80,7 +80,7 @@ func main() {
 		err = erasure.WriteConfig()
 		failOnErr(mode, err)
 	case "update":
-		//update an old file according to a new file
+		//update an old file with a new version
 		err = erasure.ReadConfig()
 		failOnErr(mode, err)
 		err = erasure.Update(filePath, newFilePath)
@@ -88,7 +88,7 @@ func main() {
 		err = erasure.WriteConfig()
 		failOnErr(mode, err)
 	case "recover":
-		//recover all the blocks of a disk and put the recovered result to new path
+		//recover in case of disk failure
 		err = erasure.ReadConfig()
 		failOnErr(mode, err)
 		erasure.Destroy(failMode, failNum, "")
@@ -100,6 +100,7 @@ func main() {
 	// 	e.ReadConfig()
 	// 	scaling(new_k, new_m)
 	case "delete":
+		//delete a file
 		err = erasure.ReadConfig()
 		failOnErr(mode, err)
 		err = erasure.RemoveFile(filePath)
