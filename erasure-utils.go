@@ -8,6 +8,7 @@ import (
 	"io"
 	"math/rand"
 	"os"
+	"os/exec"
 	"os/signal"
 	"runtime"
 	"strconv"
@@ -233,4 +234,50 @@ func copyFile(srcFile, destFile string) (int64, error) {
 	}
 	defer file2.Close()
 	return io.Copy(file2, file1)
+}
+
+func execShell(command string) ([][]byte, error) {
+	cmd := exec.Command("/bin/bash", "-c", command)
+
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		fmt.Printf("Error:can not obtain stdout pipe for command:%s\n", err)
+		return nil, err
+	}
+
+	// execute command
+	if err := cmd.Start(); err != nil {
+		fmt.Println("Error:The command is err,", err)
+		return nil, err
+	}
+
+	outputBuf := bufio.NewReader(stdout)
+	res := make([][]byte, 0)
+
+	for {
+		output, _, err := outputBuf.ReadLine()
+		if err != nil {
+			if err.Error() != "EOF" {
+				return nil, err
+			}
+			break
+		}
+		res = append(res, output)
+	}
+	return res, nil
+}
+
+func parsePartition(partInfo string) string {
+	if len(partInfo) == 0 {
+		return ""
+	}
+	res := make([]byte, 0)
+	for _, c := range partInfo {
+		if c != ' ' {
+			res = append(res, byte(c))
+		} else {
+			break
+		}
+	}
+	return string(res)
 }

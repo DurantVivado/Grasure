@@ -31,6 +31,9 @@ type diskInfo struct {
 	numBlocks   int    //it tells how many blocks a disk holds
 	ifMetaExist bool   //it's a disk with meta file?
 	capacity    int64  //the capacity of a disk
+	readBytes   uint64 //volume of data that has been read
+	readTime    uint64 //time of reading
+	partition   string
 }
 
 type Erasure struct {

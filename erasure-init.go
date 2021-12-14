@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 
 	"github.com/DurantVivado/reedsolomon"
+	"github.com/shirou/gopsutil/disk"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -416,4 +417,34 @@ func (e *Erasure) checkIfFileExist(filename string) (bool, error) {
 		return false, nil
 	}
 	return true, nil
+}
+
+func (e *Erasure) readDiskInfo() error {
+	erg := new(errgroup.Group)
+	for i := range e.diskInfos {
+		i := i
+		erg.Go(func() error {
+			// execute df first to get partition
+			command := `df -h ` + e.diskInfos[i].diskPath
+			partInfo, err := execShell(command)
+			if err != nil {
+				return err
+			}
+			partName := parsePartition(string(partInfo[1]))
+			e.diskInfos[i].partition = partName
+
+			// get IOCounter next
+			partBaseName := filepath.Base(partName)
+			diskIOInfo, _ := disk.IOCounters()
+			partIOInfo := diskIOInfo[partBaseName]
+			e.diskInfos[i].readBytes = partIOInfo.ReadBytes
+			e.diskInfos[i].readTime = partIOInfo.ReadTime
+
+			return nil
+		})
+	}
+	if err := erg.Wait(); err != nil {
+		return err
+	}
+	return nil
 }

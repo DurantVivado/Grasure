@@ -1,8 +1,14 @@
 github.com/DurantVivado/reedsolomon v0.0.0 h1:948p8EQHqMJfvmkp1eVsLyb0/yFd/IWAP3q2Ib0Mo88=
 github.com/DurantVivado/reedsolomon v0.0.0/go.mod h1:mL9q9lpLK6GB3oTRDLyza88qqvW6xUlFZHvDrBExMds=
+github.com/DurantVivado/reedsolomon v1.9.4 h1:pt8u3Hh8FJdRGoZ2tSEvmIQf9ZwdfWxGAIfscCDxk5Y=
+github.com/DurantVivado/reedsolomon v1.9.4/go.mod h1:tG/6KoVjx3LRRwwatergya/mAXGN9/C/Io6FVP9B6Q0=
+github.com/klauspost/cpuid v1.3.1 h1:5JNjFYYQrZeKRJ0734q51WCEEn2huer72Dc7K+R/b6s=
+github.com/klauspost/cpuid v1.3.1/go.mod h1:bYW4mA6ZgKPob1/Dlai2LviZJO7KGI3uoWLd42rAQw4=
 github.com/klauspost/cpuid/v2 v2.0.9 h1:lgaqFMSdTdQYdZ04uHyN2d/eKdOMyi2YLSvlQIBFYa4=
 github.com/klauspost/cpuid/v2 v2.0.9/go.mod h1:FInQzS24/EEf25PyTYn52gqo7WaD8xa0213Md/qVLRg=
 github.com/pkg/profile v1.6.0 h1:hUDfIISABYI59DyeB3OTay/HxSRwTQ8rB/H83k6r5dM=
 github.com/pkg/profile v1.6.0/go.mod h1:qBsxPvzyUincmltOk6iyRVxHYg4adc0OFOv72ZdLa18=
+github.com/shirou/gopsutil v3.21.11+incompatible h1:+1+c1VGhc88SSonWP6foOcLhvnKlUeu/erjjvaPEYiI=
+github.com/shirou/gopsutil v3.21.11+incompatible/go.mod h1:5b4v6he4MtMOwMlS0TUMTu2PcXUg8+E1lC7eC3UO/RA=
 golang.org/x/sync v0.0.0-20210220032951-036812b2e83c h1:5KslGYwFpkhGh+Q16bwMP3cOontH8FOep7tGV86Y7SQ=
 golang.org/x/sync v0.0.0-20210220032951-036812b2e83c/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
