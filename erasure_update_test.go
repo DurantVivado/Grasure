@@ -68,10 +68,10 @@ func TestUpdateNormalExchange(t *testing.T) {
 	// we generate temp data and encode it into real storage sytem
 	// then change the file content randomly, and update it
 	// after that, all temporary file should be deleted
+	genTempDir()
 	testEC := &Erasure{
-		ConfigFile: "conf.json",
-		// fileMap:         make(map[string]*FileInfo),
-		DiskFilePath:    "examples/.hdr.disks.path",
+		ConfigFile:      "conf.json",
+		DiskFilePath:    testDiskFilePath,
 		ReplicateFactor: 3,
 		ConStripes:      100,
 		Override:        true,
@@ -103,7 +103,7 @@ func TestUpdateNormalExchange(t *testing.T) {
 					log.Printf("----k:%d,m:%d,bs:%d,N:%d----\n", k, m, bs, N)
 
 					for _, fileSize := range tempFileSizes {
-						inpath := fmt.Sprintf("./test/temp-%d", fileSize)
+						inpath := fmt.Sprintf("./input/temp-%d", fileSize)
 						outpath := fmt.Sprintf("./output/temp-%d", fileSize)
 						err = generateRandomFileBySize(inpath, fileSize)
 						if err != nil {
@@ -150,10 +150,10 @@ func TestUpdateNormalAppend(t *testing.T) {
 	// we generate temp data and encode it into real storage sytem
 	// then change the file content randomly, and update it
 	// after that, all temporary file should be deleted
+	genTempDir()
 	testEC := &Erasure{
-		ConfigFile: "conf.json",
-		// fileMap:         make(map[string]*FileInfo),
-		DiskFilePath:    "examples/.hdr.disks.path",
+		ConfigFile:      "conf.json",
+		DiskFilePath:    testDiskFilePath,
 		ReplicateFactor: 3,
 		ConStripes:      100,
 		Override:        true,
@@ -185,7 +185,7 @@ func TestUpdateNormalAppend(t *testing.T) {
 					log.Printf("----k:%d,m:%d,bs:%d,N:%d----\n", k, m, bs, N)
 
 					for _, fileSize := range tempFileSizes {
-						inpath := fmt.Sprintf("./test/temp-%d", fileSize)
+						inpath := fmt.Sprintf("./input/temp-%d", fileSize)
 						outpath := fmt.Sprintf("./output/temp-%d", fileSize)
 						err = generateRandomFileBySize(inpath, fileSize)
 						if err != nil {
@@ -235,7 +235,7 @@ func TestUpdateNormalDelete(t *testing.T) {
 	testEC := &Erasure{
 		ConfigFile: "conf.json",
 		// fileMap:         make(map[string]*FileInfo),
-		DiskFilePath:    "examples/.hdr.disks.path",
+		DiskFilePath:    testDiskFilePath,
 		ReplicateFactor: 3,
 		ConStripes:      100,
 		Override:        true,
@@ -267,7 +267,7 @@ func TestUpdateNormalDelete(t *testing.T) {
 					log.Printf("----k:%d,m:%d,bs:%d,N:%d----\n", k, m, bs, N)
 
 					for _, fileSize := range tempFileSizes {
-						inpath := fmt.Sprintf("./test/temp-%d", fileSize)
+						inpath := fmt.Sprintf("./input/temp-%d", fileSize)
 						outpath := fmt.Sprintf("./output/temp-%d", fileSize)
 						err = generateRandomFileBySize(inpath, fileSize)
 						if err != nil {
@@ -312,19 +312,19 @@ func TestUpdateNormalDelete(t *testing.T) {
 
 //---------------------BENCHMARK---------------------------------
 func benchmarkUpdate(b *testing.B, dataShards, parityShards, diskNum int, blockSize, fileSize int64) {
+	genTempDir()
 	b.ResetTimer()
 	b.SetBytes(fileSize)
 	testEC := &Erasure{
-		ConfigFile: "conf.json",
-		// fileMap:         make(map[string]*FileInfo),
-		DiskFilePath:    "examples/.hdr.disks.path",
+		ConfigFile:      "conf.json",
+		DiskFilePath:    testDiskFilePath,
 		ReplicateFactor: 3,
 		ConStripes:      100,
 		Override:        true,
 		Quiet:           true,
 	}
 	defer deleteTempFiles([]int64{fileSize})
-	inpath := fmt.Sprintf("./test/temp-%d", fileSize)
+	inpath := fmt.Sprintf("./input/temp-%d", fileSize)
 	outpath := fmt.Sprintf("./output/temp-%d", fileSize)
 	err = generateRandomFileBySize(inpath, fileSize)
 	if err != nil {
@@ -438,10 +438,10 @@ func BenchmarkUpdate20x4x24x4096x20M(b *testing.B) {
 }
 
 func benchmarkUpdateParallel(b *testing.B, dataShards, parityShards, diskNum int, blockSize, fileSize int64, conNum int) {
+	genTempDir()
 	testEC := &Erasure{
-		ConfigFile: "conf.json",
-		// fileMap:         make(map[string]*FileInfo),
-		DiskFilePath:    "examples/.hdr.disks.path",
+		ConfigFile:      "conf.json",
+		DiskFilePath:    testDiskFilePath,
 		ReplicateFactor: 3,
 		ConStripes:      100,
 		Override:        true,
@@ -471,7 +471,7 @@ func benchmarkUpdateParallel(b *testing.B, dataShards, parityShards, diskNum int
 	outpath := make([]string, conNum)
 	//create c files and sent to channel
 	for i := 0; i < conNum; i++ {
-		inpath[i] = fmt.Sprintf("./test/temp%d-%d", i, fileSize)
+		inpath[i] = fmt.Sprintf("./input/temp%d-%d", i, fileSize)
 		outpath[i] = fmt.Sprintf("./output/temp%d-%d", i, fileSize)
 		err = generateRandomFileBySize(inpath[i], fileSize)
 		if err != nil {

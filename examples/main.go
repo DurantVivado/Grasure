@@ -23,20 +23,24 @@ var failOnErr = func(mode string, e error) {
 		log.Fatalf("%s: %s", mode, e.Error())
 	}
 }
+
+const profileEnable = true
+
 var err error
 
 func main() {
 	flag_init()
 	flag.Parse()
-
-	pf, err := os.OpenFile(mode+".cpu.pprof", os.O_CREATE|os.O_RDWR, 0666)
-	if err != nil {
-		failOnErr(mode, err)
+	if profileEnable {
+		pf, err := os.OpenFile(mode+".cpu.pprof", os.O_CREATE|os.O_RDWR, 0666)
+		if err != nil {
+			failOnErr(mode, err)
+		}
+		defer pf.Close()
+		pprof.StartCPUProfile(pf)
+		defer pprof.StopCPUProfile()
+		defer profile.Start(profile.MemProfile, profile.MemProfileRate(1)).Stop()
 	}
-	defer pf.Close()
-	pprof.StartCPUProfile(pf)
-	defer pprof.StopCPUProfile()
-	defer profile.Start(profile.MemProfile, profile.MemProfileRate(1)).Stop()
 	erasure := &grasure.Erasure{
 		ConfigFile:      "conf.json",
 		DiskFilePath:    ".hdr.disks.path",
@@ -63,12 +67,12 @@ func main() {
 		//read a file
 		err = erasure.ReadConfig()
 		failOnErr(mode, err)
-		erasure.Destroy(failMode, failNum)
+		erasure.Destroy(failMode, failNum, filePath)
 		err = erasure.ReadFile(filePath, savePath, degrade)
 		failOnErr(mode, err)
 
 	case "encode":
-		//We are entering the encoding mode, and for brevity,we only encode one filePath
+		//encode a file
 		err = erasure.ReadConfig()
 		failOnErr(mode, err)
 		_, err := erasure.EncodeFile(filePath)
@@ -76,7 +80,7 @@ func main() {
 		err = erasure.WriteConfig()
 		failOnErr(mode, err)
 	case "update":
-		//update an old file according to a new file
+		//update an old file with a new version
 		err = erasure.ReadConfig()
 		failOnErr(mode, err)
 		err = erasure.Update(filePath, newFilePath)
@@ -84,18 +88,19 @@ func main() {
 		err = erasure.WriteConfig()
 		failOnErr(mode, err)
 	case "recover":
-		//recover all the blocks of a disk and put the recovered result to new path
+		//recover in case of disk failure
 		err = erasure.ReadConfig()
 		failOnErr(mode, err)
-		erasure.Destroy(failMode, failNum)
-		err = erasure.Recover()
+		erasure.Destroy(failMode, failNum, "")
+		_, err = erasure.Recover()
 		failOnErr(mode, err)
 
-	// case "scaling":
+	// case "scale":
 	// 	//scaling the system, ALERT: this is a system-level operation and irreversible
 	// 	e.ReadConfig()
 	// 	scaling(new_k, new_m)
 	case "delete":
+		//delete a file
 		err = erasure.ReadConfig()
 		failOnErr(mode, err)
 		err = erasure.RemoveFile(filePath)

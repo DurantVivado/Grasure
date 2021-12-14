@@ -9,6 +9,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/DurantVivado/reedsolomon"
 )
 
 var testDiskFilePath = filepath.Join("examples", ".hdr.disks.path")
@@ -22,10 +24,10 @@ const (
 )
 
 var dataShards = []int{
-	2, 3, 4, 5, 6, 8, 9, 12, 14, 16, 18, 20,
+	18, 20,
 }
 var parityShards = []int{
-	1, 2, 3, 4,
+	2, 3, 4,
 }
 
 var fileSizesV1 = []int64{
@@ -329,7 +331,7 @@ func TestEncodeDecodeTwoFailure(t *testing.T) {
 	// and decoding functions for numerous files
 	for _, k := range dataShards {
 		testEC.K = k
-		for _, m := range parityShards[1:] {
+		for _, m := range parityShards {
 			testEC.M = m
 			for N := k + m; N <= min(k+m+4, totalDisk); N++ {
 				testEC.DiskNum = N
@@ -365,6 +367,90 @@ func TestEncodeDecodeTwoFailure(t *testing.T) {
 
 						err = testEC.ReadFile(inpath, outpath, false)
 						if err != nil {
+							t.Errorf("k:%d,m:%d,bs:%d,N:%d read fails when fileSize is %d, for %s", k, m, bs, N, fileSize, err.Error())
+						}
+
+						//evaluate the results
+						if ok, err := checkFileIfSame(inpath, outpath); !ok && err != nil {
+							t.Fatalf("k:%d,m:%d,bs:%d,N:%d read fails when fileSize is %d, for hash check fail", k, m, bs, N, fileSize)
+						} else if err != nil {
+							t.Fatalf("k:%d,m:%d,bs:%d,N:%d read fails when fileSize is %d, for %s", k, m, bs, N, fileSize, err.Error())
+						}
+					}
+				}
+			}
+		}
+	}
+
+}
+
+func TestEncodeDecodeBitRot(t *testing.T) {
+	//we generate temp data and encode it into real storage sytem
+	//after that, all temporary file should be deleted
+	genTempDir()
+	testEC := &Erasure{
+		ConfigFile: "conf.json",
+		// fileMap:         make(map[string]*fileInfo),
+		DiskFilePath:    testDiskFilePath,
+		ReplicateFactor: 3,
+		ConStripes:      100,
+		Override:        true,
+		Quiet:           true,
+	}
+	rand.Seed(100000007)
+	tempFileSizes := generateRandomFileSize(1*KiB, 1*MiB, 100)
+	defer deleteTempFiles(tempFileSizes)
+	//1. read disk paths
+	err = testEC.ReadDiskPath()
+	if err != nil {
+		t.Fatal(err)
+	}
+	totalDisk := len(testEC.diskInfos)
+
+	// for each tuple (k,m,N,bs) we testify  encoding
+	// and decoding functions for numerous files
+	for _, k := range dataShards {
+		testEC.K = k
+		for _, m := range parityShards {
+			testEC.M = m
+			for N := k + m; N <= min(k+m+4, totalDisk); N++ {
+				testEC.DiskNum = N
+				for _, bs := range blockSizesV1 {
+					testEC.BlockSize = bs
+					err = testEC.InitSystem(true)
+					if err != nil {
+						t.Fatalf("k:%d,m:%d,bs:%d,N:%d,%s\n", k, m, bs, N, err.Error())
+					}
+					log.Printf("----k:%d,m:%d,bs:%d,N:%d----\n", k, m, bs, N)
+
+					for _, fileSize := range tempFileSizes {
+						//system-level paras
+						inpath := filepath.Join("input", fmt.Sprintf("temp-%d", fileSize))
+						outpath := filepath.Join("output", fmt.Sprintf("temp-%d", fileSize))
+						err = generateRandomFileBySize(inpath, fileSize)
+						if err != nil {
+							t.Errorf("k:%d,m:%d,bs:%d,N:%d,%s\n", k, m, bs, N, err.Error())
+						}
+						err = testEC.ReadConfig()
+						if err != nil {
+							t.Errorf("k:%d,m:%d,bs:%d,N:%d,%s\n", k, m, bs, N, err.Error())
+						}
+						_, err := testEC.EncodeFile(inpath)
+						if err != nil {
+							t.Errorf("k:%d,m:%d,bs:%d,N:%d encode fails when fileSize is %d, for %s", k, m, bs, N, fileSize, err.Error())
+						}
+						err = testEC.WriteConfig()
+						if err != nil {
+							t.Errorf("k:%d,m:%d,bs:%d,N:%d,%s\n", k, m, bs, N, err.Error())
+						}
+						randFail := int(rand.Int31()) % (k + m)
+						testEC.Destroy("bitRot", randFail, inpath)
+
+						err = testEC.ReadFile(inpath, outpath, false)
+						if err != nil {
+							if randFail > m && err == reedsolomon.ErrTooFewShards {
+								continue
+							}
 							t.Errorf("k:%d,m:%d,bs:%d,N:%d read fails when fileSize is %d, for %s", k, m, bs, N, fileSize, err.Error())
 						}
 
@@ -497,7 +583,7 @@ func TestEncodeDecodeTwoFailureDegraded(t *testing.T) {
 	// and decoding functions for numerous files
 	for _, k := range dataShards {
 		testEC.K = k
-		for _, m := range parityShards[1:] {
+		for _, m := range parityShards {
 			testEC.M = m
 			for N := k + m; N <= min(k+m+4, totalDisk); N++ {
 				testEC.DiskNum = N

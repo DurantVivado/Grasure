@@ -94,13 +94,18 @@ type Erasure struct {
 	// allBlobPool     sync.Pool                 // memory pool for conStripes stripe access
 }
 type fileInfo struct {
-	FileName      string  `json:"fileName"` //file name
-	FileSize      int64   `json:"fileSize"` //file size
-	Hash          string  `json:"fileHash"` //hash value (SHA256 by default)
-	Distribution  [][]int `json:"fileDist"` //distribution forms a block->disk mapping
-	blockToOffset [][]int //blockToOffset has the same row and column number as Distribution but points to the block offset relative to a disk.
-
+	FileName      string         `json:"fileName"` //file name
+	FileSize      int64          `json:"fileSize"` //file size
+	Hash          string         `json:"fileHash"` //hash value (SHA256 by default)
+	Distribution  [][]int        `json:"fileDist"` //distribution forms a block->disk mapping
+	blockToOffset [][]int        //blockToOffset has the same row and column number as Distribution but points to the block offset relative to a disk.
+	blockInfos    [][]*blockInfo //block state, blkFail if it's bit-rotten
 	// metaInfo     *os.fileInfo //system-level file info
+}
+
+type blockStat uint8
+type blockInfo struct {
+	bstat blockStat
 }
 
 //global system-level variables
@@ -110,8 +115,10 @@ var (
 
 //constant variables
 const (
-	tempFile      = "./test/file.temp"
-	maxGoroutines = 10240
+	blkOK         blockStat = 0
+	blkFail       blockStat = 1
+	tempFile                = "./test/file.temp"
+	maxGoroutines           = 10240
 )
 
 //templates
