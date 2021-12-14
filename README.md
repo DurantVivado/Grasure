@@ -24,11 +24,7 @@ Godoc: https://pkg.go.dev/github.com/DurantVivado/Grasure
 
 - `erasure-read.go` contains operation for striped file reading, if some parts are lost, we try to recover.
 
-<<<<<<< HEAD
 - `erasure-update.go` contains operation for striped file updating, if some parts are lost, we try to recover.
-=======
-- `erasure-errors.go` contains the definitions for various possible errors.
->>>>>>> 774227feac6f28285a1e4a58ab7f043b0f4399b9
 
 - `erasure-recover.go` deals with multi-disk recovery, concerning both data and meta data.
 
