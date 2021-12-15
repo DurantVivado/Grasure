@@ -159,6 +159,8 @@ func (e *Erasure) EncodeFile(filename string) (*fileInfo, error) {
 	//transform map into array for json marshaling
 	e.fileMap.Store(baseFileName, fi)
 	fi.blockInfos = make([][]*blockInfo, stripeNum)
+	fi.firstStripeId = e.stripeNum
+	e.stripeNum += int64(stripeNum)
 	for row := range fi.Distribution {
 		fi.blockInfos[row] = make([]*blockInfo, e.K+e.M)
 		for line := range fi.Distribution[row] {

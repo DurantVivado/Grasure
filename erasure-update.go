@@ -296,6 +296,7 @@ func compareStripe(oldStripe, newStripe [][]byte) ([]int, error) {
 func adjustDist(e *Erasure, fi *fileInfo, oldStripeNum, newStripeNum int) {
 	countSum := make([]int, e.DiskNum)
 	if newStripeNum > oldStripeNum {
+		e.stripeNum += (int64(newStripeNum) - int64(oldStripeNum))
 		for i := 0; i < newStripeNum-oldStripeNum; i++ {
 			fi.Distribution = append(fi.Distribution, make([]int, e.K+e.M))
 			fi.blockToOffset = append(fi.blockToOffset, make([]int, e.K+e.M))
@@ -315,6 +316,7 @@ func adjustDist(e *Erasure, fi *fileInfo, oldStripeNum, newStripeNum int) {
 			}
 		}
 	} else {
+		e.stripeNum -= (int64(oldStripeNum) - int64(newStripeNum))
 		fi.Distribution = fi.Distribution[0:newStripeNum]
 		fi.blockToOffset = fi.blockToOffset[0:newStripeNum]
 	}

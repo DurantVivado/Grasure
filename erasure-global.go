@@ -33,7 +33,7 @@ type diskInfo struct {
 	capacity    int64  //the capacity of a disk
 	readBytes   uint64 //volume of data that has been read
 	readTime    uint64 //time of reading
-	partition   string
+	partition   string //partition of disk path
 }
 
 type Erasure struct {
@@ -70,6 +70,9 @@ type Erasure struct {
 	// the data plus parity stripe size, equal to (k+m)*bs
 	allStripeSize int64
 
+	// the number of stripes
+	stripeNum int64
+
 	// diskInfo lists
 	diskInfos []*diskInfo
 
@@ -97,10 +100,11 @@ type Erasure struct {
 	// allBlobPool     sync.Pool                 // memory pool for conStripes stripe access
 }
 type fileInfo struct {
-	FileName      string         `json:"fileName"` //file name
-	FileSize      int64          `json:"fileSize"` //file size
-	Hash          string         `json:"fileHash"` //hash value (SHA256 by default)
-	Distribution  [][]int        `json:"fileDist"` //distribution forms a block->disk mapping
+	FileName      string         `json:"fileName"`      //file name
+	FileSize      int64          `json:"fileSize"`      //file size
+	Hash          string         `json:"fileHash"`      //hash value (SHA256 by default)
+	Distribution  [][]int        `json:"fileDist"`      //distribution forms a block->disk mapping
+	firstStripeId int64          `json:"firstStripeId"` //ID of the first stripe
 	blockToOffset [][]int        //blockToOffset has the same row and column number as Distribution but points to the block offset relative to a disk.
 	blockInfos    [][]*blockInfo //block state, blkFail if it's bit-rotten
 	// metaInfo     *os.fileInfo //system-level file info

@@ -93,6 +93,7 @@ func (e *Erasure) InitSystem(assume bool) error {
 	if err != nil {
 		return err
 	}
+	e.stripeNum = 0
 	if !e.Quiet {
 		fmt.Printf("System init!\n Erasure parameters: dataShards:%d, parityShards:%d,blocksize:%d,diskNum:%d\n",
 			e.K, e.M, e.BlockSize, e.DiskNum)
@@ -152,6 +153,7 @@ func (e *Erasure) resetSystem() error {
 	if err != nil {
 		return err
 	}
+	e.stripeNum = 0
 	err = e.replicateConfig(e.ReplicateFactor)
 	if err != nil {
 		return err
