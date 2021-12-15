@@ -24,7 +24,7 @@ const (
 )
 
 var dataShards = []int{
-	18, 20,
+	2, 4, 6, 8, 10, 12, 14, 16, 18, 20,
 }
 var parityShards = []int{
 	2, 3, 4,
