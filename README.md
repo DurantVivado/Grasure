@@ -114,7 +114,7 @@ The previous disk path file will be renamed to `.hdr.disks.path.old`. New disk c
 We display the structure of storage system using `tree` command. As shown below, each `file` is encoded and split into `k`+`m` parts then saved in `N` disks. Every part named `BLOB` is placed into a folder with the same basename of `file`. And the system's metadata (e.g., filename, filesize, filehash and file distribution) is recorded in META. Concerning reliability, we replicate the `META` file K-fold.(K is uppercased and not equal to aforementioned `k`). It functions as the  general erasure-coding experiment settings and easily integrated into other systems.
 It currently suppports `encode`, `read`, `update`, and more coming soon.
  ```
- server1@ubuntu:~/data$ sudo tree . -Rh
+ server1@ubuntu:~/data$  tree . -Rh
 .
 ├── [4.0K]  data1
 │   ├── [4.0K]  Goprogramming.pdf

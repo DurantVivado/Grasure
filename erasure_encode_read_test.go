@@ -307,8 +307,7 @@ func TestEncodeDecodeTwoFailure(t *testing.T) {
 	//after that, all temporary file should be deleted
 	genTempDir()
 	testEC := &Erasure{
-		ConfigFile: "conf.json",
-		// fileMap:         make(map[string]*fileInfo),
+		ConfigFile:      "conf.json",
 		DiskFilePath:    testDiskFilePath,
 		ReplicateFactor: 3,
 		ConStripes:      100,
