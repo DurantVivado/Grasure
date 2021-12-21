@@ -40,7 +40,7 @@ Here we elaborate the steps as following, in dir `./examples`:
 
 0. Build the project:
 ```
-go build -o main ./main.go ./flag.go 
+go build -o main ./main.go  
 ```
 
 1. New a file named `.hdr.disks.path` in `./examples`, list the path of your local disks, e.g.,
@@ -190,7 +190,11 @@ the command-line parameters of `./examples/main.go` are listed as below.
 |failNum(fn)|simulate multiple disk failure, provides the fail number of disks|0|
 |conStripes(cs)|how many stripes are allowed to encode/decode concurrently|100|
 |quiet(q)|whether or not to mute outputs in terminal|false|
-## Performance
 
+## Performance
+Performance are testedin test files.
 
 ## Contributions
+Please fork and issue whenever you are in trouble with the project. 
+
+It's also applicable to email to [durantthorvals@gmail.com](). 
