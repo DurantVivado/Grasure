@@ -6,6 +6,7 @@ file.save
 cmd/
 input/
 output/
+sga/
 grasure
 __debug_bin
 conf.json

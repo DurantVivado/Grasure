@@ -99,7 +99,7 @@ type fileInfo struct {
 	Hash          string         `json:"fileHash"` //hash value (SHA256 by default)
 	Distribution  [][]int        `json:"fileDist"` //distribution forms a block->disk mapping
 	blockToOffset [][]int        //blockToOffset has the same row and column number as Distribution but points to the block offset relative to a disk.
-	blockInfos    [][]*blockInfo //block state, blkFail if it's bit-rotten
+	blockInfos    [][]*blockInfo //block state, default to blkOK otherwise blkFail in case of bit-rot.
 	// metaInfo     *os.fileInfo //system-level file info
 }
 
