@@ -16,6 +16,61 @@ import (
 	"time"
 )
 
+//A Go-version Set
+type IntSet map[int]struct{}
+
+func (is *IntSet) Insert(x int) {
+	if *is == nil {
+		*is = make(IntSet)
+	}
+	(*is)[x] = struct{}{}
+}
+func (is *IntSet) Exist(x int) bool {
+	if *is == nil {
+		return false
+	}
+	_, ok := (*is)[x]
+	return ok
+}
+func (is *IntSet) Erase(x int) {
+	if *is == nil {
+		return
+	}
+	if !is.Exist(x) {
+		return
+	}
+	delete(*is, x)
+}
+func (is *IntSet) Clear() {
+	if *is == nil {
+		return
+	}
+
+	for k, _ := range *is {
+		delete(*is, k)
+	}
+}
+func (is *IntSet) Empty() bool {
+	if *is == nil {
+		return true
+	}
+	return len(*is) == 0
+}
+func (is *IntSet) Size() int {
+	if *is == nil {
+		return 0
+	}
+	return len(*is)
+}
+
+func sumInt(arrs []int, base int) int {
+	sum := base
+	for i := range arrs {
+		sum += arrs[i]
+	}
+	return sum
+}
+
 //consult user to avoid maloperation
 func consultUserBeforeAction() (bool, error) {
 	fmt.Println("If you are sure to proceed, type:\n [Y]es or [N]o.")

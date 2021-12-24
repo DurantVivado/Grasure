@@ -24,7 +24,7 @@ var failOnErr = func(mode string, e error) {
 	}
 }
 
-const profileEnable = true
+const profileEnable = false
 
 var err error
 

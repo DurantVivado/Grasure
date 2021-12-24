@@ -133,7 +133,7 @@ func ExampleErasure_EncodeFile() {
 }
 
 //A canonical example of how to read a file normally from the system
-func ExampleErasure_ReadFile_1() {
+func ExampleErasure_ReadFile_a() {
 	filepath := "example.file"
 	savePath := "example.file.decode"
 	erasure := &grasure.Erasure{
@@ -174,7 +174,7 @@ func ExampleErasure_ReadFile_1() {
 }
 
 //A heuristical example on read file in case of double failure
-func ExampleErasure_ReadFile_2() {
+func ExampleErasure_ReadFile_b() {
 	filepath := "example.file"
 	savePath := "example.file.decode"
 	erasure := &grasure.Erasure{

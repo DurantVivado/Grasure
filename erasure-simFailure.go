@@ -22,7 +22,7 @@ func (e *Erasure) Destroy(mode string, failNum int, fileName string) {
 	if !e.isDiskHealthy() {
 		return
 	}
-	if mode == "diskFail" {
+	if mode == "diskFail" || mode == "DiskFail" {
 		if failNum <= 0 {
 			return
 		}
@@ -43,7 +43,7 @@ func (e *Erasure) Destroy(mode string, failNum int, fileName string) {
 			}
 			e.diskInfos[shuff[i]].available = false
 		}
-	} else if mode == "bitRot" {
+	} else if mode == "bitRot" || mode == "BitRot" {
 		//in thi smode, we don't really corrupt a bit. Instead, we mark the block containing rots as failed
 		// which is omnipresent is today's storage facilities.
 		//if fileName is "", we corrupt all the files, else corrupt specific file

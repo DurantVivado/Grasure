@@ -6,7 +6,7 @@ file.save
 cmd/
 input/
 output/
-sga/
+sga.go
 grasure
 __debug_bin
 conf.json
