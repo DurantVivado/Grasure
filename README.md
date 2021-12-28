@@ -40,7 +40,7 @@ Here we elaborate the steps as following, in dir `./examples`:
 
 0. Build the project:
 ```
-go build -o main ./main.go ./flag.go 
+go build -o main ./main.go  
 ```
 
 1. New a file named `.hdr.disks.path` in `./examples`, list the path of your local disks, e.g.,
@@ -114,7 +114,7 @@ The previous disk path file will be renamed to `.hdr.disks.path.old`. New disk c
 We display the structure of storage system using `tree` command. As shown below, each `file` is encoded and split into `k`+`m` parts then saved in `N` disks. Every part named `BLOB` is placed into a folder with the same basename of `file`. And the system's metadata (e.g., filename, filesize, filehash and file distribution) is recorded in META. Concerning reliability, we replicate the `META` file K-fold.(K is uppercased and not equal to aforementioned `k`). It functions as the  general erasure-coding experiment settings and easily integrated into other systems.
 It currently suppports `encode`, `read`, `update`, and more coming soon.
  ```
- server1@ubuntu:~/data$ sudo tree . -Rh
+ server1@ubuntu:~/data$  tree . -Rh
 .
 ├── [4.0K]  data1
 │   ├── [4.0K]  Goprogramming.pdf
@@ -190,7 +190,11 @@ the command-line parameters of `./examples/main.go` are listed as below.
 |failNum(fn)|simulate multiple disk failure, provides the fail number of disks|0|
 |conStripes(cs)|how many stripes are allowed to encode/decode concurrently|100|
 |quiet(q)|whether or not to mute outputs in terminal|false|
-## Performance
 
+## Performance
+Performance are testedin test files.
 
 ## Contributions
+Please fork and issue whenever you are in trouble with the project. 
+
+It's also applicable to email to [durantthorvals@gmail.com](). 

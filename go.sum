@@ -1,9 +1,5 @@
-github.com/DurantVivado/reedsolomon v0.0.0 h1:948p8EQHqMJfvmkp1eVsLyb0/yFd/IWAP3q2Ib0Mo88=
-github.com/DurantVivado/reedsolomon v0.0.0/go.mod h1:mL9q9lpLK6GB3oTRDLyza88qqvW6xUlFZHvDrBExMds=
-github.com/DurantVivado/reedsolomon v1.9.4 h1:pt8u3Hh8FJdRGoZ2tSEvmIQf9ZwdfWxGAIfscCDxk5Y=
-github.com/DurantVivado/reedsolomon v1.9.4/go.mod h1:tG/6KoVjx3LRRwwatergya/mAXGN9/C/Io6FVP9B6Q0=
-github.com/klauspost/cpuid v1.3.1 h1:5JNjFYYQrZeKRJ0734q51WCEEn2huer72Dc7K+R/b6s=
-github.com/klauspost/cpuid v1.3.1/go.mod h1:bYW4mA6ZgKPob1/Dlai2LviZJO7KGI3uoWLd42rAQw4=
+github.com/DurantVivado/reedsolomon v0.0.2 h1:c06A+Xkd5cMX+cXWRt8sOajWLtu5CHTFeedecKnxf8M=
+github.com/DurantVivado/reedsolomon v0.0.2/go.mod h1:mL9q9lpLK6GB3oTRDLyza88qqvW6xUlFZHvDrBExMds=
 github.com/klauspost/cpuid/v2 v2.0.9 h1:lgaqFMSdTdQYdZ04uHyN2d/eKdOMyi2YLSvlQIBFYa4=
 github.com/klauspost/cpuid/v2 v2.0.9/go.mod h1:FInQzS24/EEf25PyTYn52gqo7WaD8xa0213Md/qVLRg=
 github.com/pkg/profile v1.6.0 h1:hUDfIISABYI59DyeB3OTay/HxSRwTQ8rB/H83k6r5dM=

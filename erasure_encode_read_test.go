@@ -307,8 +307,7 @@ func TestEncodeDecodeTwoFailure(t *testing.T) {
 	//after that, all temporary file should be deleted
 	genTempDir()
 	testEC := &Erasure{
-		ConfigFile: "conf.json",
-		// fileMap:         make(map[string]*fileInfo),
+		ConfigFile:      "conf.json",
 		DiskFilePath:    testDiskFilePath,
 		ReplicateFactor: 3,
 		ConStripes:      100,
@@ -413,7 +412,7 @@ func TestEncodeDecodeBitRot(t *testing.T) {
 		testEC.K = k
 		for _, m := range parityShards {
 			testEC.M = m
-			for N := k + m; N <= min(k+m+4, totalDisk); N++ {
+			for N := k + m + 1; N <= min(k+m+4, totalDisk); N++ {
 				testEC.DiskNum = N
 				for _, bs := range blockSizesV1 {
 					testEC.BlockSize = bs

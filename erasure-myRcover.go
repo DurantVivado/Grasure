@@ -32,14 +32,14 @@ func (e *Erasure) ReconstructWithGBlocks(g int) (map[string]string, error) {
 	//the failed disks are mapped to backup disks
 	replaceMap := make(map[int]int)
 	ReplaceMap := make(map[string]string)
-	diskFailId := 0
+	// diskFailId := 0
 	j := e.DiskNum
 
 	for i := 0; i < e.DiskNum; i++ {
 		if !e.diskInfos[i].available {
 			ReplaceMap[e.diskInfos[i].diskPath] = e.diskInfos[j].diskPath
 			replaceMap[i] = j
-			diskFailId = i
+			// diskFailId = i
 			break
 		}
 	}
