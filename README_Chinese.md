@@ -3,8 +3,7 @@
 
 [English](https://github.com/DurantVivado/Grasure/blob/master/README.md)|[简体中文](https://github.com/DurantVivado/Grasure/blob/master/README_Chinese.md)
 
-Go 中的通用纠删码架构
-实现最流行的基于纠删码的文件系统操作，它很容易使用并集成到其他文件系统中。
+基于Go的通用纠删码实验框架，非常简单，高效，并且容易集成到其它任何文件系统。
 
 项目主页：https://github.com/DurantVivado/Grasure
 
@@ -36,7 +35,8 @@ Godoc：https://pkg.go.dev/github.com/DurantVivado/Grasure
 [reedsolomon 库](https://github.com/klauspost/reedsolomon)
 
 
-＃＃ 用法
+## 用法
+
 各种 CLI 用法位于 `examples/buildAndRun.sh`。
 这里我们在目录`./examples`中详细说明以下步骤：
 
@@ -115,7 +115,7 @@ sha256sum {destination file path}
 ## 存储系统结构
 我们使用 `tree` 命令显示存储系统的结构。如下图所示，每个`file`都被编码并分成`k`+`m`个部分，然后保存在`N`个磁盘中。每个名为“BLOB”的部分都放置在一个具有相同基本名称“file”的文件夹中。并且系统的元数据（例如，文件名、文件大小、文件哈希和文件分布）记录在 META 中。关于可靠性，我们复制了 `META` 文件 K-fold。（K 是大写的，不等于前面提到的 `k`）。它用作一般纠删码实验设置，并且很容易集成到其他系统中。
 它目前支持 `encode`、`read`、`update` 和更多即将推出的功能。
- ``
+ ```
  server1@ubuntu:~/data$ tree . -Rh
 .
 server1@ubuntu:~/data$  tree . -Rh
@@ -170,7 +170,7 @@ server1@ubuntu:~/data$  tree . -Rh
 ├── [4.0K]  data23
 │   └── [4.0K]  Goprogramming.pdf
 │       └── [1.4M]  BLOB
-``
+```
 
 
 ## CLI 参数
