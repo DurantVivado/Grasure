@@ -184,7 +184,6 @@ sha256sum {destination file path}
 |savePath|本地保存路径（local path）|file.save|
 |newDataNum(new_k)|新的数据分片数|32|
 |newParityNum(new_m)|新的奇偶校验分片数|8|
-|recoveredDiskPath(rDP)|恢复磁盘的数据路径，默认为/tmp/restore| /tmp/恢复|
 |override(o)|是否覆盖之前的文件或目录，默认为false|false|
 |conWrites(cw)|是否开启并发写入，默认为false|false|
 |conReads(cr)|是否开启并发读取，默认为false|false|
