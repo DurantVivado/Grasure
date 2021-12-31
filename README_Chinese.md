@@ -118,8 +118,6 @@ sha256sum {destination file path}
  ```
  server1@ubuntu:~/data$ tree . -Rh
 .
-server1@ubuntu:~/data$  tree . -Rh
-.
 ├── [4.0K]  data1
 │   ├── [4.0K]  Goprogramming.pdf
 │   │   └── [1.3M]  BLOB
