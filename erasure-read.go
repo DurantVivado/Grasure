@@ -89,10 +89,6 @@ func (e *Erasure) ReadFile(filename string, savepath string, degrade bool) error
 	numBlob := ceilFracInt(stripeNum, e.ConStripes)
 	stripeCnt := 0
 	nextStripe := 0
-	loadBalancedScheme, err := e.SGA(fi)
-	if err != nil {
-		return err
-	}
 	for blob := 0; blob < numBlob; blob++ {
 		if stripeCnt+e.ConStripes > stripeNum {
 			nextStripe = stripeNum - stripeCnt
