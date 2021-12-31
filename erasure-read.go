@@ -1,6 +1,7 @@
 package grasure
 
 import (
+	"fmt"
 	"io"
 	"log"
 	"os"
@@ -10,6 +11,8 @@ import (
 	"github.com/DurantVivado/reedsolomon"
 	"golang.org/x/sync/errgroup"
 )
+
+var loadBalancedScheme [][]int
 
 //ReadFile reads ONE file  on the system and save it to local `savePath`.
 //
@@ -76,6 +79,12 @@ func (e *Erasure) ReadFile(filename string, savepath string, degrade bool) error
 		if !e.Quiet {
 			log.Println("start reconstructing blocks")
 		}
+		//--------------------------------
+		loadBalancedScheme, err = e.SGA(fi)
+		if err != nil {
+			return err
+		}
+		//-------------------------------
 	}
 	//for local save path
 	sf, err := os.OpenFile(savepath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0666)
@@ -89,10 +98,9 @@ func (e *Erasure) ReadFile(filename string, savepath string, degrade bool) error
 	numBlob := ceilFracInt(stripeNum, e.ConStripes)
 	stripeCnt := 0
 	nextStripe := 0
-	loadBalancedScheme, err := e.SGA(fi)
-	if err != nil {
-		return err
-	}
+	//-----------------------------------
+	diskLoads := make([]int32, e.DiskNum)
+	//-----------------------------------
 	for blob := 0; blob < numBlob; blob++ {
 		if stripeCnt+e.ConStripes > stripeNum {
 			nextStripe = stripeNum - stripeCnt
@@ -147,20 +155,39 @@ func (e *Erasure) ReadFile(filename string, savepath string, degrade bool) error
 					return err
 				}
 				if !ok {
-					// fmt.Println("reconstruct data of stripe:", stripeNo)
 					// err = e.enc.ReconstructWithList(splitData,
-					// &failList,
-					// &(fi.Distribution[stripeNo]),
-					// degrade)
-
-					// err = e.enc.ReconstructWithKBlocks(splitData,
 					// 	&failList,
-					// 	&loadBalancedScheme[stripeNo],
 					// 	&(fi.Distribution[stripeNo]),
 					// 	degrade)
+					//------------------------------------------------
+					// please comment belowing lines in released version
+					tempCnt := 0
+					for _, disk := range dist[stripeNo] {
+						if _, ok := failList[disk]; !ok {
+							atomic.AddInt32(&diskLoads[disk], 1)
+							tempCnt++
+							if tempCnt >= e.K {
+								break
+							}
+						}
+					}
+					//-------------------------------------------------
+					// fmt.Printf("stripeNo:%d, \n%v\n%v\n", stripeNo, dist[stripeNo], loadBalancedScheme[stripeNo])
+					err = e.enc.ReconstructWithKBlocks(splitData,
+						&failList,
+						&loadBalancedScheme[stripeNo],
+						&(dist[stripeNo]),
+						degrade)
 					if err != nil {
 						return err
 					}
+				}
+				ok, err = e.enc.Verify(splitData)
+				if err != nil {
+					return err
+				}
+				if !ok {
+					fmt.Printf("faik \n")
 				}
 				//join and write to output file
 
@@ -201,6 +228,16 @@ func (e *Erasure) ReadFile(filename string, savepath string, degrade bool) error
 
 	}
 	if !e.Quiet {
+		//--------------------------------------------
+		fmt.Printf("----------Normal----------")
+		maxload, sumload := 0, 0
+		for i := range diskLoads {
+			maxload = max(maxload, int(diskLoads[i]))
+			sumload += int(diskLoads[i])
+		}
+		fmt.Printf("\nmaxLoad:%d, sumLoad: %d\n", maxload, sumload)
+		fmt.Printf("disk loads:\n%v\n", diskLoads)
+		//-------------------------------------------
 		log.Printf("reading %s...", filename)
 	}
 	return nil

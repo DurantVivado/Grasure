@@ -13,6 +13,7 @@ const (
 )
 
 //SGA is a fast-recovery  algorithm that balance the read block amount for each disk
+//Currently, only support diskFail mode
 //
 //input : fileInfo
 //
@@ -84,7 +85,12 @@ func (e *Erasure) SGA(fi *fileInfo) (loadBalancedScheme [][]int, err error) {
 
 		}
 	}
-	// minTimeSlice := failStripeNum
+	failStripeVec := []int{}
+	for k, _ := range *failStripeSet {
+		failStripeVec = append(failStripeVec, k)
+	}
+	sort.Ints(failStripeVec)
+
 	// maxload_idx is the current maximal reducible load's index
 	maxload_idx := e.DiskNum - 1
 	//failReduList records the disks failing to reduce in maxReduVec
@@ -173,15 +179,13 @@ func (e *Erasure) SGA(fi *fileInfo) (loadBalancedScheme [][]int, err error) {
 	//sumLoad is the total load of all disks
 	sumLoad := 0
 	//mapInd stores disk-to-block_index mapping
-	mapInd := make([]int, e.DiskNum)
+	// mapInd := make([]int, e.DiskNum)
+	//for every stripe, determine which stripes chosen for recovery
 	for s := 0; s < stripeNum; s++ {
 		if failStripeSet.Exist(s) {
 			for i := 0; i < e.K+e.M; i++ {
-				mapInd[dist[s][i]] = i
-			}
-			for i := 0; i < e.K+e.M; i++ {
-				if diskDict[dist[s][i]].Exist(s) {
-					loadBalancedScheme[s] = append(loadBalancedScheme[s], mapInd[dist[s][i]])
+				if !failNodeSet.Exist(dist[s][i]) && diskDict[dist[s][i]].Exist(s) {
+					loadBalancedScheme[s] = append(loadBalancedScheme[s], dist[s][i])
 					sumDisk[dist[s][i]]++
 					maxLoad = max(maxLoad, sumDisk[dist[s][i]])
 					sumLoad++
@@ -191,10 +195,15 @@ func (e *Erasure) SGA(fi *fileInfo) (loadBalancedScheme [][]int, err error) {
 			loadBalancedScheme[s] = dist[s]
 		}
 	}
-
-	fmt.Printf("maxLoad:%d, sumLoad: %d\n", maxLoad, sumLoad)
-	fmt.Printf("disk loads:\n%v\n", sumDisk)
-	fmt.Printf("sum Blocks:[For verifying]\n%v\n", diskLoads)
+	if !e.Quiet {
+		fmt.Printf("----------SGA Algorithm----------")
+		fmt.Printf("\nmaxLoad:%d, sumLoad: %d\n", maxLoad, sumLoad)
+		fmt.Printf("disk loads:\n%v\n", sumDisk)
+		fmt.Printf("---------------------------------")
+	}
+	// if !reflect.DeepEqual(diskLoads, sumDisk) {
+	// 	return nil, fmt.Errorf("SGA verifying failed")
+	// }
 	// tmp := make([][]int, failStripeNum)
 	// for i, s := range failStripeSet {
 	// 	tmp[i] = loadBalancedScheme[s]
