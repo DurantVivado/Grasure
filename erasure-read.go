@@ -144,10 +144,10 @@ func (e *Erasure) ReadFile(filename string, savepath string, degrade bool) error
 				}
 				if !ok {
 					// fmt.Println("reconstruct data of stripe:", stripeNo)
-					// err = e.enc.ReconstructWithList(splitData,
-					// &failList,
-					// &(fi.Distribution[stripeNo]),
-					// degrade)
+					err = e.enc.ReconstructWithList(splitData,
+						&failList,
+						&(fi.Distribution[stripeNo]),
+						degrade)
 
 					// err = e.enc.ReconstructWithKBlocks(splitData,
 					// 	&failList,

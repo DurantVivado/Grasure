@@ -1,8 +1,10 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/DurantVivado/Grasure.svg)](https://pkg.go.dev/github.com/DurantVivado/Grasure)
 # Grasure
 
-Go 中的通用擦除编码架构
-实现最流行的基于擦除的文件系统操作，它很容易使用并集成到其他文件系统中。
+[English](https://github.com/DurantVivado/Grasure/blob/master/README.md)|[简体中文](https://github.com/DurantVivado/Grasure/blob/master/README_Chinese.md)
+
+Go 中的通用纠删码架构
+实现最流行的基于纠删码的文件系统操作，它很容易使用并集成到其他文件系统中。
 
 项目主页：https://github.com/DurantVivado/Grasure
 
@@ -35,7 +37,7 @@ Godoc：https://pkg.go.dev/github.com/DurantVivado/Grasure
 
 
 ＃＃ 用法
-各种 CLI 用法的完整演示位于 `examples/buildAndRun.sh`。你可能会一瞥。
+各种 CLI 用法位于 `examples/buildAndRun.sh`。
 这里我们在目录`./examples`中详细说明以下步骤：
 
 0. 构建项目：
@@ -63,20 +65,20 @@ go build -o main ./main.go
 /home/server1/data/data16
 ``
 
-2. 初始化系统，你应该明确附加数据（k）和奇偶校验分片（m）的数量以及块大小（以字节为单位），记住k+m不能大于256。
+2. 初始化系统，你应该明确数据块（k）和校验块（m）的数量以及块大小（以字节为单位），记住k+m不能大于256。
 ``
 ./main -md init -k 12 -m 4 -bs 4096 -dn 16
 ``
-`bs` 是以字节为单位的块大小，`dn` 是你打算在 `.hdr.disks.path` 中使用的 diskNum。显然，为了容错目的，您应该保留一些磁盘。
+`bs` 是以字节为单位的块大小，`dn` 是你打算在 `.hdr.disks.path` 中使用的磁盘数量。显然，为了容错目的，您应该保留一些备份磁盘。
 
 3. 编码一个示例文件。
 ``
-./main -md encode -f {源文件路径} -conStripes 100 -o
+./main -md encode -f {source file path} -conStripes 100 -o
 ``
 
 4. 解码（读取）示例文件。
 ``
-./grasure -md read -f {源文件基名} -conStripes 100 -sp {目标文件路径}
+./grasure -md read -f {source file basename} -conStripes 100 -sp {destination file path}
 ``
 
 这里的“conStripes”表示允许同时操作的条带数量，默认值为 100。
@@ -87,10 +89,10 @@ go build -o main ./main.go
 5. 检查哈希字符串以查看编码/解码是否正确。
 
 ``
-sha256sum {源文件路径}
+sha256sum {source file path}
 ``
 ``
-sha256sum {目标文件路径}
+sha256sum {destination file path}
 ``
 
 6. 删除存储中的文件（目前不可逆，我们正在努力）：
@@ -106,7 +108,7 @@ sha256sum {目标文件路径}
 8. 恢复磁盘（例如故障磁盘中的所有文件 blob），并将其传输到备份磁盘。这变成了一项耗时的工作。
 之前的磁盘路径文件将重命名为`.hdr.disks.path.old`。新的磁盘配置路径将用冗余路径替换每个失败的路径。
 ``
-./main -md 恢复
+./main -md recover
 ``
 
 
@@ -116,56 +118,58 @@ sha256sum {目标文件路径}
  ``
  server1@ubuntu:~/data$ tree . -Rh
 .
-├── [4.0K] 数据1
-│ ├── [4.0K] Goprogramming.pdf
-│ │ └── [1.3M] BLOB
-│ └── [ 46K] META
-├── [4.0K] 数据10
-│ └── [4.0K] Goprogramming.pdf
-│ └── [1.4M] BLOB
-├── [4.0K] data11
-│ └── [4.0K] Goprogramming.pdf
-│ └── [1.4M] BLOB
-├── [4.0K] data12
-│ └── [4.0K] Goprogramming.pdf
-│ └── [1.4M] BLOB
-├── [4.0K] data13
-│ └── [4.0K] Goprogramming.pdf
-│ └── [1.4M] BLOB
-├── [4.0K] data14
-│ └── [4.0K] Goprogramming.pdf
-│ └── [1.4M] BLOB
-├── [4.0K] data15
-│ └── [4.0K] Goprogramming.pdf
-│ └── [1.4M] BLOB
-├── [4.0K] data16
-│ └── [4.0K] Goprogramming.pdf
-│ └── [1.4M] BLOB
-├── [4.0K] data17
-│ └── [4.0K] Goprogramming.pdf
-│ └── [1.4M] BLOB
-├── [4.0K] data18
-│ └── [4.0K] Goprogramming.pdf
-│ └── [1.4M] BLOB
-├── [4.0K] data19
-│ └── [4.0K] Goprogramming.pdf
-│ └── [1.4M] BLOB
-├── [4.0K] data2
-│ ├── [4.0K] Goprogramming.pdf
-│ │ └── [1.4M] BLOB
-│ └── [ 46K] META
-├── [4.0K] data20
-│ └── [4.0K] Goprogramming.pdf
-│ └── [1.5M] BLOB
-├── [4.0K] data21
-│ └── [4.0K] Goprogramming.pdf
-│ └── [1.4M] BLOB
-├── [4.0K] data22
-│ └── [4.0K] Goprogramming.pdf
-│ └── [1.3M] BLOB
-├── [4.0K] data23
-│ └── [4.0K] Goprogramming.pdf
-│ └── [1.4M] BLOB
+server1@ubuntu:~/data$  tree . -Rh
+.
+├── [4.0K]  data1
+│   ├── [4.0K]  Goprogramming.pdf
+│   │   └── [1.3M]  BLOB
+│   └── [ 46K]  META
+├── [4.0K]  data10
+│   └── [4.0K]  Goprogramming.pdf
+│       └── [1.4M]  BLOB
+├── [4.0K]  data11
+│   └── [4.0K]  Goprogramming.pdf
+│       └── [1.4M]  BLOB
+├── [4.0K]  data12
+│   └── [4.0K]  Goprogramming.pdf
+│       └── [1.4M]  BLOB
+├── [4.0K]  data13
+│   └── [4.0K]  Goprogramming.pdf
+│       └── [1.4M]  BLOB
+├── [4.0K]  data14
+│   └── [4.0K]  Goprogramming.pdf
+│       └── [1.4M]  BLOB
+├── [4.0K]  data15
+│   └── [4.0K]  Goprogramming.pdf
+│       └── [1.4M]  BLOB
+├── [4.0K]  data16
+│   └── [4.0K]  Goprogramming.pdf
+│       └── [1.4M]  BLOB
+├── [4.0K]  data17
+│   └── [4.0K]  Goprogramming.pdf
+│       └── [1.4M]  BLOB
+├── [4.0K]  data18
+│   └── [4.0K]  Goprogramming.pdf
+│       └── [1.4M]  BLOB
+├── [4.0K]  data19
+│   └── [4.0K]  Goprogramming.pdf
+│       └── [1.4M]  BLOB
+├── [4.0K]  data2
+│   ├── [4.0K]  Goprogramming.pdf
+│   │   └── [1.4M]  BLOB
+│   └── [ 46K]  META
+├── [4.0K]  data20
+│   └── [4.0K]  Goprogramming.pdf
+│       └── [1.5M]  BLOB
+├── [4.0K]  data21
+│   └── [4.0K]  Goprogramming.pdf
+│       └── [1.4M]  BLOB
+├── [4.0K]  data22
+│   └── [4.0K]  Goprogramming.pdf
+│       └── [1.3M]  BLOB
+├── [4.0K]  data23
+│   └── [4.0K]  Goprogramming.pdf
+│       └── [1.4M]  BLOB
 ``
 
 
@@ -195,6 +199,6 @@ sha256sum {目标文件路径}
 性能在测试文件中进行测试。
 
 ## 贡献
-项目遇到问题时请 fork 和 issue。
+请 fork 项目, 遇到问题时 issue。
 
 它也适用于发送至 [durantthorvals@gmail.com]() 的电子邮件。

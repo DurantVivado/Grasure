@@ -1,6 +1,8 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/DurantVivado/Grasure.svg)](https://pkg.go.dev/github.com/DurantVivado/Grasure) 
 # Grasure
 
+[English](https://github.com/DurantVivado/Grasure/blob/master/README.md)|[简体中文](https://github.com/DurantVivado/Grasure/blob/master/README_Chinese.md)
+
 Universal Erasure Coding Architecture in Go
 Implementing most popular erasured-based filesystem operations, it's readily used and integrated into other filesystems. 
 
