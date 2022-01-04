@@ -22,7 +22,7 @@
         "go.autocompleteUnimportedPackages": true,
         "go.formatTool": "gofmt",
         "go.goroot": "/usr/local/go",    
-        "go.gopath": "/home/grasure/go", 
+        "go.gopath": "/Users/wanglin/go", 
         "go.gocodeAutoBuild": true
     
         

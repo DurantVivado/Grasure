@@ -1,5 +1,5 @@
 #!/bin/bash
-file=Goprogramming.pdf
+file=LICENSE
 go build -o main ./main.go
 # init the system
 ./main -md init -k 12 -m 4 -dn 24 -bs 4096
