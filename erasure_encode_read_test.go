@@ -738,11 +738,11 @@ func benchmarkEncodeDecode(b *testing.B, dataShards, parityShards, diskNum int, 
 		}
 
 		//evaluate the results
-		if ok, err := checkFileIfSame(inpath, outpath); !ok && err != nil {
-			b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
-		} else if err != nil {
-			b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
-		}
+		// if ok, err := checkFileIfSame(inpath, outpath); !ok && err != nil {
+		// 	b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
+		// } else if err != nil {
+		// 	b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
+		// }
 	}
 }
 func benchmarkEncodeDecodeWithFault(b *testing.B, dataShards, parityShards, diskNum int, blockSize, fileSize int64, failNum int, degrade bool) {
@@ -808,11 +808,11 @@ func benchmarkEncodeDecodeWithFault(b *testing.B, dataShards, parityShards, disk
 		}
 
 		//evaluate the results
-		if ok, err := checkFileIfSame(inpath, outpath); !ok && err != nil {
-			b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
-		} else if err != nil {
-			b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
-		}
+		// if ok, err := checkFileIfSame(inpath, outpath); !ok && err != nil {
+		// 	b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
+		// } else if err != nil {
+		// 	b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
+		// }
 	}
 }
 
@@ -994,11 +994,11 @@ func benchmarkParallel(b *testing.B, dataShards, parityShards, diskNum int, bloc
 				b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
 			}
 			//evaluate the results
-			if ok, err := checkFileIfSame(inpath[i], outpath[i]); !ok && err != nil {
-				b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
-			} else if err != nil {
-				b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
-			}
+			// if ok, err := checkFileIfSame(inpath[i], outpath[i]); !ok && err != nil {
+			// 	b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
+			// } else if err != nil {
+			// 	b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
+			// }
 			fileCh <- i
 		}
 	})

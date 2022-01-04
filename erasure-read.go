@@ -12,8 +12,6 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-var loadBalancedScheme [][]int
-
 //ReadFile reads ONE file  on the system and save it to local `savePath`.
 //
 //In case of any failure within fault tolerance, the file will be decoded first.
@@ -81,7 +79,7 @@ func (e *Erasure) ReadFile(filename string, savepath string, options *Options) e
 		}
 		//--------------------------------
 		if options.WithSGA {
-			loadBalancedScheme, err = e.SGA(fi)
+			fi.loadBalancedScheme, err = e.SGA(fi)
 			if err != nil {
 				return err
 			}
@@ -166,7 +164,7 @@ func (e *Erasure) ReadFile(filename string, savepath string, options *Options) e
 					if options.WithSGA {
 						err = e.enc.ReconstructWithKBlocks(splitData,
 							&failList,
-							&loadBalancedScheme[stripeNo],
+							&fi.loadBalancedScheme[stripeNo],
 							&(fi.Distribution[stripeNo]),
 							options.Degrade)
 					} else {
@@ -229,7 +227,7 @@ func (e *Erasure) ReadFile(filename string, savepath string, options *Options) e
 	}
 	if !e.Quiet {
 		//--------------------------------------------
-		fmt.Printf("----------Normal----------")
+		fmt.Printf("------------------Normal--------------------")
 		maxload, sumload := 0, 0
 		for i := range diskLoads {
 			maxload = max(maxload, int(diskLoads[i]))

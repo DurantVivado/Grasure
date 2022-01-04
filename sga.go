@@ -200,10 +200,9 @@ func (e *Erasure) SGA(fi *fileInfo) (loadBalancedScheme [][]int, err error) {
 		}
 	}
 	if !e.Quiet {
-		fmt.Printf("----------SGA Algorithm----------")
+		fmt.Printf("---------------SGA Algorithm--------------")
 		fmt.Printf("\nmaxLoad:%d, sumLoad: %d\n", maxLoad, sumLoad)
 		fmt.Printf("disk loads:\n%v\n", sumDisk)
-		fmt.Printf("---------------------------------")
 	}
 	// if !reflect.DeepEqual(diskLoads, sumDisk) {
 	// 	return nil, fmt.Errorf("SGA verifying failed")
