@@ -79,7 +79,7 @@ func (e *Erasure) ReadFile(filename string, savepath string, options *Options) e
 		}
 		//--------------------------------
 		if options.WithSGA {
-			fi.loadBalancedScheme, err = e.SGA(fi)
+			fi.loadBalancedScheme, err = e.SGA(fi, options.WithGCA)
 			if err != nil {
 				return err
 			}
