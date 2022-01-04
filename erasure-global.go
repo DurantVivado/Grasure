@@ -108,6 +108,26 @@ type blockInfo struct {
 	bstat blockStat
 }
 
+//Options define the parameters for read and recover mode
+type Options struct {
+	//Degrade tells if degrade read is on
+	Degrade bool
+	WithSGA bool
+	WithGCA bool
+}
+
+//SimOptions defines the parameters for simulation
+type SimOptions struct {
+	//switch between "diskFail" and "bitRot"
+	Mode string
+	// specify which disks to fail
+	FailDisk string
+	// specify number of disks to fail
+	FailNum int
+	//specify the fileName, used only for "bitRot" mode
+	FileName string
+}
+
 //global system-level variables
 var (
 	err error

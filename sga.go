@@ -142,10 +142,10 @@ func (e *Erasure) SGA(fi *fileInfo) (loadBalancedScheme [][]int, err error) {
 			}
 		}
 		//if current maximally loaded disk are fully reduced
-		//He could borrow some money from previously richest relatives, for illustration
+		//He could borrow some money from previously the richest relatives, for illustration
 		if !isMaxReducible {
 			for j := range *maxReduVec {
-				for s := range diskDict[j] {
+				for s := range *failStripeSet {
 					for n := 0; n < e.DiskNum; n++ {
 						if !failReduList.Exist(n) &&
 							!failNodeSet.Exist(n) &&
@@ -160,6 +160,10 @@ func (e *Erasure) SGA(fi *fileInfo) (loadBalancedScheme [][]int, err error) {
 							isMaxReducible = true
 							break
 						}
+
+					}
+					if isMaxReducible {
+						break
 					}
 				}
 				if avlbleSum == last_avlbleSum {

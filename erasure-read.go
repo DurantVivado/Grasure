@@ -17,8 +17,8 @@ var loadBalancedScheme [][]int
 //ReadFile reads ONE file  on the system and save it to local `savePath`.
 //
 //In case of any failure within fault tolerance, the file will be decoded first.
-//`degrade` indicates whether degraded read is enabled.
-func (e *Erasure) ReadFile(filename string, savepath string, degrade bool) error {
+//`Degrade` indicates whether degraded read is enabled.
+func (e *Erasure) ReadFile(filename string, savepath string, options *Options) error {
 	baseFileName := filepath.Base(filename)
 	intFi, ok := e.fileMap.Load(baseFileName)
 	if !ok {
@@ -80,9 +80,11 @@ func (e *Erasure) ReadFile(filename string, savepath string, degrade bool) error
 			log.Println("start reconstructing blocks")
 		}
 		//--------------------------------
-		loadBalancedScheme, err = e.SGA(fi)
-		if err != nil {
-			return err
+		if options.WithSGA {
+			loadBalancedScheme, err = e.SGA(fi)
+			if err != nil {
+				return err
+			}
 		}
 		//-------------------------------
 	}
@@ -155,12 +157,27 @@ func (e *Erasure) ReadFile(filename string, savepath string, degrade bool) error
 					return err
 				}
 				if !ok {
-					// err = e.enc.ReconstructWithList(splitData,
-					// 	&failList,
-					// 	&(fi.Distribution[stripeNo]),
-					// 	degrade)
+
 					//------------------------------------------------
 					// please comment belowing lines in released version
+
+					//-------------------------------------------------
+					// fmt.Printf("stripeNo:%d, \n%v\n%v\n", stripeNo, dist[stripeNo], loadBalancedScheme[stripeNo])
+					if options.WithSGA {
+						err = e.enc.ReconstructWithKBlocks(splitData,
+							&failList,
+							&loadBalancedScheme[stripeNo],
+							&(fi.Distribution[stripeNo]),
+							options.Degrade)
+					} else {
+						err = e.enc.ReconstructWithList(splitData,
+							&failList,
+							&(fi.Distribution[stripeNo]),
+							options.Degrade)
+					}
+					if err != nil {
+						return err
+					}
 					tempCnt := 0
 					for _, disk := range dist[stripeNo] {
 						if _, ok := failList[disk]; !ok {
@@ -171,23 +188,6 @@ func (e *Erasure) ReadFile(filename string, savepath string, degrade bool) error
 							}
 						}
 					}
-					//-------------------------------------------------
-					// fmt.Printf("stripeNo:%d, \n%v\n%v\n", stripeNo, dist[stripeNo], loadBalancedScheme[stripeNo])
-					err = e.enc.ReconstructWithKBlocks(splitData,
-						&failList,
-						&loadBalancedScheme[stripeNo],
-						&(dist[stripeNo]),
-						degrade)
-					if err != nil {
-						return err
-					}
-				}
-				ok, err = e.enc.Verify(splitData)
-				if err != nil {
-					return err
-				}
-				if !ok {
-					fmt.Printf("faik \n")
 				}
 				//join and write to output file
 

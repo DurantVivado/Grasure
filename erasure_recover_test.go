@@ -72,9 +72,9 @@ func TestRecover(t *testing.T) {
 					}
 					// oops, serveral disks shut down one by one
 					for fn := 1; fn <= m+1; fn++ {
-						testEC.Destroy("diskFail", fn, "")
+						testEC.Destroy(&SimOptions{Mode: "diskFail", FailNum: fn})
 						//Don't worry, I'll fix with that
-						rm, err := testEC.Recover()
+						rm, err := testEC.Recover(&Options{Degrade: false})
 						if err != nil {
 							if fn > m && err == errTooFewDisksAlive ||
 								fn > totalDisk-testEC.DiskNum && err == errNotEnoughBackupForRecovery {
@@ -174,9 +174,9 @@ func benchmarkRecover(b *testing.B, dataShards, parityShards, diskNum, failNum i
 	b.SetBytes(totalFileSize)
 	// oops, serveral disks shut down one by one
 	for i := 0; i < b.N; i++ {
-		testEC.Destroy("diskFail", failNum, "")
+		testEC.Destroy(&SimOptions{Mode: "diskFail", FailNum: failNum})
 		//Don't worry, I'll fix with that
-		_, err := testEC.Recover()
+		_, err := testEC.Recover(&Options{Degrade: false})
 		if err != nil {
 			b.Fatal(err)
 		}

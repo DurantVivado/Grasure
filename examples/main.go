@@ -1,7 +1,6 @@
-//   @Author: your name
+//   @Author: Durant Thorvald
 //   @Date: 2021-09-06 04:47:11
-//   @LastEditTime: 2021-09-06 04:47:11
-//   @LastEditors: Please set LastEditors
+//   @LastEditors: Durant Thorvald
 //   @Description: We decide to consider every operation in concurrent manner
 //   @ProjectUrl: github.com/DurantVivado/Grasure
 
@@ -24,6 +23,9 @@ var failOnErr = func(mode string, e error) {
 	}
 }
 
+//if you want to enable cpu,memory or block profile functionality
+//set profileEnable as true, otherwise false
+//it's strongly advised to close this in production
 const profileEnable = false
 
 var err error
@@ -67,8 +69,13 @@ func main() {
 		//read a file
 		err = erasure.ReadConfig()
 		failOnErr(mode, err)
-		erasure.Destroy(failMode, failNum, filePath)
-		err = erasure.ReadFile(filePath, savePath, degrade)
+		erasure.Destroy(&grasure.SimOptions{
+			Mode:     failMode,
+			FailNum:  failNum,
+			FailDisk: failDisk,
+			FileName: filePath,
+		})
+		err = erasure.ReadFile(filePath, savePath, &grasure.Options{Degrade: degrade})
 		failOnErr(mode, err)
 
 	case "encode":
@@ -91,8 +98,13 @@ func main() {
 		//recover in case of disk failure
 		err = erasure.ReadConfig()
 		failOnErr(mode, err)
-		erasure.Destroy(failMode, failNum, "")
-		_, err = erasure.Recover()
+		erasure.Destroy(&grasure.SimOptions{
+			Mode:     failMode,
+			FailNum:  failNum,
+			FailDisk: failDisk,
+			FileName: filePath,
+		})
+		_, err = erasure.Recover(&grasure.Options{})
 		failOnErr(mode, err)
 
 	// case "scale":
@@ -127,6 +139,7 @@ var (
 	new_m           int
 	failMode        string
 	failNum         int
+	failDisk        string
 	override        bool
 	conWrites       bool
 	conReads        bool
@@ -190,6 +203,9 @@ func flag_init() {
 
 	flag.IntVar(&failNum, "fn", 0, "simulate multiple disk failure, provides the fail number of disks")
 	flag.IntVar(&failNum, "failNum", 0, "simulate multiple disk failure, provides the fail number of disks")
+
+	flag.StringVar(&failDisk, "fd", "", "input the disks ids intended for failure (e.g., 0,3,4).")
+	flag.StringVar(&failDisk, "failDisk", "", "input the disks ids intended for failure (e.g., 0,3,4).")
 
 	flag.IntVar(&replicateFactor, "rf", 3, "the meta data is replicated `rf`- fold to provide enough reliability, default is 3-fold")
 	flag.IntVar(&replicateFactor, "replicateFactor", 3, "the meta data is replicated `rf`- fold to provide enough reliability, default is 3-fold")
