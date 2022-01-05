@@ -75,7 +75,7 @@ func main() {
 			FailDisk: failDisk,
 			FileName: filePath,
 		})
-		err = erasure.ReadFile(filePath, savePath, &grasure.Options{Degrade: degrade})
+		err = erasure.ReadFile(filePath, savePath, &grasure.Options{WithSGA: true, WithGCA: true})
 		failOnErr(mode, err)
 
 	case "encode":

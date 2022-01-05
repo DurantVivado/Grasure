@@ -36,7 +36,7 @@
                         "-f","Goprogramming.pdf",
                         "-conStripes","100",
                         "-fmd","diskFail",
-                        "-fd","14,18",
+                        "-fn","1",
                         "-sp","output/Goprogramming.pdf",
                         // "-md","read", 
                         // "-f","file.128",

@@ -16,7 +16,7 @@ const (
 //Currently, only support diskFail mode
 //
 //output: loadBalancedScheme stripeNum x K array
-func (e *Erasure) SGA(fi *fileInfo, gca_enable bool) (loadBalancedScheme [][]int, err error) {
+func (e *Erasure) SGA(fi *fileInfo, gca_enable bool) (loadBalancedScheme [][]int, stripeOrder map[int][]int, err error) {
 	//first, make clear how many disks need to be recovered
 	//Second, match backup partners
 	//Third, concurrently recover the part of the files
@@ -29,11 +29,11 @@ func (e *Erasure) SGA(fi *fileInfo, gca_enable bool) (loadBalancedScheme [][]int
 		}
 	}
 	if failNodeNum == 0 {
-		return nil, nil
+		return nil, nil, nil
 	}
 	//the failure number exceeds the fault tolerance
 	if failNodeNum > e.M {
-		return nil, errTooFewDisksAlive
+		return nil, nil, errTooFewDisksAlive
 	}
 	// maxRepairPerSlice := (e.DiskNum - int(failNodeNum)) / e.M
 	// if !e.Quiet {
@@ -211,14 +211,14 @@ func (e *Erasure) SGA(fi *fileInfo, gca_enable bool) (loadBalancedScheme [][]int
 	// 	fmt.Printf("%v\n", loadBalancedScheme[s])
 	// }
 	if !gca_enable {
-		return loadBalancedScheme, nil
+		return loadBalancedScheme, nil, nil
 	}
 	graph := make(map[int][]int)
 	edgeNum := 0
 	for s1 := range *failStripeSet {
 		for s2 := range *failStripeSet {
 			//if two nodes conflicts, then add an edge
-			if s1 < s2 && isConflict(&dist[s1], &dist[s2]) {
+			if s1 < s2 && isConflict(&loadBalancedScheme[s1], &loadBalancedScheme[s2], failNodeSet) {
 				graph[s1] = append(graph[s1], s2)
 				graph[s2] = append(graph[s2], s1)
 				edgeNum++
@@ -226,58 +226,50 @@ func (e *Erasure) SGA(fi *fileInfo, gca_enable bool) (loadBalancedScheme [][]int
 		}
 	}
 	if edgeNum == 0 {
-		//all stripes could be in one time slice
-		stripes := make([]int, failStripeSet.Size())
-		for s := range *failStripeSet {
-			stripes = append(stripes, s)
-		}
-		sort.Ints(stripes)
-		return [][]int{stripes}, nil
+		return loadBalancedScheme, nil, nil
 	}
 	//minTimeSlice is the minimal time slices needed for recovery
 	minTimeSlice := 0
 	//record records the used color
 	record := IntSet{}
 	//stripeColor marks the color of each stripe
-	stripeColor := make([]int, failStripeNum)
+	stripeColor := make(map[int]int)
+	stripeOrder = make(map[int][]int)
 	//we use the disk_vec generated from last step
 	//to give assistance to coloring sequence
 	cur, maxColor := 0, 0
-	for i := 0; i < e.DiskNum; i++ {
-		for s := range *failStripeSet {
-			if stripeColor[s] == 0 && diskDict[i].Exist(s) {
-				cur = s
-				maxColor = 0
-				for neig := range graph[cur] {
-					record.Insert(stripeColor[neig])
-					maxColor = max(maxColor, stripeColor[neig])
-				}
-				for t := 1; t <= maxColor+1; t++ {
-					if !record.Exist(t) {
-						stripeColor[cur] = t
-						minTimeSlice = max(minTimeSlice, t)
-						break
-					}
+	for s := range *failStripeSet {
+		if _, ok := stripeColor[s]; !ok {
+			cur = s
+			maxColor = 0
+			record.Clear()
+			for _, neig := range graph[cur] {
+				record.Insert(stripeColor[neig])
+				maxColor = max(maxColor, stripeColor[neig])
+			}
+			for t := 1; t <= maxColor+1; t++ {
+				if !record.Exist(t) {
+					stripeColor[cur] = t
+					stripeOrder[t] = append(stripeOrder[t], cur)
+					minTimeSlice = max(minTimeSlice, t)
+					break
 				}
 			}
 		}
 	}
-	matchStripeSet := make([][]int, minTimeSlice)
-	for t := 0; t < minTimeSlice; t++ {
-		for k := range *failStripeSet {
-			if stripeColor[k] == t+1 {
-				matchStripeSet[t] = append(matchStripeSet[t], k)
-			}
-		}
-	}
-	return matchStripeSet, nil
+
+	return loadBalancedScheme, stripeOrder, nil
 }
 
-func isConflict(arr1, arr2 *[]int) bool {
-	for i := range *arr1 {
-		for j := range *arr2 {
-			if (*arr1)[i] == (*arr2)[j] {
-				return true
+func isConflict(arr1, arr2 *[]int, failnodeSet *IntSet) bool {
+	for _, a := range *arr1 {
+		if !failnodeSet.Exist(a) {
+			for _, b := range *arr2 {
+				if !failnodeSet.Exist(b) {
+					if a == b {
+						return true
+					}
+				}
 			}
 		}
 	}

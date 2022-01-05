@@ -79,7 +79,8 @@ func (e *Erasure) ReadFile(filename string, savepath string, options *Options) e
 		}
 		//--------------------------------
 		if options.WithSGA {
-			fi.loadBalancedScheme, err = e.SGA(fi, options.WithGCA)
+			loadBalancedScheme, _, err := e.SGA(fi, options.WithGCA)
+			fi.loadBalancedScheme = loadBalancedScheme
 			if err != nil {
 				return err
 			}
@@ -156,11 +157,6 @@ func (e *Erasure) ReadFile(filename string, savepath string, options *Options) e
 				}
 				if !ok {
 
-					//------------------------------------------------
-					// please comment belowing lines in released version
-
-					//-------------------------------------------------
-					// fmt.Printf("stripeNo:%d, \n%v\n%v\n", stripeNo, dist[stripeNo], loadBalancedScheme[stripeNo])
 					if options.WithSGA {
 						err = e.enc.ReconstructWithKBlocks(splitData,
 							&failList,
