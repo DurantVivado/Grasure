@@ -1070,3 +1070,105 @@ func BenchmarkParallel_20x4x24x4096x1Mx200(b *testing.B) {
 func BenchmarkParallel_20x4x24x4096x1Mx200xdegrade(b *testing.B) {
 	benchmarkParallel(b, 20, 4, 24, 4096, 10*MiB, 200, true)
 }
+
+//the impact of conStripe
+func benchmarkEncodeDecodeConstripe(b *testing.B, conStripe, dataShards, parityShards, diskNum int, blockSize, fileSize int64, failNum int, degrade bool) {
+	b.ResetTimer()
+	b.SetBytes(fileSize)
+	genTempDir()
+	testEC := &Erasure{
+		ConfigFile: "conf.json",
+		// fileMap:         make(map[string]*fileInfo),
+		DiskFilePath:    testDiskFilePath,
+		ReplicateFactor: 3,
+		ConStripes:      conStripe,
+		Override:        true,
+		Quiet:           true,
+	}
+	rand.Seed(100000007)
+	defer deleteTempFiles([]int64{fileSize})
+	inpath := filepath.Join("input", fmt.Sprintf("temp-%d", fileSize))
+	outpath := filepath.Join("output", fmt.Sprintf("temp-%d", fileSize))
+	err = generateRandomFileBySize(inpath, fileSize)
+	if err != nil {
+		b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
+	}
+	//repeat b.N times
+
+	for i := 0; i < b.N; i++ {
+		err = testEC.ReadDiskPath()
+		if err != nil {
+			b.Fatal(err)
+		}
+		for j := 0; j < failNum; j++ {
+			testEC.diskInfos[j].available = false
+		}
+		// for each tuple (k,m,N,bs) we testify  encoding
+		// and decoding functions for numerous files
+		testEC.K = dataShards
+		testEC.M = parityShards
+		testEC.DiskNum = diskNum
+
+		testEC.BlockSize = blockSize
+		err = testEC.InitSystem(true)
+		if err != nil {
+			b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
+		}
+		// log.Printf("----k:%d,m:%d,bs:%d,N:%d----\n", k, m, bs, N)
+
+		err = testEC.ReadConfig()
+		if err != nil {
+			b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
+		}
+		_, err := testEC.EncodeFile(inpath)
+		if err != nil {
+			b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
+		}
+		err = testEC.WriteConfig()
+		if err != nil {
+			b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
+		}
+
+		err = testEC.ReadFile(inpath, outpath, &Options{Degrade: degrade})
+		if err != nil {
+			b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
+		}
+
+		//evaluate the results
+		// if ok, err := checkFileIfSame(inpath, outpath); !ok && err != nil {
+		// 	b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
+		// } else if err != nil {
+		// 	b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
+		// }
+	}
+}
+
+func BenchmarkEncodeDecode20x4x24x4096x20Mx2x50(b *testing.B) {
+	benchmarkEncodeDecodeConstripe(b, 50, 20, 4, 24, 4096, 20*MiB, 2, true)
+}
+
+//6         192236068 ns/op         109.09 MB/s    49596322 B/op      61852 allocs/op
+
+func BenchmarkEncodeDecode20x4x24x4096x20Mx2x100(b *testing.B) {
+	benchmarkEncodeDecodeConstripe(b, 100, 20, 4, 24, 4096, 20*MiB, 2, true)
+}
+
+// 5         208078144 ns/op         100.79 MB/s    54397798 B/op      61763 allocs/op
+
+func BenchmarkEncodeDecode20x4x24x4096x20Mx2x150(b *testing.B) {
+	benchmarkEncodeDecodeConstripe(b, 150, 20, 4, 24, 4096, 20*MiB, 2, true)
+}
+
+// 6         190064891 ns/op         110.34 MB/s    57785693 B/op      61863 allocs/op
+
+func BenchmarkEncodeDecode20x4x24x4096x20Mx2x200(b *testing.B) {
+	benchmarkEncodeDecodeConstripe(b, 200, 20, 4, 24, 4096, 20*MiB, 2, true)
+}
+
+// 6         201086254 ns/op         104.29 MB/s    71690058 B/op      61534 allocs/op
+
+func BenchmarkEncodeDecode20x4x24x4096x20Mx2x400(b *testing.B) {
+	benchmarkEncodeDecodeConstripe(b, 400, 20, 4, 24, 4096, 20*MiB, 2, true)
+}
+
+// 6	 188624099 ns/op	 111.18 MB/s	88068084 B/op	   61723 allocs/op

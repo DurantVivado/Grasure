@@ -253,7 +253,7 @@ func benchmarkWithSGA(b *testing.B, dataShards, parityShards, diskNum int, block
 	}
 }
 
-func benchmarkWithoutSGA(b *testing.B, dataShards, parityShards, diskNum int, blockSize, fileSize int64, failNum int, degrade bool) {
+func benchmarkBaseline(b *testing.B, dataShards, parityShards, diskNum int, blockSize, fileSize int64, failNum int, degrade bool) {
 	b.ResetTimer()
 	b.SetBytes(fileSize)
 	genTempDir()
@@ -324,14 +324,86 @@ func benchmarkWithoutSGA(b *testing.B, dataShards, parityShards, diskNum int, bl
 	}
 }
 
+//Note: GCA depends on SGA's outcome
+func benchmarkWithGCA(b *testing.B, dataShards, parityShards, diskNum int, blockSize, fileSize int64, failNum int, degrade bool) {
+	b.ResetTimer()
+	b.SetBytes(fileSize)
+	genTempDir()
+	testEC := &Erasure{
+		ConfigFile: "conf.json",
+		// fileMap:         make(map[string]*fileInfo),
+		DiskFilePath:    testDiskFilePath,
+		ReplicateFactor: 3,
+		ConStripes:      100,
+		Override:        true,
+		Quiet:           true,
+	}
+	rand.Seed(100000007)
+	defer deleteTempFiles([]int64{fileSize})
+	inpath := filepath.Join("input", fmt.Sprintf("temp-%d", fileSize))
+	outpath := filepath.Join("output", fmt.Sprintf("temp-%d", fileSize))
+	err = generateRandomFileBySize(inpath, fileSize)
+	if err != nil {
+		b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
+	}
+	//repeat b.N times
+	testEC.Destroy(&SimOptions{Mode: "diskFail", FailNum: failNum})
+	for i := 0; i < b.N; i++ {
+		err = testEC.ReadDiskPath()
+		if err != nil {
+			b.Fatal(err)
+		}
+		for j := 0; j < failNum; j++ {
+			testEC.diskInfos[j].available = false
+		}
+		// for each tuple (k,m,N,bs) we testify  encoding
+		// and decoding functions for numerous files
+		testEC.K = dataShards
+		testEC.M = parityShards
+		testEC.DiskNum = diskNum
+
+		testEC.BlockSize = blockSize
+		err = testEC.InitSystem(true)
+		if err != nil {
+			b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
+		}
+		// log.Printf("----k:%d,m:%d,bs:%d,N:%d----\n", k, m, bs, N)
+
+		err = testEC.ReadConfig()
+		if err != nil {
+			b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
+		}
+		_, err := testEC.EncodeFile(inpath)
+		if err != nil {
+			b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
+		}
+		err = testEC.WriteConfig()
+		if err != nil {
+			b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
+		}
+
+		err = testEC.ReadFile(inpath, outpath, &Options{Degrade: degrade, WithSGA: true, WithGCA: true})
+		if err != nil {
+			b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
+		}
+
+		//evaluate the results
+		if ok, err := checkFileIfSame(inpath, outpath); !ok && err != nil {
+			b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
+		} else if err != nil {
+			b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
+		}
+	}
+}
+
 func BenchmarkWithSGA2x1x3x512x1M(b *testing.B) {
 	benchmarkWithSGA(b, 2, 1, 3, 512, 1*MiB, 1, false)
 }
 
 // 16          66340699 ns/op          15.81 MB/s     5867938 B/op      57544 allocs/op
 
-func BenchmarkWithoutSGA2x1x3x512x1M(b *testing.B) {
-	benchmarkWithoutSGA(b, 2, 1, 3, 512, 1*MiB, 1, false)
+func BenchmarkBaseline2x1x3x512x1M(b *testing.B) {
+	benchmarkBaseline(b, 2, 1, 3, 512, 1*MiB, 1, false)
 }
 
 // 18          67493862 ns/op          15.54 MB/s     5340390 B/op   42610 allocs/op
@@ -342,8 +414,8 @@ func BenchmarkWithSGA2x2x4x1024x1Mx2(b *testing.B) {
 
 // 19          57017134 ns/op          18.39 MB/s     6695192 B/op   32267 allocs/op
 
-func BenchmarkWithoutSGA2x2x4x1024x1Mx2(b *testing.B) {
-	benchmarkWithoutSGA(b, 2, 2, 4, 1024, 1*MiB, 2, false)
+func BenchmarkBaseline2x2x4x1024x1Mx2(b *testing.B) {
+	benchmarkBaseline(b, 2, 2, 4, 1024, 1*MiB, 2, false)
 }
 
 // 25          41051034 ns/op          25.54 MB/s     4664189 B/op      16626 allocs/op
@@ -354,8 +426,8 @@ func BenchmarkWithSGA4x2x6x1024x1Mx1(b *testing.B) {
 
 // 21          50411945 ns/op          20.80 MB/s     6426600 B/op      24642 allocs/op
 
-func BenchmarkWithoutSGA4x2x6x1024x1Mx1(b *testing.B) {
-	benchmarkWithoutSGA(b, 4, 2, 6, 1024, 1*MiB, 1, false)
+func BenchmarkBaseline4x2x6x1024x1Mx1(b *testing.B) {
+	benchmarkBaseline(b, 4, 2, 6, 1024, 1*MiB, 1, false)
 }
 
 // 25          41051034 ns/op          25.54 MB/s     4664189 B/op      16626 allocs/op
@@ -366,8 +438,8 @@ func BenchmarkWithSGA6x3x9x8192x10Mx3(b *testing.B) {
 
 // 6         186141556 ns/op          56.33 MB/s    38367601 B/op   50045 allocs/op
 
-func BenchmarkWithoutSGA6x3x9x8192x10Mx3(b *testing.B) {
-	benchmarkWithoutSGA(b, 6, 3, 9, 4096, 10*MiB, 3, false)
+func BenchmarkBaseline6x3x9x8192x10Mx3(b *testing.B) {
+	benchmarkBaseline(b, 6, 3, 9, 4096, 10*MiB, 3, false)
 }
 
 // 6         192607708 ns/op          54.44 MB/s    37685298 B/op    37770 allocs/op
@@ -378,8 +450,8 @@ func BenchmarkWithSGA8x4x16x16384x10Mx4(b *testing.B) {
 
 // 7         150438667 ns/op          69.70 MB/s    46127457 B/op      14989 allocs/op
 
-func BenchmarkWithoutSGA8x4x16x16384x10Mx4(b *testing.B) {
-	benchmarkWithoutSGA(b, 8, 4, 16, 16384, 10*MiB, 4, false)
+func BenchmarkBaseline8x4x16x16384x10Mx4(b *testing.B) {
+	benchmarkBaseline(b, 8, 4, 16, 16384, 10*MiB, 4, false)
 }
 
 // 7         143706267 ns/op          72.97 MB/s    46014085 B/op    13577 allocs/op
@@ -390,8 +462,8 @@ func BenchmarkWithSGA9x6x15x8192x10Mx3(b *testing.B) {
 
 // 6         171089483 ns/op          61.29 MB/s    37603145 B/op      23370 allocs/op
 
-func BenchmarkWithoutSGA9x6x15x8192x10Mx3(b *testing.B) {
-	benchmarkWithoutSGA(b, 9, 3, 15, 8192, 10*MiB, 3, false)
+func BenchmarkBaseline9x6x15x8192x10Mx3(b *testing.B) {
+	benchmarkBaseline(b, 9, 3, 15, 8192, 10*MiB, 3, false)
 }
 
 // 7         153507932 ns/op          68.31 MB/s    37061705 B/op    19396 allocs/op
@@ -402,8 +474,8 @@ func BenchmarkWithSGA12x4x18x8192x10Mx2(b *testing.B) {
 
 // 7         183826931 ns/op          57.04 MB/s    46450907 B/op      23813 allocs/op
 
-func BenchmarkWithoutSGA12x4x18x8192x10Mx2(b *testing.B) {
-	benchmarkWithoutSGA(b, 12, 4, 18, 8192, 10*MiB, 2, false)
+func BenchmarkBaseline12x4x18x8192x10Mx2(b *testing.B) {
+	benchmarkBaseline(b, 12, 4, 18, 8192, 10*MiB, 2, false)
 }
 
 // 6         167069150 ns/op          62.76 MB/s    46391402 B/op    19670 allocs/op
@@ -414,8 +486,8 @@ func BenchmarkWithSGA16x4x24x8192x10Mx3(b *testing.B) {
 
 // 7         150561632 ns/op          69.64 MB/s    38043987 B/op   22330 allocs/op
 
-func BenchmarkWithoutSGA16x4x24x8192x10Mx3(b *testing.B) {
-	benchmarkWithoutSGA(b, 16, 4, 24, 8192, 10*MiB, 3, false)
+func BenchmarkBaseline16x4x24x8192x10Mx3(b *testing.B) {
+	benchmarkBaseline(b, 16, 4, 24, 8192, 10*MiB, 3, false)
 }
 
 // 7         145379675 ns/op          72.13 MB/s    37838318 B/op    20437 allocs/op
@@ -426,12 +498,29 @@ func BenchmarkWithSGA20x4x24x4096x20Mx4(b *testing.B) {
 
 // 4         294637462 ns/op          71.18 MB/s    56650320 B/op      74759 allocs/op
 
-func BenchmarkWithoutSGA20x4x24x4096x20Mx4(b *testing.B) {
-	benchmarkWithoutSGA(b, 20, 4, 24, 4096, 20*MiB, 4, false)
+func BenchmarkBaseline20x4x24x4096x20Mx4(b *testing.B) {
+	benchmarkBaseline(b, 20, 4, 24, 4096, 20*MiB, 4, false)
 }
 
 // 4         311492602 ns/op          67.33 MB/s    55941788 B/op    70832 allocs/op
+//---Remind that GCA only works when disknum >> k+m, and m > 1
+func BenchmarkWithGCA4x2x12x4096x10Mx1(b *testing.B) {
+	benchmarkWithGCA(b, 4, 2, 12, 4096, 10*MiB, 1, false)
+}
 
+// 5         235861312 ns/op          44.46 MB/s    48355374 B/op      60877 allocs/op
+func BenchmarkWithSGA4x2x12x4096x10Mx1(b *testing.B) {
+	benchmarkWithSGA(b, 4, 2, 12, 4096, 10*MiB, 1, false)
+}
+
+// 6         189287844 ns/op          55.40 MB/s    34046673 B/op      47319 allocs/op
+func BenchmarkBase4x2x12x4096x10Mx1(b *testing.B) {
+	benchmarkBaseline(b, 4, 2, 12, 4096, 10*MiB, 1, false)
+}
+
+// 6         187326403 ns/op          55.98 MB/s    33648053 B/op      38938 allocs/op
+
+// parallel tests
 func benchmarkSGAParallel(b *testing.B, dataShards, parityShards, diskNum int, blockSize, fileSize int64, failNum, conNum int, degrade bool) {
 	genTempDir()
 	testEC := &Erasure{

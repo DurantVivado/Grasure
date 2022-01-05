@@ -84,7 +84,7 @@ func (e *Erasure) SGA(fi *fileInfo, gca_enable bool) (loadBalancedScheme [][]int
 		}
 	}
 	failStripeVec := []int{}
-	for k, _ := range *failStripeSet {
+	for k := range *failStripeSet {
 		failStripeVec = append(failStripeVec, k)
 	}
 	sort.Ints(failStripeVec)
@@ -104,6 +104,7 @@ func (e *Erasure) SGA(fi *fileInfo, gca_enable bool) (loadBalancedScheme [][]int
 		sort.Ints(tempDiskLoad)
 		curMaxLoad := tempDiskLoad[maxload_idx]
 		maxRedu := 0
+		maxReduVec.Clear()
 		for i := 0; i < e.DiskNum; i++ {
 			if !failNodeSet.Exist(i) && !failReduList.Exist(i) && diskLoads[i] == curMaxLoad {
 				reduNum := len(diskDict[i])
