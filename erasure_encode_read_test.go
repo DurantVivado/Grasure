@@ -1144,31 +1144,69 @@ func benchmarkEncodeDecodeConstripe(b *testing.B, conStripe, dataShards, parityS
 }
 
 func BenchmarkEncodeDecode20x4x24x4096x20Mx2x50(b *testing.B) {
-	benchmarkEncodeDecodeConstripe(b, 50, 20, 4, 24, 4096, 20*MiB, 2, true)
+	benchmarkEncodeDecodeConstripe(b, 50, 20, 4, 24, 4096, 20*MiB, 2, false)
 }
 
 //6         192236068 ns/op         109.09 MB/s    49596322 B/op      61852 allocs/op
 
 func BenchmarkEncodeDecode20x4x24x4096x20Mx2x100(b *testing.B) {
-	benchmarkEncodeDecodeConstripe(b, 100, 20, 4, 24, 4096, 20*MiB, 2, true)
+	benchmarkEncodeDecodeConstripe(b, 100, 20, 4, 24, 4096, 20*MiB, 2, false)
 }
 
 // 5         208078144 ns/op         100.79 MB/s    54397798 B/op      61763 allocs/op
 
 func BenchmarkEncodeDecode20x4x24x4096x20Mx2x150(b *testing.B) {
-	benchmarkEncodeDecodeConstripe(b, 150, 20, 4, 24, 4096, 20*MiB, 2, true)
+	benchmarkEncodeDecodeConstripe(b, 150, 20, 4, 24, 4096, 20*MiB, 2, false)
 }
 
 // 6         190064891 ns/op         110.34 MB/s    57785693 B/op      61863 allocs/op
 
 func BenchmarkEncodeDecode20x4x24x4096x20Mx2x200(b *testing.B) {
-	benchmarkEncodeDecodeConstripe(b, 200, 20, 4, 24, 4096, 20*MiB, 2, true)
+	benchmarkEncodeDecodeConstripe(b, 200, 20, 4, 24, 4096, 20*MiB, 2, false)
 }
 
 // 6         201086254 ns/op         104.29 MB/s    71690058 B/op      61534 allocs/op
 
 func BenchmarkEncodeDecode20x4x24x4096x20Mx2x400(b *testing.B) {
-	benchmarkEncodeDecodeConstripe(b, 400, 20, 4, 24, 4096, 20*MiB, 2, true)
+	benchmarkEncodeDecodeConstripe(b, 400, 20, 4, 24, 4096, 20*MiB, 2, false)
 }
 
 // 6	 188624099 ns/op	 111.18 MB/s	88068084 B/op	   61723 allocs/op
+
+func BenchmarkEncodeDecode12x4x16x4096x10Mx2x1(b *testing.B) {
+	benchmarkEncodeDecodeConstripe(b, 1, 12, 4, 16, 4096, 10*MiB, 2, false)
+}
+
+// 8         146975893 ns/op          71.34 MB/s    24668448 B/op      33026 allocs/op
+
+func BenchmarkEncodeDecode12x4x16x4096x10Mx2x10(b *testing.B) {
+	benchmarkEncodeDecodeConstripe(b, 10, 12, 4, 16, 4096, 10*MiB, 2, false)
+}
+
+// 8         135243915 ns/op          77.53 MB/s    25510278 B/op      32915 allocs/op
+
+func BenchmarkEncodeDecode12x4x16x4096x10Mx2x50(b *testing.B) {
+	benchmarkEncodeDecodeConstripe(b, 50, 12, 4, 16, 4096, 10*MiB, 2, false)
+}
+
+//       10	 108872997 ns/op	  96.31 MB/s	29188593 B/op	   33150 allocs/op
+
+func BenchmarkEncodeDecode12x4x16x4096x10Mx2x100(b *testing.B) {
+	benchmarkEncodeDecodeConstripe(b, 100, 12, 4, 16, 4096, 10*MiB, 2, false)
+}
+
+// 10	 107138339 ns/op	  97.87 MB/s	34925734 B/op	   33191 allocs/op
+
+func BenchmarkEncodeDecode12x4x16x4096x10Mx2x150(b *testing.B) {
+	benchmarkEncodeDecodeConstripe(b, 150, 12, 4, 16, 4096, 10*MiB, 2, false)
+}
+
+// 10         108390984 ns/op          96.74 MB/s    37385000 B/op      33259 allocs/op
+
+func BenchmarkEncodeDecode12x4x16x4096x10Mx2x200(b *testing.B) {
+	benchmarkEncodeDecodeConstripe(b, 200, 12, 4, 16, 4096, 10*MiB, 2, false)
+}
+
+// 9         113679860 ns/op          92.24 MB/s    46519827 B/op      33543 allocs/op
+
+//how to sweep the variable paremeter to obtain optimal value

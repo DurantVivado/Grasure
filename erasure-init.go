@@ -83,6 +83,9 @@ func (e *Erasure) InitSystem(assume bool) error {
 	if e.DiskNum > len(e.diskInfos) {
 		return errDiskNumTooLarge
 	}
+	if e.ConStripes < 1 {
+		e.ConStripes = 1 //totally serialized
+	}
 	//replicate the config files
 
 	if e.ReplicateFactor < 1 {

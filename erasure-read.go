@@ -279,34 +279,34 @@ func (e *Erasure) ReadFile(filename string, savepath string, options *Options) e
 					if err != nil {
 						return err
 					}
-					//verify and reconstruct if broken
-					ok, err := e.enc.Verify(splitData)
+					//must be broken so verifying is needless
+					// ok, err := e.enc.Verify(splitData)
+					// if err != nil {
+					// 	return err
+					// }
+					// if !ok {
+
+					err = e.enc.ReconstructWithKBlocks(splitData,
+						&failList,
+						&fi.loadBalancedScheme[stripeNo],
+						&(fi.Distribution[stripeNo]),
+						options.Degrade)
 					if err != nil {
 						return err
 					}
-					if !ok {
-
-						err = e.enc.ReconstructWithKBlocks(splitData,
-							&failList,
-							&fi.loadBalancedScheme[stripeNo],
-							&(fi.Distribution[stripeNo]),
-							options.Degrade)
-						if err != nil {
-							return err
-						}
-						//----------------------------------------
-						tempCnt := 0
-						for _, disk := range fi.loadBalancedScheme[stripeNo] {
-							if _, ok := failList[disk]; !ok {
-								atomic.AddInt32(&diskLoads[disk], 1)
-								tempCnt++
-								if tempCnt >= e.K {
-									break
-								}
+					//----------------------------------------
+					tempCnt := 0
+					for _, disk := range fi.loadBalancedScheme[stripeNo] {
+						if _, ok := failList[disk]; !ok {
+							atomic.AddInt32(&diskLoads[disk], 1)
+							tempCnt++
+							if tempCnt >= e.K {
+								break
 							}
 						}
-						//---------------------------------------
 					}
+					//---------------------------------------
+					// }
 					//join and write to output file
 
 					for i := 0; i < e.K; i++ {

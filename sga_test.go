@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-//we fail certain number of disks
+//functionality tests
 func TestWithSGA(t *testing.T) {
 	//we generate temp data and encode it into real storage sytem
 	//after that, all temporary file should be deleted
@@ -16,7 +16,7 @@ func TestWithSGA(t *testing.T) {
 		ConfigFile:      "conf.json",
 		DiskFilePath:    testDiskFilePath,
 		ReplicateFactor: 3,
-		ConStripes:      100,
+		ConStripes:      1,
 		Override:        true,
 		Quiet:           true,
 	}
@@ -95,6 +95,93 @@ func TestWithSGA(t *testing.T) {
 
 //PASS
 
+func TestWithGCA(t *testing.T) {
+	//we generate temp data and encode it into real storage sytem
+	//after that, all temporary file should be deleted
+	genTempDir()
+	testEC := &Erasure{
+		ConfigFile:      "conf.json",
+		DiskFilePath:    testDiskFilePath,
+		ReplicateFactor: 3,
+		ConStripes:      1,
+		Override:        true,
+		Quiet:           true,
+	}
+	rand.Seed(100000007)
+	//since we focus on recovering, we do not necessarily have to generate a dozen of files
+	fileSize := int64(26269586)
+	defer deleteTempFiles([]int64{fileSize})
+	inpath := filepath.Join("input", fmt.Sprintf("temp-%d", fileSize))
+	outpath := filepath.Join("output", fmt.Sprintf("temp-%d", fileSize))
+	err = generateRandomFileBySize(inpath, fileSize)
+	if err != nil {
+		t.Fatal(err)
+	}
+	//1. read disk paths
+	err = testEC.ReadDiskPath()
+	if err != nil {
+		t.Fatal(err)
+	}
+	totalDisk := len(testEC.diskInfos)
+	// for each tuple (k,m,N,bs) we testify  encoding
+	// and decoding functions for numerous files
+	for _, k := range dataShards {
+		testEC.K = k
+		for _, m := range parityShards {
+			testEC.M = m
+			for N := k + m; N <= min(k+m+4, totalDisk); N++ {
+				testEC.DiskNum = N
+				for _, bs := range blockSizesV1 {
+					testEC.BlockSize = bs
+					err = testEC.InitSystem(true)
+					if err != nil {
+						t.Fatalf("k:%d,m:%d,bs:%d,N:%d,%s\n", k, m, bs, N, err.Error())
+					}
+					for failNum := 1; failNum <= testEC.M; failNum++ {
+						// log.Printf("----k:%d,m:%d,bs:%d,N:%d,fail:%d----\n", k, m, bs, N, failNum)
+
+						for _, disk := range testEC.diskInfos {
+							disk.available = true
+						}
+						err = testEC.ReadConfig()
+						if err != nil {
+							t.Errorf("k:%d,m:%d,bs:%d,N:%d,%s\n", k, m, bs, N, err.Error())
+						}
+						_, err := testEC.EncodeFile(inpath)
+						if err != nil {
+							t.Errorf("k:%d,m:%d,bs:%d,N:%d encode fails when fileSize is %d, for %s", k, m, bs, N, fileSize, err.Error())
+						}
+						err = testEC.WriteConfig()
+						if err != nil {
+							t.Errorf("k:%d,m:%d,bs:%d,N:%d,%s\n", k, m, bs, N, err.Error())
+						}
+						//Here we explicitly test single and multiple fault
+						testEC.Destroy(&SimOptions{
+							Mode:    "diskFail",
+							FailNum: failNum,
+						})
+						err = testEC.ReadFile(inpath, outpath, &Options{Degrade: false, WithSGA: true, WithGCA: true})
+						if err != nil {
+							t.Errorf("k:%d,m:%d,bs:%d,N:%d read fails when fileSize is %d, for %s", k, m, bs, N, fileSize, err.Error())
+						}
+
+						//evaluate the results
+						if ok, err := checkFileIfSame(inpath, outpath); !ok && err != nil {
+							t.Fatalf("k:%d,m:%d,bs:%d,N:%d read fails when fileSize is %d, for hash check fail", k, m, bs, N, fileSize)
+						} else if err != nil {
+							t.Fatalf("k:%d,m:%d,bs:%d,N:%d read fails when fileSize is %d, for %s", k, m, bs, N, fileSize, err.Error())
+						}
+					}
+
+				}
+			}
+		}
+	}
+
+}
+
+//PASS
+
 func TestWithoutSGA(t *testing.T) {
 	//we generate temp data and encode it into real storage sytem
 	//after that, all temporary file should be deleted
@@ -104,7 +191,7 @@ func TestWithoutSGA(t *testing.T) {
 		// fileMap:         make(map[string]*fileInfo),
 		DiskFilePath:    testDiskFilePath,
 		ReplicateFactor: 3,
-		ConStripes:      100,
+		ConStripes:      1,
 		Override:        true,
 		Quiet:           true,
 	}
@@ -182,77 +269,7 @@ func TestWithoutSGA(t *testing.T) {
 
 //PASS
 
-func benchmarkWithSGA(b *testing.B, dataShards, parityShards, diskNum int, blockSize, fileSize int64, failNum int, degrade bool) {
-	b.ResetTimer()
-	b.SetBytes(fileSize)
-	genTempDir()
-	testEC := &Erasure{
-		ConfigFile: "conf.json",
-		// fileMap:         make(map[string]*fileInfo),
-		DiskFilePath:    testDiskFilePath,
-		ReplicateFactor: 3,
-		ConStripes:      100,
-		Override:        true,
-		Quiet:           true,
-	}
-	rand.Seed(100000007)
-	defer deleteTempFiles([]int64{fileSize})
-	inpath := filepath.Join("input", fmt.Sprintf("temp-%d", fileSize))
-	outpath := filepath.Join("output", fmt.Sprintf("temp-%d", fileSize))
-	err = generateRandomFileBySize(inpath, fileSize)
-	if err != nil {
-		b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
-	}
-	//repeat b.N times
-	testEC.Destroy(&SimOptions{Mode: "diskFail", FailNum: failNum})
-	for i := 0; i < b.N; i++ {
-		err = testEC.ReadDiskPath()
-		if err != nil {
-			b.Fatal(err)
-		}
-		for j := 0; j < failNum; j++ {
-			testEC.diskInfos[j].available = false
-		}
-		// for each tuple (k,m,N,bs) we testify  encoding
-		// and decoding functions for numerous files
-		testEC.K = dataShards
-		testEC.M = parityShards
-		testEC.DiskNum = diskNum
-
-		testEC.BlockSize = blockSize
-		err = testEC.InitSystem(true)
-		if err != nil {
-			b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
-		}
-		// log.Printf("----k:%d,m:%d,bs:%d,N:%d----\n", k, m, bs, N)
-
-		err = testEC.ReadConfig()
-		if err != nil {
-			b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
-		}
-		_, err := testEC.EncodeFile(inpath)
-		if err != nil {
-			b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
-		}
-		err = testEC.WriteConfig()
-		if err != nil {
-			b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
-		}
-
-		err = testEC.ReadFile(inpath, outpath, &Options{Degrade: degrade, WithSGA: true})
-		if err != nil {
-			b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
-		}
-
-		//evaluate the results
-		if ok, err := checkFileIfSame(inpath, outpath); !ok && err != nil {
-			b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
-		} else if err != nil {
-			b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
-		}
-	}
-}
-
+//benchmark tests
 func benchmarkBaseline(b *testing.B, dataShards, parityShards, diskNum int, blockSize, fileSize int64, failNum int, degrade bool) {
 	b.ResetTimer()
 	b.SetBytes(fileSize)
@@ -262,53 +279,51 @@ func benchmarkBaseline(b *testing.B, dataShards, parityShards, diskNum int, bloc
 		// fileMap:         make(map[string]*fileInfo),
 		DiskFilePath:    testDiskFilePath,
 		ReplicateFactor: 3,
-		ConStripes:      100,
+		ConStripes:      1,
 		Override:        true,
 		Quiet:           true,
 	}
 	rand.Seed(100000007)
-	defer deleteTempFiles([]int64{fileSize})
+	//defer deleteTempFiles([]int64{fileSize})
 	inpath := filepath.Join("input", fmt.Sprintf("temp-%d", fileSize))
 	outpath := filepath.Join("output", fmt.Sprintf("temp-%d", fileSize))
 	err = generateRandomFileBySize(inpath, fileSize)
 	if err != nil {
 		b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
 	}
-	//repeat b.N times
-	testEC.Destroy(&SimOptions{Mode: "diskFail", FailNum: failNum})
+	err = testEC.ReadDiskPath()
+	if err != nil {
+		b.Fatal(err)
+	}
+	for j := 0; j < failNum; j++ {
+		testEC.diskInfos[j].available = false
+	}
+	// for each tuple (k,m,N,bs) we testify  encoding
+	// and decoding functions for numerous files
+	testEC.K = dataShards
+	testEC.M = parityShards
+	testEC.DiskNum = diskNum
+
+	testEC.BlockSize = blockSize
+	err = testEC.InitSystem(true)
+	if err != nil {
+		b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
+	}
+	err = testEC.ReadConfig()
+	if err != nil {
+		b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
+	}
+	_, err := testEC.EncodeFile(inpath)
+	if err != nil {
+		b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
+	}
+	err = testEC.WriteConfig()
+	if err != nil {
+		b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
+	}
 	for i := 0; i < b.N; i++ {
-		err = testEC.ReadDiskPath()
-		if err != nil {
-			b.Fatal(err)
-		}
-		for j := 0; j < failNum; j++ {
-			testEC.diskInfos[j].available = false
-		}
-		// for each tuple (k,m,N,bs) we testify  encoding
-		// and decoding functions for numerous files
-		testEC.K = dataShards
-		testEC.M = parityShards
-		testEC.DiskNum = diskNum
 
-		testEC.BlockSize = blockSize
-		err = testEC.InitSystem(true)
-		if err != nil {
-			b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
-		}
 		// log.Printf("----k:%d,m:%d,bs:%d,N:%d----\n", k, m, bs, N)
-
-		err = testEC.ReadConfig()
-		if err != nil {
-			b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
-		}
-		_, err := testEC.EncodeFile(inpath)
-		if err != nil {
-			b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
-		}
-		err = testEC.WriteConfig()
-		if err != nil {
-			b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
-		}
 
 		err = testEC.ReadFile(inpath, outpath, &Options{Degrade: degrade, WithSGA: false})
 		if err != nil {
@@ -316,11 +331,81 @@ func benchmarkBaseline(b *testing.B, dataShards, parityShards, diskNum int, bloc
 		}
 
 		//evaluate the results
-		if ok, err := checkFileIfSame(inpath, outpath); !ok && err != nil {
-			b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
-		} else if err != nil {
+		// if ok, err := checkFileIfSame(inpath, outpath); !ok && err != nil {
+		// 	b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
+		// } else if err != nil {
+		// 	b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
+		// }
+	}
+}
+
+func benchmarkWithSGA(b *testing.B, dataShards, parityShards, diskNum int, blockSize, fileSize int64, failNum int, degrade bool) {
+	b.ResetTimer()
+	b.SetBytes(fileSize)
+	genTempDir()
+	testEC := &Erasure{
+		ConfigFile: "conf.json",
+		// fileMap:         make(map[string]*fileInfo),
+		DiskFilePath:    testDiskFilePath,
+		ReplicateFactor: 3,
+		ConStripes:      1,
+		Override:        true,
+		Quiet:           true,
+	}
+	rand.Seed(100000007)
+	//defer deleteTempFiles([]int64{fileSize})
+	inpath := filepath.Join("input", fmt.Sprintf("temp-%d", fileSize))
+	outpath := filepath.Join("output", fmt.Sprintf("temp-%d", fileSize))
+	err = generateRandomFileBySize(inpath, fileSize)
+	if err != nil {
+		b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
+	}
+	err = testEC.ReadDiskPath()
+	if err != nil {
+		b.Fatal(err)
+	}
+	for j := 0; j < failNum; j++ {
+		testEC.diskInfos[j].available = false
+	}
+	// for each tuple (k,m,N,bs) we testify  encoding
+	// and decoding functions for numerous files
+	testEC.K = dataShards
+	testEC.M = parityShards
+	testEC.DiskNum = diskNum
+
+	testEC.BlockSize = blockSize
+	err = testEC.InitSystem(true)
+	if err != nil {
+		b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
+	}
+	err = testEC.ReadConfig()
+	if err != nil {
+		b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
+	}
+	_, err := testEC.EncodeFile(inpath)
+	if err != nil {
+		b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
+	}
+	err = testEC.WriteConfig()
+	if err != nil {
+		b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
+	}
+
+	for i := 0; i < b.N; i++ {
+
+		// log.Printf("----k:%d,m:%d,bs:%d,N:%d----\n", k, m, bs, N)
+
+		err = testEC.ReadFile(inpath, outpath, &Options{Degrade: degrade, WithSGA: true})
+		if err != nil {
 			b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
 		}
+
+		//evaluate the results
+		// if ok, err := checkFileIfSame(inpath, outpath); !ok && err != nil {
+		// 	b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
+		// } else if err != nil {
+		// 	b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
+		// }
 	}
 }
 
@@ -334,53 +419,51 @@ func benchmarkWithGCA(b *testing.B, dataShards, parityShards, diskNum int, block
 		// fileMap:         make(map[string]*fileInfo),
 		DiskFilePath:    testDiskFilePath,
 		ReplicateFactor: 3,
-		ConStripes:      100,
+		ConStripes:      1,
 		Override:        true,
 		Quiet:           true,
 	}
 	rand.Seed(100000007)
-	defer deleteTempFiles([]int64{fileSize})
+	//defer deleteTempFiles([]int64{fileSize})
 	inpath := filepath.Join("input", fmt.Sprintf("temp-%d", fileSize))
 	outpath := filepath.Join("output", fmt.Sprintf("temp-%d", fileSize))
 	err = generateRandomFileBySize(inpath, fileSize)
 	if err != nil {
 		b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
 	}
-	//repeat b.N times
-	testEC.Destroy(&SimOptions{Mode: "diskFail", FailNum: failNum})
+	err = testEC.ReadDiskPath()
+	if err != nil {
+		b.Fatal(err)
+	}
+	for j := 0; j < failNum; j++ {
+		testEC.diskInfos[j].available = false
+	}
+	// for each tuple (k,m,N,bs) we testify  encoding
+	// and decoding functions for numerous files
+	testEC.K = dataShards
+	testEC.M = parityShards
+	testEC.DiskNum = diskNum
+
+	testEC.BlockSize = blockSize
+	err = testEC.InitSystem(true)
+	if err != nil {
+		b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
+	}
+	err = testEC.ReadConfig()
+	if err != nil {
+		b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
+	}
+	_, err := testEC.EncodeFile(inpath)
+	if err != nil {
+		b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
+	}
+	err = testEC.WriteConfig()
+	if err != nil {
+		b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
+	}
 	for i := 0; i < b.N; i++ {
-		err = testEC.ReadDiskPath()
-		if err != nil {
-			b.Fatal(err)
-		}
-		for j := 0; j < failNum; j++ {
-			testEC.diskInfos[j].available = false
-		}
-		// for each tuple (k,m,N,bs) we testify  encoding
-		// and decoding functions for numerous files
-		testEC.K = dataShards
-		testEC.M = parityShards
-		testEC.DiskNum = diskNum
 
-		testEC.BlockSize = blockSize
-		err = testEC.InitSystem(true)
-		if err != nil {
-			b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
-		}
 		// log.Printf("----k:%d,m:%d,bs:%d,N:%d----\n", k, m, bs, N)
-
-		err = testEC.ReadConfig()
-		if err != nil {
-			b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
-		}
-		_, err := testEC.EncodeFile(inpath)
-		if err != nil {
-			b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
-		}
-		err = testEC.WriteConfig()
-		if err != nil {
-			b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
-		}
 
 		err = testEC.ReadFile(inpath, outpath, &Options{Degrade: degrade, WithSGA: true, WithGCA: true})
 		if err != nil {
@@ -388,11 +471,11 @@ func benchmarkWithGCA(b *testing.B, dataShards, parityShards, diskNum int, block
 		}
 
 		//evaluate the results
-		if ok, err := checkFileIfSame(inpath, outpath); !ok && err != nil {
-			b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
-		} else if err != nil {
-			b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
-		}
+		// if ok, err := checkFileIfSame(inpath, outpath); !ok && err != nil {
+		// 	b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
+		// } else if err != nil {
+		// 	b.Fatalf("k:%d,m:%d,bs:%d,N:%d,fs:%d, %s\n", dataShards, parityShards, blockSize, diskNum, fileSize, err.Error())
+		// }
 	}
 }
 
@@ -400,13 +483,13 @@ func BenchmarkWithSGA2x1x3x512x1M(b *testing.B) {
 	benchmarkWithSGA(b, 2, 1, 3, 512, 1*MiB, 1, false)
 }
 
-// 16          66340699 ns/op          15.81 MB/s     5867938 B/op      57544 allocs/op
+// 12          92156796 ns/op          11.38 MB/s     5630254 B/op      58242 allocs/op
 
 func BenchmarkBaseline2x1x3x512x1M(b *testing.B) {
 	benchmarkBaseline(b, 2, 1, 3, 512, 1*MiB, 1, false)
 }
 
-// 18          67493862 ns/op          15.54 MB/s     5340390 B/op   42610 allocs/op
+// 15          75593663 ns/op          13.87 MB/s     5097836 B/op      43303 allocs/op
 
 func BenchmarkWithSGA2x2x4x1024x1Mx2(b *testing.B) {
 	benchmarkWithSGA(b, 2, 2, 4, 1024, 1*MiB, 2, false)
@@ -503,22 +586,6 @@ func BenchmarkBaseline20x4x24x4096x20Mx4(b *testing.B) {
 }
 
 // 4         311492602 ns/op          67.33 MB/s    55941788 B/op    70832 allocs/op
-//---Remind that GCA only works when disknum >> k+m, and m > 1
-func BenchmarkWithGCA4x2x12x4096x10Mx1(b *testing.B) {
-	benchmarkWithGCA(b, 4, 2, 12, 4096, 10*MiB, 1, false)
-}
-
-// 5         235861312 ns/op          44.46 MB/s    48355374 B/op      60877 allocs/op
-func BenchmarkWithSGA4x2x12x4096x10Mx1(b *testing.B) {
-	benchmarkWithSGA(b, 4, 2, 12, 4096, 10*MiB, 1, false)
-}
-
-// 6         189287844 ns/op          55.40 MB/s    34046673 B/op      47319 allocs/op
-func BenchmarkBase4x2x12x4096x10Mx1(b *testing.B) {
-	benchmarkBaseline(b, 4, 2, 12, 4096, 10*MiB, 1, false)
-}
-
-// 6         187326403 ns/op          55.98 MB/s    33648053 B/op      38938 allocs/op
 
 // parallel tests
 func benchmarkSGAParallel(b *testing.B, dataShards, parityShards, diskNum int, blockSize, fileSize int64, failNum, conNum int, degrade bool) {
@@ -528,7 +595,7 @@ func benchmarkSGAParallel(b *testing.B, dataShards, parityShards, diskNum int, b
 		// fileMap:         make(map[string]*fileInfo),
 		DiskFilePath:    testDiskFilePath,
 		ReplicateFactor: 3,
-		ConStripes:      100,
+		ConStripes:      1,
 		Override:        true,
 		Quiet:           true,
 	}
@@ -614,7 +681,7 @@ func benchmarkNoSGAParallel(b *testing.B, dataShards, parityShards, diskNum int,
 		// fileMap:         make(map[string]*fileInfo),
 		DiskFilePath:    testDiskFilePath,
 		ReplicateFactor: 3,
-		ConStripes:      100,
+		ConStripes:      1,
 		Override:        true,
 		Quiet:           true,
 	}
@@ -716,3 +783,22 @@ func BenchmarkNoSGAParallel_4x2x6x1024x1Mx2x4(b *testing.B) {
 }
 
 // BenchmarkNoSGAParallel_4x2x6x1024x1Mx2x4-2            86          12129589 ns/op         345.79 MB/s     2830078 B/op     8895 allocs/op
+
+//---Remind that GCA only works when disknum >> k+m, and m > 1
+func BenchmarkWithGCA4x2x12x4096x10Mx1(b *testing.B) {
+	benchmarkWithGCA(b, 4, 2, 12, 4096, 10*MiB, 2, false)
+}
+
+// 10         192867288 ns/op          54.37 MB/s    40110038 B/op      53985 allocs/op
+
+func BenchmarkWithSGA4x2x12x4096x10Mx1(b *testing.B) {
+	benchmarkWithSGA(b, 4, 2, 12, 4096, 10*MiB, 2, false)
+}
+
+// 10         102548710 ns/op         102.25 MB/s    23277325 B/op      36158 allocs/op
+
+func BenchmarkBase4x2x12x4096x10Mx1(b *testing.B) {
+	benchmarkBaseline(b, 4, 2, 12, 4096, 10*MiB, 2, false)
+}
+
+// 10         109229141 ns/op          96.00 MB/s    22783136 B/op      24066 allocs/op
