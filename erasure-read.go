@@ -126,7 +126,7 @@ func (e *Erasure) ReadFile(filename string, savepath string, options *Options) e
 			s := s
 			stripeNo := stripeCnt + s
 			// offset := int64(subCnt) * e.allStripeSize
-			eg.Go(func() error {
+			func() error {
 				erg := e.errgroupPool.Get().(*errgroup.Group)
 				defer e.errgroupPool.Put(erg)
 				//read all blocks in parallel
@@ -224,7 +224,7 @@ func (e *Erasure) ReadFile(filename string, savepath string, options *Options) e
 					return err
 				}
 				return nil
-			})
+			}()
 
 		}
 		if err := eg.Wait(); err != nil {
