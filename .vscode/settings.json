@@ -12,7 +12,8 @@
             "-v",
             "-cpuprofile", "profiles/cpu.profile",
             "-memprofile",  "profiles/mem.profile",
-            "-blockprofile", "profiles/blk.profile"
+            "-blockprofile", "profiles/blk.profile",
+            "-benchtime","10x"
         ],
             
          "go.lintFlags": [],
