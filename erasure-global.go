@@ -105,6 +105,7 @@ type fileInfo struct {
 	Distribution  [][]int        `json:"fileDist"` //distribution forms a block->disk mapping
 	blockToOffset [][]int        //blockToOffset has the same row and column number as Distribution but points to the block offset relative to a disk.
 	blockInfos    [][]*blockInfo //block state, blkFail if it's bit-rotten
+	DistBit       []int64        // distribution bits of file
 	// metaInfo     *os.fileInfo //system-level file info
 }
 
