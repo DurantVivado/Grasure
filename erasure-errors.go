@@ -44,6 +44,10 @@ var errDiskNumTooLarge = errors.New("diskNum is larger than provided")
 
 var errTooFewBlockAliveInStripe = errors.New("not enough blocks for reading in a stripe")
 
+var errPartInfoNotFound = errors.New("partition info not found")
+
+var errIoStatNotFound = errors.New("io status await or svctm not found")
+
 // errUnexpected - unexpected error, requires manual intervention.
 var errUnexpected = storageErr("unexpected error, please report this issue at https://github.com/minio/minio/issues")
 

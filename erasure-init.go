@@ -425,13 +425,16 @@ func (e *Erasure) ReadDiskInfo() error {
 	for i := range e.diskInfos {
 		i := i
 		erg.Go(func() error {
-			// execute df first to get partition
+			// firstly, execute "df -h diskPath" to get partition
 			command := `df -h ` + e.diskInfos[i].diskPath
 			partInfo, err := execShell(command)
 			if err != nil {
 				return err
 			}
-			partName := parsePartition(string(partInfo[1]))
+			partName, err := parsePartition(string(partInfo))
+			if err != nil {
+				return err
+			}
 			e.diskInfos[i].partition = partName
 
 			return nil

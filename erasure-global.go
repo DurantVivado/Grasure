@@ -26,12 +26,13 @@ import (
 // }
 
 type diskInfo struct {
-	diskPath    string //the disk path
-	available   bool   //it's flag and when disk fails, it renders false.
-	numBlocks   int    //it tells how many blocks a disk holds
-	ifMetaExist bool   //it's a disk with meta file?
-	capacity    int64  //the capacity of a disk
-	partition   string //partition of disk path
+	diskPath     string  //the disk path
+	available    bool    //it's flag and when disk fails, it renders false.
+	numBlocks    int     //it tells how many blocks a disk holds
+	ifMetaExist  bool    //it's a disk with meta file?
+	capacity     int64   //the capacity of a disk
+	partition    string  //partition of disk path
+	queueLatency float64 //queue latency of a disk
 }
 
 type Erasure struct {

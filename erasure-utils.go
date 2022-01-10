@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"math/rand"
 	"os"
 	"os/exec"
@@ -236,48 +237,85 @@ func copyFile(srcFile, destFile string) (int64, error) {
 	return io.Copy(file2, file1)
 }
 
-func execShell(command string) ([][]byte, error) {
+func execShell(command string) ([]byte, error) {
 	cmd := exec.Command("/bin/bash", "-c", command)
 
 	stdout, err := cmd.StdoutPipe()
+	defer stdout.Close()
 	if err != nil {
 		fmt.Printf("Error:can not obtain stdout pipe for command:%s\n", err)
 		return nil, err
 	}
 
-	// execute command
 	if err := cmd.Start(); err != nil {
 		fmt.Println("Error:The command is err,", err)
 		return nil, err
 	}
 
-	outputBuf := bufio.NewReader(stdout)
-	res := make([][]byte, 0)
+	result, _ := ioutil.ReadAll(stdout)
 
-	for {
-		output, _, err := outputBuf.ReadLine()
-		if err != nil {
-			if err.Error() != "EOF" {
-				return nil, err
-			}
-			break
-		}
-		res = append(res, output)
+	if err := cmd.Wait(); err != nil {
+		fmt.Println("wait:", err.Error())
+		return nil, err
 	}
-	return res, nil
+	return result, nil
 }
 
-func parsePartition(partInfo string) string {
+func parsePartition(partInfo string) (string, error) {
 	if len(partInfo) == 0 {
-		return ""
+		return "", errPartInfoNotFound
 	}
-	res := make([]byte, 0)
-	for _, c := range partInfo {
-		if c != ' ' {
-			res = append(res, byte(c))
-		} else {
-			break
+
+	partInfo_array := strings.Split(partInfo, "\n")
+
+	partName := ""
+	for i, str := range partInfo_array {
+		if strings.Contains(str, "Filesystem") {
+			keys := strings.Fields(str)
+			values := strings.Fields(partInfo_array[i+1])
+			for j := range keys {
+				if keys[j] == "Filesystem" {
+					partName = values[j]
+				}
+			}
 		}
 	}
-	return string(res)
+	if partName == "" {
+		return "", errPartInfoNotFound
+	}
+	return partName, nil
+}
+
+func parseIoStat(iostat string) (float64, float64, error) {
+	if len(iostat) == 0 {
+		return 0, 0, errIoStatNotFound
+	}
+
+	iostat_arr := strings.Split(iostat, "\n")
+
+	await := -1.0
+	svctm := -1.0
+	flag := 0
+
+	for i, str := range iostat_arr {
+		if strings.Contains(str, "await") {
+			keys := strings.Fields(str)
+			values := strings.Fields(iostat_arr[i+1])
+
+			for j := range keys {
+				if keys[j] == "await" {
+					await, err = strconv.ParseFloat(values[j], 64)
+					flag++
+				} else if keys[j] == "svctm" {
+					svctm, err = strconv.ParseFloat(values[j], 64)
+					flag++
+				}
+			}
+		}
+	}
+
+	if flag < 2 {
+		return 0, 0, errIoStatNotFound
+	}
+	return await, svctm, nil
 }
