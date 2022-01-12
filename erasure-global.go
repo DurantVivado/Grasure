@@ -142,8 +142,6 @@ type blockInfo struct {
 type Options struct {
 	//Degrade tells if degrade read is on
 	Degrade bool
-	WithSGA bool
-	WithGCA bool
 }
 
 //SimOptions defines the parameters for simulation
