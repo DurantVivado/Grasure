@@ -2,7 +2,7 @@
 file=Goprogramming.pdf
 go build -o main ./main.go
 # init the system
-./main -md init -k 12 -m 4 -dn 24 -bs 4096
+./main -md init -k 12 -m 4 -dn 16 -bs 4096
 
 # to encode a file 
 ./main -md encode -f test/$file -conStripes 100 -o
