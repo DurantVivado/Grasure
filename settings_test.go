@@ -1,3 +1,6 @@
+// This exhibits the test file setups and parameters sets
+//
+
 package grasure
 
 import "path/filepath"
@@ -13,7 +16,8 @@ const (
 )
 
 var dataShards = []int{
-	2, 3, 4, 5, 6, 8, 9, 10, 12, 16, 18, 20,
+
+	2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
 }
 var parityShards = []int{
 	2, 3, 4,

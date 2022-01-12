@@ -1,8 +1,9 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/DurantVivado/Grasure.svg)](https://pkg.go.dev/github.com/DurantVivado/Grasure)
 # Grasure
 
-Go 中的通用擦除编码架构
-实现最流行的基于擦除的文件系统操作，它很容易使用并集成到其他文件系统中。
+[English](https://github.com/DurantVivado/Grasure/blob/master/README.md)|[简体中文](https://github.com/DurantVivado/Grasure/blob/master/README_Chinese.md)
+
+基于Go的通用纠删码实验框架，非常简单，高效，并且容易集成到其它任何文件系统。
 
 项目主页：https://github.com/DurantVivado/Grasure
 
@@ -34,8 +35,9 @@ Godoc：https://pkg.go.dev/github.com/DurantVivado/Grasure
 [reedsolomon 库](https://github.com/klauspost/reedsolomon)
 
 
-＃＃ 用法
-各种 CLI 用法的完整演示位于 `examples/buildAndRun.sh`。你可能会一瞥。
+## 用法
+
+各种 CLI 用法位于 `examples/buildAndRun.sh`。
 这里我们在目录`./examples`中详细说明以下步骤：
 
 0. 构建项目：
@@ -63,20 +65,20 @@ go build -o main ./main.go
 /home/server1/data/data16
 ``
 
-2. 初始化系统，你应该明确附加数据（k）和奇偶校验分片（m）的数量以及块大小（以字节为单位），记住k+m不能大于256。
+2. 初始化系统，你应该明确数据块（k）和校验块（m）的数量以及块大小（以字节为单位），记住k+m不能大于256。
 ``
 ./main -md init -k 12 -m 4 -bs 4096 -dn 16
 ``
-`bs` 是以字节为单位的块大小，`dn` 是你打算在 `.hdr.disks.path` 中使用的 diskNum。显然，为了容错目的，您应该保留一些磁盘。
+`bs` 是以字节为单位的块大小，`dn` 是你打算在 `.hdr.disks.path` 中使用的磁盘数量。显然，为了容错目的，您应该保留一些备份磁盘。
 
 3. 编码一个示例文件。
 ``
-./main -md encode -f {源文件路径} -conStripes 100 -o
+./main -md encode -f {source file path} -conStripes 100 -o
 ``
 
 4. 解码（读取）示例文件。
 ``
-./grasure -md read -f {源文件基名} -conStripes 100 -sp {目标文件路径}
+./grasure -md read -f {source file basename} -conStripes 100 -sp {destination file path}
 ``
 
 这里的“conStripes”表示允许同时操作的条带数量，默认值为 100。
@@ -87,10 +89,10 @@ go build -o main ./main.go
 5. 检查哈希字符串以查看编码/解码是否正确。
 
 ``
-sha256sum {源文件路径}
+sha256sum {source file path}
 ``
 ``
-sha256sum {目标文件路径}
+sha256sum {destination file path}
 ``
 
 6. 删除存储中的文件（目前不可逆，我们正在努力）：
@@ -106,67 +108,67 @@ sha256sum {目标文件路径}
 8. 恢复磁盘（例如故障磁盘中的所有文件 blob），并将其传输到备份磁盘。这变成了一项耗时的工作。
 之前的磁盘路径文件将重命名为`.hdr.disks.path.old`。新的磁盘配置路径将用冗余路径替换每个失败的路径。
 ``
-./main -md 恢复
+./main -md recover
 ``
 
 
 ## 存储系统结构
 我们使用 `tree` 命令显示存储系统的结构。如下图所示，每个`file`都被编码并分成`k`+`m`个部分，然后保存在`N`个磁盘中。每个名为“BLOB”的部分都放置在一个具有相同基本名称“file”的文件夹中。并且系统的元数据（例如，文件名、文件大小、文件哈希和文件分布）记录在 META 中。关于可靠性，我们复制了 `META` 文件 K-fold。（K 是大写的，不等于前面提到的 `k`）。它用作一般纠删码实验设置，并且很容易集成到其他系统中。
 它目前支持 `encode`、`read`、`update` 和更多即将推出的功能。
- ``
+ ```
  server1@ubuntu:~/data$ tree . -Rh
 .
-├── [4.0K] 数据1
-│ ├── [4.0K] Goprogramming.pdf
-│ │ └── [1.3M] BLOB
-│ └── [ 46K] META
-├── [4.0K] 数据10
-│ └── [4.0K] Goprogramming.pdf
-│ └── [1.4M] BLOB
-├── [4.0K] data11
-│ └── [4.0K] Goprogramming.pdf
-│ └── [1.4M] BLOB
-├── [4.0K] data12
-│ └── [4.0K] Goprogramming.pdf
-│ └── [1.4M] BLOB
-├── [4.0K] data13
-│ └── [4.0K] Goprogramming.pdf
-│ └── [1.4M] BLOB
-├── [4.0K] data14
-│ └── [4.0K] Goprogramming.pdf
-│ └── [1.4M] BLOB
-├── [4.0K] data15
-│ └── [4.0K] Goprogramming.pdf
-│ └── [1.4M] BLOB
-├── [4.0K] data16
-│ └── [4.0K] Goprogramming.pdf
-│ └── [1.4M] BLOB
-├── [4.0K] data17
-│ └── [4.0K] Goprogramming.pdf
-│ └── [1.4M] BLOB
-├── [4.0K] data18
-│ └── [4.0K] Goprogramming.pdf
-│ └── [1.4M] BLOB
-├── [4.0K] data19
-│ └── [4.0K] Goprogramming.pdf
-│ └── [1.4M] BLOB
-├── [4.0K] data2
-│ ├── [4.0K] Goprogramming.pdf
-│ │ └── [1.4M] BLOB
-│ └── [ 46K] META
-├── [4.0K] data20
-│ └── [4.0K] Goprogramming.pdf
-│ └── [1.5M] BLOB
-├── [4.0K] data21
-│ └── [4.0K] Goprogramming.pdf
-│ └── [1.4M] BLOB
-├── [4.0K] data22
-│ └── [4.0K] Goprogramming.pdf
-│ └── [1.3M] BLOB
-├── [4.0K] data23
-│ └── [4.0K] Goprogramming.pdf
-│ └── [1.4M] BLOB
-``
+├── [4.0K]  data1
+│   ├── [4.0K]  Goprogramming.pdf
+│   │   └── [1.3M]  BLOB
+│   └── [ 46K]  META
+├── [4.0K]  data10
+│   └── [4.0K]  Goprogramming.pdf
+│       └── [1.4M]  BLOB
+├── [4.0K]  data11
+│   └── [4.0K]  Goprogramming.pdf
+│       └── [1.4M]  BLOB
+├── [4.0K]  data12
+│   └── [4.0K]  Goprogramming.pdf
+│       └── [1.4M]  BLOB
+├── [4.0K]  data13
+│   └── [4.0K]  Goprogramming.pdf
+│       └── [1.4M]  BLOB
+├── [4.0K]  data14
+│   └── [4.0K]  Goprogramming.pdf
+│       └── [1.4M]  BLOB
+├── [4.0K]  data15
+│   └── [4.0K]  Goprogramming.pdf
+│       └── [1.4M]  BLOB
+├── [4.0K]  data16
+│   └── [4.0K]  Goprogramming.pdf
+│       └── [1.4M]  BLOB
+├── [4.0K]  data17
+│   └── [4.0K]  Goprogramming.pdf
+│       └── [1.4M]  BLOB
+├── [4.0K]  data18
+│   └── [4.0K]  Goprogramming.pdf
+│       └── [1.4M]  BLOB
+├── [4.0K]  data19
+│   └── [4.0K]  Goprogramming.pdf
+│       └── [1.4M]  BLOB
+├── [4.0K]  data2
+│   ├── [4.0K]  Goprogramming.pdf
+│   │   └── [1.4M]  BLOB
+│   └── [ 46K]  META
+├── [4.0K]  data20
+│   └── [4.0K]  Goprogramming.pdf
+│       └── [1.5M]  BLOB
+├── [4.0K]  data21
+│   └── [4.0K]  Goprogramming.pdf
+│       └── [1.4M]  BLOB
+├── [4.0K]  data22
+│   └── [4.0K]  Goprogramming.pdf
+│       └── [1.3M]  BLOB
+├── [4.0K]  data23
+│   └── [4.0K]  Goprogramming.pdf
+│       └── [1.4M]  BLOB
+```
 
 
 ## CLI 参数
@@ -182,7 +184,6 @@ sha256sum {目标文件路径}
 |savePath|本地保存路径（local path）|file.save|
 |newDataNum(new_k)|新的数据分片数|32|
 |newParityNum(new_m)|新的奇偶校验分片数|8|
-|recoveredDiskPath(rDP)|恢复磁盘的数据路径，默认为/tmp/restore| /tmp/恢复|
 |override(o)|是否覆盖之前的文件或目录，默认为false|false|
 |conWrites(cw)|是否开启并发写入，默认为false|false|
 |conReads(cr)|是否开启并发读取，默认为false|false|
@@ -195,6 +196,6 @@ sha256sum {目标文件路径}
 性能在测试文件中进行测试。
 
 ## 贡献
-项目遇到问题时请 fork 和 issue。
+请 fork 项目, 遇到问题时 issue。
 
 它也适用于发送至 [durantthorvals@gmail.com]() 的电子邮件。

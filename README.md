@@ -1,10 +1,7 @@
-This branch is for experimental purpose only, you should refer to master for igniting your own ideas. The author now focuses on accerlerating disk recovery using erasure codes. If you happen to be interested, feel free to issue your thoughts!😂
-
-
 [![Go Reference](https://pkg.go.dev/badge/github.com/DurantVivado/Grasure.svg)](https://pkg.go.dev/github.com/DurantVivado/Grasure) 
 # Grasure
 
-
+[English](https://github.com/DurantVivado/Grasure/blob/master/README.md)|[简体中文](https://github.com/DurantVivado/Grasure/blob/master/README_Chinese.md)
 
 Universal Erasure Coding Architecture in Go
 Implementing most popular erasured-based filesystem operations, it's readily used and integrated into other filesystems. 
