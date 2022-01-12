@@ -12,6 +12,9 @@ go build -o main ./main.go
 ./main -md read -f $file -fmd bitRot -fn 2 -conStripes 100 -sp output/$file
 # to remove a file
 # ./main -md delete -f $file
+# to destroy a disk
+
+# to recover a disk
 
 srchash=(`sha256sum test/$file|tr ' ' ' '`)
 dsthash=(`sha256sum output/$file|tr ' ' ' '`)

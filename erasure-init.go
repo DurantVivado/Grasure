@@ -28,6 +28,7 @@ func (e *Erasure) ReadDiskPath() error {
 	defer f.Close()
 	buf := bufio.NewReader(f)
 	e.diskInfos = make([]*diskInfo, 0)
+	var id int64 = 0
 	for {
 		line, _, err := buf.ReadLine()
 		if err == io.EOF {
@@ -49,8 +50,9 @@ func (e *Erasure) ReadDiskPath() error {
 		} else if err != nil {
 			return err
 		}
-		diskInfo := &diskInfo{diskPath: string(line), available: true, ifMetaExist: flag}
+		diskInfo := &diskInfo{diskId: id, diskPath: string(line), available: true, ifMetaExist: flag}
 		e.diskInfos = append(e.diskInfos, diskInfo)
+		id++
 	}
 	return nil
 }

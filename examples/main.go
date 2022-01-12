@@ -61,7 +61,7 @@ func main() {
 	failOnErr(mode, err)
 	err = erasure.ReadDiskInfo()
 	failOnErr(mode, err)
-	erasure.PrintDiskInfo()
+	// erasure.PrintDiskInfo()
 	switch mode {
 	case "init":
 		err = erasure.InitSystem(false)

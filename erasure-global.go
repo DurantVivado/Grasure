@@ -26,6 +26,7 @@ import (
 // }
 
 type diskInfo struct {
+	diskId       int64   // id of disk
 	diskPath     string  //the disk path
 	available    bool    //it's flag and when disk fails, it renders false.
 	numBlocks    int     //it tells how many blocks a disk holds
@@ -33,6 +34,7 @@ type diskInfo struct {
 	capacity     int64   //the capacity of a disk
 	partition    string  //partition of disk path
 	queueLatency float64 //queue latency of a disk
+	stripeIdList []int64 // fild id list: what files are on the disk
 }
 
 type Erasure struct {
@@ -69,9 +71,6 @@ type Erasure struct {
 	// the data plus parity stripe size, equal to (k+m)*bs
 	allStripeSize int64
 
-	// the number of stripes
-	stripeNum int64
-
 	// diskInfo lists
 	diskInfos []*diskInfo
 
@@ -80,6 +79,12 @@ type Erasure struct {
 
 	//file map
 	fileMap sync.Map
+
+	// the number of stripes
+	stripeNum int64
+
+	// stripeList
+	stripes []*stripeInfo
 
 	// the path of file recording all disks path
 	DiskFilePath string `json:"-"`
@@ -99,14 +104,24 @@ type Erasure struct {
 	// allBlobPool     sync.Pool                 // memory pool for conStripes stripe access
 }
 type fileInfo struct {
+	FildId        int64          `json:"fileId"`   // file id
 	FileName      string         `json:"fileName"` //file name
 	FileSize      int64          `json:"fileSize"` //file size
 	Hash          string         `json:"fileHash"` //hash value (SHA256 by default)
 	Distribution  [][]int        `json:"fileDist"` //distribution forms a block->disk mapping
 	blockToOffset [][]int        //blockToOffset has the same row and column number as Distribution but points to the block offset relative to a disk.
 	blockInfos    [][]*blockInfo //block state, blkFail if it's bit-rotten
-	DistBit       []int64        // distribution bits of file
 	// metaInfo     *os.fileInfo //system-level file info
+}
+
+type stripeInfo struct {
+	DistBit       *stripeDistBit
+	blockToOffset []int
+}
+
+type stripeDistBit struct {
+	num  int
+	dist []uint64
 }
 
 type blockStat uint8
@@ -125,6 +140,7 @@ const (
 	blkFail       blockStat = 1
 	tempFile                = "./test/file.temp"
 	maxGoroutines           = 10240
+	intBit                  = 64
 )
 
 //templates

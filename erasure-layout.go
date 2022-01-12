@@ -17,6 +17,26 @@ func (e *Erasure) generateLayout(fi *fileInfo) {
 			fi.blockToOffset[i][j] = countSum[diskId]
 			countSum[diskId]++
 		}
+	}
+	e.generateStripeInfo(fi)
+}
 
+func (e *Erasure) generateStripeInfo(fi *fileInfo) {
+	if fi == nil {
+		return
+	}
+	stripeNum := int(ceilFracInt64(fi.FileSize, e.dataStripeSize))
+	distNum := ceilFracInt(e.DiskNum, intBit)
+	for i := 0; i < stripeNum; i++ {
+		dist := fi.Distribution[i]
+		blockToOffset := fi.blockToOffset[i]
+		spDist := &stripeDistBit{num: distNum, dist: make([]uint64, distNum)}
+		for j := 0; j < e.K+e.M; j++ {
+			var mask uint64 = 1
+			mask <<= uint64(dist[j] % intBit)
+			spDist.dist[dist[j]/intBit] |= mask
+		}
+		spInfo := &stripeInfo{DistBit: spDist, blockToOffset: blockToOffset}
+		e.stripes = append(e.stripes, spInfo)
 	}
 }

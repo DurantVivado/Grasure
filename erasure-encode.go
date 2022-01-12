@@ -31,6 +31,7 @@ func (e *Erasure) EncodeFile(filename string) (*fileInfo, error) {
 	}
 	f.Seek(0, 0)
 	fi := &fileInfo{}
+	fi.FildId = int64(len(e.FileMeta))
 	fi.Hash = hashStr
 	fi.FileName = baseFileName
 	fileInfo, err := f.Stat()
