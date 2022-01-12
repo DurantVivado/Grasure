@@ -34,7 +34,7 @@ var errFileNotFound = errors.New("file not found")
 
 var errFailModeNotRecognized = errors.New("the fail mode is not recognizable, please specify in \"diskFail\" or \"bitRot\"")
 
-var errNegativeReplicateFactor = errors.New("the replicate factor MUST be non-negative")
+var errInvalidReplicateFactor = errors.New("the replicate factor MUST be non-negative")
 
 var errNotEnoughBackupForRecovery = errors.New("not enough disk for recovery, needs more backup devices")
 

@@ -158,7 +158,7 @@ func ExampleErasure_ReadFile_a() {
 		log.Fatal(err)
 	}
 	// read the file and save to savePath
-	err = erasure.ReadFile(filepath, savePath, false)
+	err = erasure.ReadFile(filepath, savePath, &grasure.Options{Degrade: false})
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -198,8 +198,8 @@ func ExampleErasure_ReadFile_b() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	erasure.Destroy("diskFail", 2, "")
-	err = erasure.ReadFile(filepath, savePath, false)
+	erasure.Destroy(&grasure.SimOptions{Mode: "diskFail", FailNum: 2})
+	err = erasure.ReadFile(filepath, savePath, &grasure.Options{})
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -271,8 +271,8 @@ func ExampleErasure_Recover() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	erasure.Destroy("diskFail", 2, "")
-	_, err = erasure.Recover()
+	erasure.Destroy(&grasure.SimOptions{Mode: "diskFail", FailNum: 2})
+	_, err = erasure.Recover(&grasure.Options{})
 	if err != nil {
 		log.Fatal(err)
 	}

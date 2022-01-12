@@ -15,7 +15,7 @@ import (
 //
 //In case of any failure within fault tolerance, the file will be decoded first.
 //`degrade` indicates whether degraded read is enabled.
-func (e *Erasure) ReadFile(filename string, savepath string, degrade bool) error {
+func (e *Erasure) ReadFile(filename string, savepath string, options *Options) error {
 	baseFileName := filepath.Base(filename)
 	intFi, ok := e.fileMap.Load(baseFileName)
 	if !ok {
@@ -147,7 +147,7 @@ func (e *Erasure) ReadFile(filename string, savepath string, degrade bool) error
 					err = e.enc.ReconstructWithList(splitData,
 						&failList,
 						&(fi.Distribution[stripeNo]),
-						degrade)
+						options.Degrade)
 
 					// err = e.enc.ReconstructWithKBlocks(splitData,
 					// 	&failList,
@@ -185,7 +185,7 @@ func (e *Erasure) ReadFile(filename string, savepath string, degrade bool) error
 				if err := erg.Wait(); err != nil {
 					return err
 				}
-				return err
+				return nil
 			})
 
 		}

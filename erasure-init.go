@@ -83,10 +83,13 @@ func (e *Erasure) InitSystem(assume bool) error {
 	if e.DiskNum > len(e.diskInfos) {
 		return errDiskNumTooLarge
 	}
+	if e.ConStripes < 1 {
+		e.ConStripes = 1 //totally serialized
+	}
 	//replicate the config files
 
 	if e.ReplicateFactor < 1 {
-		return errNegativeReplicateFactor
+		return errInvalidReplicateFactor
 	}
 	err = e.resetSystem()
 	if err != nil {
@@ -294,7 +297,7 @@ func (e *Erasure) WriteConfig() error {
 		return err
 	}
 	buf.Flush()
-	f.Sync()
+	// f.Sync()
 	err = e.updateConfigReplica()
 	if err != nil {
 		return err

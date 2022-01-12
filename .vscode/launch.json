@@ -26,22 +26,14 @@
                         // "-f","test/Goprogramming.pdf",
                         // "-conStripes","100",
                         // "-o"
-                        // "-md","encode", 
-                        // "-f","test/LICENSE.txt",
-                        // "-conStripes","100",
-                        // "-o"
                         
                         //read mode, just input basename of file
                         "-md","read", 
                         "-f","Goprogramming.pdf",
                         "-conStripes","100",
                         "-fmd","diskFail",
-                        "-fn","1",
+                        "-fd","0",
                         "-sp","output/Goprogramming.pdf",
-                        // "-md","read", 
-                        // "-f","file.128",
-                        // "-conStripes","100",
-                        // "-sp","output/file.128"
 
                         //update mode
                         // "-md","update", 

@@ -9,7 +9,7 @@ go build -o main ./main.go
 # to update a file
 # ./main -md update -f $file -nf test/$file
 # to read a file
-./main -md read -f $file -fmd bitRot -fn 1 -conStripes 100 -sp output/$file
+./main -md read -f $file -fmd diskFail -fn 2 -conStripes 100 -sp output/$file
 # to remove a file
 # ./main -md delete -f $file
 
