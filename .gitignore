@@ -19,4 +19,4 @@ examples/*.old
 examples/conf.json
 examples/main.json
 examples/*.pprof
-profiles/*.pprof
+profiles/*
