@@ -6,6 +6,7 @@ file.save
 cmd/
 input/
 output/
+sga*.go
 grasure
 __debug_bin
 conf.json
@@ -18,4 +19,4 @@ examples/*.old
 examples/conf.json
 examples/main.json
 examples/*.pprof
-profiles/*.pprof
+profiles/*

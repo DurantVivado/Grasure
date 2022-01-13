@@ -2,7 +2,7 @@ package grasure
 
 import "github.com/DurantVivado/reedsolomon"
 
-//Scale expands the storage system to a new k and new m, for example,
+// Scale expands the storage system to a new k and new m, for example,
 // Start with a (2,1) system but with more data flouring into, the system needs to be scaled to
 // a larger system, say (6,4).
 //
@@ -25,9 +25,8 @@ func (e *Erasure) Scale(new_k, new_m int) error {
 		return nil
 	}
 	//step 1: modify the struct
-
 	//step 2: migrate data as well as replicas
-	//step 3: reorganize layout to conform to randomized distribution
+	//step 3: reorganize layout to conform to randomized distribution (other forms applies)
 	//step 4: write the new config and update replicas
 	return nil
 }

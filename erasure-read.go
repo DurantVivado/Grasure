@@ -15,7 +15,7 @@ import (
 //
 //In case of any failure within fault tolerance, the file will be decoded first.
 //`degrade` indicates whether degraded read is enabled.
-func (e *Erasure) ReadFile(filename string, savepath string, degrade bool) error {
+func (e *Erasure) ReadFile(filename string, savepath string, options *Options) error {
 	baseFileName := filepath.Base(filename)
 	intFi, ok := e.fileMap.Load(baseFileName)
 	if !ok {
@@ -89,14 +89,6 @@ func (e *Erasure) ReadFile(filename string, savepath string, degrade bool) error
 	numBlob := ceilFracInt(stripeNum, e.ConStripes)
 	stripeCnt := 0
 	nextStripe := 0
-	//allocate stripe-size pool if and only if needed
-	// e.allBlobPool.New = func() interface{} {
-	// 	out := make([][]byte, e.ConStripes)
-	// 	for i := range out {
-	// 		out[i] = make([]byte, e.allStripeSize)
-	// 	}
-	// 	return &out
-	// }
 	for blob := 0; blob < numBlob; blob++ {
 		if stripeCnt+e.ConStripes > stripeNum {
 			nextStripe = stripeNum - stripeCnt
@@ -105,7 +97,6 @@ func (e *Erasure) ReadFile(filename string, savepath string, degrade bool) error
 		}
 		eg := e.errgroupPool.Get().(*errgroup.Group)
 		blobBuf := makeArr2DByte(e.ConStripes, int(e.allStripeSize))
-		// blobBuf := *e.allBlobPool.Get().(*[][]byte)
 		for s := 0; s < nextStripe; s++ {
 			s := s
 			stripeNo := stripeCnt + s
@@ -146,14 +137,23 @@ func (e *Erasure) ReadFile(filename string, savepath string, degrade bool) error
 				if err != nil {
 					return err
 				}
-				//verify and reconstruct
+				//verify and reconstruct if broken
 				ok, err := e.enc.Verify(splitData)
 				if err != nil {
 					return err
 				}
 				if !ok {
 					// fmt.Println("reconstruct data of stripe:", stripeNo)
-					err = e.enc.ReconstructWithList(splitData, &failList, &(fi.Distribution[stripeNo]), degrade)
+					err = e.enc.ReconstructWithList(splitData,
+						&failList,
+						&(fi.Distribution[stripeNo]),
+						options.Degrade)
+
+					// err = e.enc.ReconstructWithKBlocks(splitData,
+					// 	&failList,
+					// 	&loadBalancedScheme[stripeNo],
+					// 	&(fi.Distribution[stripeNo]),
+					// 	degrade)
 					if err != nil {
 						return err
 					}
@@ -185,11 +185,10 @@ func (e *Erasure) ReadFile(filename string, savepath string, degrade bool) error
 				if err := erg.Wait(); err != nil {
 					return err
 				}
-				return err
+				return nil
 			})
 
 		}
-		// e.allBlobPool.Put(&blobBuf)
 		if err := eg.Wait(); err != nil {
 			return err
 		}

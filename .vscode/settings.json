@@ -10,9 +10,11 @@
         "go.testTimeout": "7200s",
         "go.testFlags": [
             "-v",
-            "-cpuprofile", "profiles/cpu.profile",
-            "-memprofile",  "profiles/mem.profile",
-            "-blockprofile", "profiles/blk.profile"
+            "-cpuprofile", "profiles/cpuGCA.profile",
+            "-memprofile",  "profiles/memGCA.profile",
+            "-blockprofile", "profiles/blkGCA.profile",
+            // "-coverprofile", "profiles/cover.out",
+            "-benchtime=10x"
         ],
             
          "go.lintFlags": [],

@@ -1,7 +1,5 @@
-github.com/DurantVivado/reedsolomon v0.0.2 h1:c06A+Xkd5cMX+cXWRt8sOajWLtu5CHTFeedecKnxf8M=
-github.com/DurantVivado/reedsolomon v0.0.2/go.mod h1:mL9q9lpLK6GB3oTRDLyza88qqvW6xUlFZHvDrBExMds=
-github.com/go-ole/go-ole v1.2.6 h1:/Fpf6oFPoeFik9ty7siob0G6Ke8QvQEuVcuChpwXzpY=
-github.com/go-ole/go-ole v1.2.6/go.mod h1:pprOEPIfldk/42T2oK7lQ4v4JSDwmV0As9GaiUsvbm0=
+github.com/DurantVivado/reedsolomon v0.0.3 h1:FOOHvWCRh8yQUA2zm3puumkrzhuN33eOjMkErZGNNZ4=
+github.com/DurantVivado/reedsolomon v0.0.3/go.mod h1:mL9q9lpLK6GB3oTRDLyza88qqvW6xUlFZHvDrBExMds=
 github.com/klauspost/cpuid/v2 v2.0.9 h1:lgaqFMSdTdQYdZ04uHyN2d/eKdOMyi2YLSvlQIBFYa4=
 github.com/klauspost/cpuid/v2 v2.0.9/go.mod h1:FInQzS24/EEf25PyTYn52gqo7WaD8xa0213Md/qVLRg=
 github.com/pkg/profile v1.6.0 h1:hUDfIISABYI59DyeB3OTay/HxSRwTQ8rB/H83k6r5dM=

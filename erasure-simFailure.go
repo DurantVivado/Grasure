@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"log"
 	"path/filepath"
+	"strconv"
+	"strings"
 )
 
 //the proportion of stripe where bitrot occurs of all stripes
@@ -17,17 +19,26 @@ const stripeFailProportion = 0.3
 //
 // Since it's a simulation, no real data will be lost.
 // Note that failNum = min(failNum, DiskNum).
-func (e *Erasure) Destroy(mode string, failNum int, fileName string) {
+func (e *Erasure) Destroy(simOption *SimOptions) {
 	//if disk is currently unhealthy then give up
 	if !e.isDiskHealthy() {
 		return
 	}
-	if mode == "diskFail" {
-		if failNum <= 0 {
+	//if failDisk is specialized, then use that
+	if simOption.FailDisk != "" {
+		disks := strings.Split(simOption.FailDisk, ",")
+		for _, d := range disks {
+			dd, _ := strconv.Atoi(d)
+			e.diskInfos[dd].available = false
+		}
+		return
+	}
+	if simOption.Mode == "diskFail" || simOption.Mode == "DiskFail" {
+		if simOption.FailNum <= 0 {
 			return
 		}
-		if failNum > e.DiskNum {
-			failNum = e.DiskNum
+		if simOption.FailNum > e.DiskNum {
+			simOption.FailNum = e.DiskNum
 		}
 
 		//we randomly picked up failNum disks and mark as unavailable
@@ -36,21 +47,21 @@ func (e *Erasure) Destroy(mode string, failNum int, fileName string) {
 		}
 
 		shuff := genRandomArr(e.DiskNum, 0)
-		for i := 0; i < failNum; i++ {
+		for i := 0; i < simOption.FailNum; i++ {
 
 			if !e.Quiet {
 				log.Println(e.diskInfos[shuff[i]].diskPath)
 			}
 			e.diskInfos[shuff[i]].available = false
 		}
-	} else if mode == "bitRot" {
+	} else if simOption.Mode == "bitRot" || simOption.Mode == "BitRot" {
 		//in thi smode, we don't really corrupt a bit. Instead, we mark the block containing rots as failed
 		// which is omnipresent is today's storage facilities.
 		//if fileName is "", we corrupt all the files, else corrupt specific file
-		if failNum > e.K+e.M {
-			failNum = e.K + e.M
+		if simOption.FailNum > e.K+e.M {
+			simOption.FailNum = e.K + e.M
 		}
-		if fileName == "" {
+		if simOption.FileName == "" {
 			e.fileMap.Range(func(filename, fi interface{}) bool {
 				fd := fi.(*fileInfo)
 				//of course the bitrot must be random, and pesudo-random
@@ -59,14 +70,14 @@ func (e *Erasure) Destroy(mode string, failNum int, fileName string) {
 				stripeFail := int(stripeFailProportion * float32(stripeNum))
 				for i := range genRandomArr(stripeNum, 0)[:stripeFail] {
 
-					for j := range genRandomArr(e.K+e.M, 0)[:failNum] {
+					for j := range genRandomArr(e.K+e.M, 0)[:simOption.FailNum] {
 						fd.blockInfos[i][j].bstat = blkFail
 					}
 				}
 				return true
 			})
 		} else {
-			baseFileName := filepath.Base(fileName)
+			baseFileName := filepath.Base(simOption.FileName)
 			intFi, ok := e.fileMap.Load(baseFileName)
 			if !ok {
 				log.Fatal(errFileNotFound)
@@ -74,13 +85,13 @@ func (e *Erasure) Destroy(mode string, failNum int, fileName string) {
 			fi := intFi.(*fileInfo)
 
 			//of course the bitrot must be random, and pesudo-random
-			//algorithms have flaws. For every stripe, we corrupt failNum blocks
+			//algorithms have flaws. For every stripe, we corrupt simOption.FailNum blocks
 			stripeNum := len(fi.blockInfos)
 			stripeFail := int(stripeFailProportion * float32(stripeNum))
 			strps := genRandomArr(stripeNum, 0)[:stripeFail]
 			for _, i := range strps {
 
-				blks := genRandomArr(e.K+e.M, 0)[:failNum]
+				blks := genRandomArr(e.K+e.M, 0)[:simOption.FailNum]
 				for _, j := range blks {
 					// fmt.Printf("i:%d, j :%d fails.\n", i, j)
 					fi.blockInfos[i][j].bstat = blkFail

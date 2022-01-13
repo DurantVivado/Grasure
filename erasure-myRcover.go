@@ -1,3 +1,3 @@
 package grasure
 
-func RecoverWithStripe()
+// func RecoverWithStripe()

@@ -133,7 +133,7 @@ func ExampleErasure_EncodeFile() {
 }
 
 //A canonical example of how to read a file normally from the system
-func ExampleErasure_ReadFile_1() {
+func ExampleErasure_ReadFile_a() {
 	filepath := "example.file"
 	savePath := "example.file.decode"
 	erasure := &grasure.Erasure{
@@ -158,7 +158,7 @@ func ExampleErasure_ReadFile_1() {
 		log.Fatal(err)
 	}
 	// read the file and save to savePath
-	err = erasure.ReadFile(filepath, savePath, false)
+	err = erasure.ReadFile(filepath, savePath, &grasure.Options{Degrade: false})
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -174,7 +174,7 @@ func ExampleErasure_ReadFile_1() {
 }
 
 //A heuristical example on read file in case of double failure
-func ExampleErasure_ReadFile_2() {
+func ExampleErasure_ReadFile_b() {
 	filepath := "example.file"
 	savePath := "example.file.decode"
 	erasure := &grasure.Erasure{
@@ -198,8 +198,8 @@ func ExampleErasure_ReadFile_2() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	erasure.Destroy("diskFail", 2, "")
-	err = erasure.ReadFile(filepath, savePath, false)
+	erasure.Destroy(&grasure.SimOptions{Mode: "diskFail", FailNum: 2})
+	err = erasure.ReadFile(filepath, savePath, &grasure.Options{})
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -271,8 +271,8 @@ func ExampleErasure_Recover() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	erasure.Destroy("diskFail", 2, "")
-	_, err = erasure.Recover()
+	erasure.Destroy(&grasure.SimOptions{Mode: "diskFail", FailNum: 2})
+	_, err = erasure.Recover(&grasure.Options{})
 	if err != nil {
 		log.Fatal(err)
 	}
