@@ -36,7 +36,21 @@ func (e *Erasure) generateStripeInfo(fi *fileInfo) {
 			mask <<= uint64(dist[j] % intBit)
 			spDist.dist[dist[j]/intBit] |= mask
 		}
-		spInfo := &stripeInfo{DistBit: spDist, blockToOffset: blockToOffset}
+		spInfo := &stripeInfo{stripeId: e.stripeNum + int64(i), DistBit: spDist, blockToOffset: blockToOffset}
 		e.stripes = append(e.stripes, spInfo)
 	}
+}
+
+func (e *Erasure) bitToDist(bit *stripeDistBit) []int {
+	dist := make([]int, e.K+e.M)
+	for i := 0; i < bit.num; i++ {
+		var mask uint64 = 1
+		for mask/2 < 63 {
+			if bit.dist[i]&mask == 1 {
+				dist = append(dist, i*intBit+int(mask/2))
+			}
+			mask <<= 1
+		}
+	}
+	return dist
 }

@@ -109,6 +109,18 @@ func main() {
 		})
 		_, err = erasure.Recover(&grasure.Options{})
 		failOnErr(mode, err)
+	case "rws":
+		// recover with stripe
+		err = erasure.ReadConfig()
+		failOnErr(mode, err)
+		erasure.Destroy(&grasure.SimOptions{
+			Mode:     failMode,
+			FailNum:  failNum,
+			FailDisk: failDisk,
+			FileName: filePath,
+		})
+		_, err = erasure.RecoverWithStripe(filePath, &grasure.Options{})
+		failOnErr(mode, err)
 
 	// case "scale":
 	// 	//scaling the system, ALERT: this is a system-level operation and irreversible

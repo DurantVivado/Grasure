@@ -129,6 +129,7 @@ func (e *Erasure) EncodeFile(filename string) (*fileInfo, error) {
 				for i := 0; i < e.K+e.M; i++ {
 					i := i
 					diskId := randDist[i]
+					e.diskInfos[diskId].stripeInDisk = append(e.diskInfos[diskId].stripeInDisk, e.stripeNum+int64(stripeCnt+s))
 					erg.Go(func() error {
 						offset := fi.blockToOffset[stripeCnt+s][i]
 						_, err := of[diskId].WriteAt(encodeData[i], int64(offset)*e.BlockSize)
@@ -171,6 +172,10 @@ func (e *Erasure) EncodeFile(filename string) (*fileInfo, error) {
 	if !e.Quiet {
 		log.Println(baseFileName, " successfully encoded. encoding size ",
 			e.stripedFileSize(fileSize), "bytes")
+	}
+	for i := range e.diskInfos {
+		fmt.Println(e.diskInfos[i].diskPath)
+		fmt.Println(len(e.diskInfos[i].stripeInDisk))
 	}
 	return fi, nil
 }

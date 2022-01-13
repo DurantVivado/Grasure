@@ -50,7 +50,10 @@ type diskInfo struct {
 	partition string
 
 	// the latency of a disk
-	latency int64
+	latency float64
+
+	// stripe id
+	stripeInDisk []int64
 }
 
 //Erasure is the critical erasure coding structure
@@ -123,7 +126,7 @@ type Erasure struct {
 //fileInfo defines the file-level information,
 //it's concurrently safe
 type fileInfo struct {
-	// fild ID
+	//fild ID
 	FileId int64 `json:"fileId"`
 
 	//file name
@@ -152,6 +155,7 @@ type fileInfo struct {
 }
 
 type stripeInfo struct {
+	stripeId      int64
 	DistBit       *stripeDistBit
 	blockToOffset []int
 }

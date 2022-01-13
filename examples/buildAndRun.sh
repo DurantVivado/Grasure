@@ -1,23 +1,23 @@
 #!/bin/bash
-file=LICENSE
+file=testfile_1G.txt
 go build -o main ./main.go
 # init the system
-./main -md init -k 12 -m 4 -dn 16 -bs 4096
+# ./main -md init -k 12 -m 4 -dn 16 -bs 4096
 
 # to encode a file 
-./main -md encode -f test/$file -conStripes 100 -o
+# ./main -md encode -f ~/input/$file -conStripes 100 -o
 # to update a file
 # ./main -md update -f $file -nf test/$file
 # to read a file
-./main -md read -f $file -fmd diskFail -fn 2 -conStripes 100 -sp output/$file
+# ./main -md read -f $file -conStripes 100 -sp ~/output/$file
 # to remove a file
 # ./main -md delete -f $file
-# to destroy a disk
-
 # to recover a disk
+# ./main -md recover -fmd diskFail -fn 1
+./main -md rws -fmd diskFail -fn 1 -f ~/input/$file
 
-srchash=(`sha256sum test/$file|tr ' ' ' '`)
-dsthash=(`sha256sum output/$file|tr ' ' ' '`)
+srchash=(`sha256sum ~/input/$file|tr ' ' ' '`)
+dsthash=(`sha256sum ~/output/$file|tr ' ' ' '`)
 echo $srchash
 echo $dsthash
 if [ $srchash == $dsthash ];then 
