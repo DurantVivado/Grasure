@@ -245,7 +245,7 @@ func (e *Erasure) Update(oldFile, newFile string) error {
 						erg.Go(func() error {
 							a := i
 							diskID := fi.Distribution[stripeNo][a]
-							sn := e.stripeNum - (int64(newStripeNum) - int64(oldStripeNum))
+							sn := e.StripeNum - (int64(newStripeNum) - int64(oldStripeNum))
 							e.diskInfos[diskID].stripeInDisk = append(e.diskInfos[diskID].stripeInDisk, sn+int64(stripeNo))
 							writeOffset := fi.blockToOffset[stripeNo][a]
 							_, err := ifs[diskID].WriteAt(newData[a], int64(writeOffset)*e.BlockSize)
@@ -298,7 +298,7 @@ func compareStripe(oldStripe, newStripe [][]byte) ([]int, error) {
 func adjustDist(e *Erasure, fi *fileInfo, oldStripeNum, newStripeNum int) {
 	countSum := make([]int, e.DiskNum)
 	if newStripeNum > oldStripeNum {
-		e.stripeNum += (int64(newStripeNum) - int64(oldStripeNum))
+		e.StripeNum += (int64(newStripeNum) - int64(oldStripeNum))
 		for i := 0; i < newStripeNum-oldStripeNum; i++ {
 			fi.Distribution = append(fi.Distribution, make([]int, e.K+e.M))
 			fi.blockToOffset = append(fi.blockToOffset, make([]int, e.K+e.M))
@@ -318,7 +318,7 @@ func adjustDist(e *Erasure, fi *fileInfo, oldStripeNum, newStripeNum int) {
 			}
 		}
 	} else {
-		e.stripeNum -= (int64(oldStripeNum) - int64(newStripeNum))
+		e.StripeNum -= (int64(oldStripeNum) - int64(newStripeNum))
 		fi.Distribution = fi.Distribution[0:newStripeNum]
 		fi.blockToOffset = fi.blockToOffset[0:newStripeNum]
 	}

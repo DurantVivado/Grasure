@@ -12,14 +12,17 @@ import (
 )
 
 func (e *Erasure) RecoverWithStripe(fileName string, options *Options) (map[string]string, error) {
-	var failDisk int
+	var failDisk int = 0
+	for i := 0; i < e.DiskNum; i++ {
+		fmt.Println(len(e.diskInfos[i].stripeInDisk))
+	}
 	for i := range e.diskInfos {
 		if !e.diskInfos[i].available {
 			failDisk = i
 			break
 		}
 	}
-	fmt.Println(failDisk)
+	// fmt.Println(failDisk)
 	if !e.Quiet {
 		log.Printf("Start recovering with stripe, totally %d stripes need recovery",
 			len(e.diskInfos[failDisk].stripeInDisk))
@@ -127,13 +130,13 @@ func (e *Erasure) RecoverWithStripe(fileName string, options *Options) (map[stri
 			s := s
 			stripeNo := stripeCnt + s
 			spId := stripes[stripeNo]
-			spInfo := e.stripes[spId]
+			spInfo := e.Stripes[spId]
 			eg.Go(func() error {
 				eg := e.errgroupPool.Get().(*errgroup.Group)
 				defer e.errgroupPool.Put(erg)
 				// get dist and blockToOffset by stripeNo
-				dist := e.bitToDist(spInfo.DistBit)
-				blockToOffset := spInfo.blockToOffset
+				dist := e.bitToDist(spInfo.DistBit, spInfo.DistNum)
+				blockToOffset := spInfo.BlockToOffset
 				// read blocks in parallel
 				for i := 0; i < e.K+e.M; i++ {
 					i := i

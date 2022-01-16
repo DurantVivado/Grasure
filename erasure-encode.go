@@ -97,6 +97,11 @@ func (e *Erasure) EncodeFile(filename string) (*fileInfo, error) {
 	//all described in erasure-layout.go
 
 	e.generateLayout(fi)
+	e.generateStripeInfo(fi)
+	// for i := 0; i < len(e.Stripes); i++ {
+	// 	fmt.Printf("%b\n", e.Stripes[i].DistBit.dist)
+	// 	fmt.Println(e.Stripes[i].blockToOffset)
+	// }
 	blobBuf := makeArr2DByte(e.ConStripes, int(e.dataStripeSize))
 	for blob := 0; blob < numBlob; blob++ {
 		if stripeCnt+e.ConStripes > stripeNum {
@@ -129,7 +134,7 @@ func (e *Erasure) EncodeFile(filename string) (*fileInfo, error) {
 				for i := 0; i < e.K+e.M; i++ {
 					i := i
 					diskId := randDist[i]
-					e.diskInfos[diskId].stripeInDisk = append(e.diskInfos[diskId].stripeInDisk, e.stripeNum+int64(stripeCnt+s))
+					e.diskInfos[diskId].stripeInDisk = append(e.diskInfos[diskId].stripeInDisk, e.StripeNum+int64(stripeCnt+s))
 					erg.Go(func() error {
 						offset := fi.blockToOffset[stripeCnt+s][i]
 						_, err := of[diskId].WriteAt(encodeData[i], int64(offset)*e.BlockSize)
@@ -161,7 +166,7 @@ func (e *Erasure) EncodeFile(filename string) (*fileInfo, error) {
 	//transform map into array for json marshaling
 	e.fileMap.Store(baseFileName, fi)
 	fi.blockInfos = make([][]*blockInfo, stripeNum)
-	e.stripeNum += int64(stripeNum)
+	e.StripeNum += int64(stripeNum)
 	for row := range fi.Distribution {
 		fi.blockInfos[row] = make([]*blockInfo, e.K+e.M)
 		for line := range fi.Distribution[row] {
@@ -173,10 +178,9 @@ func (e *Erasure) EncodeFile(filename string) (*fileInfo, error) {
 		log.Println(baseFileName, " successfully encoded. encoding size ",
 			e.stripedFileSize(fileSize), "bytes")
 	}
-	for i := range e.diskInfos {
-		fmt.Println(e.diskInfos[i].diskPath)
-		fmt.Println(len(e.diskInfos[i].stripeInDisk))
-	}
+	// for i := 0; i < e.DiskNum; i++ {
+	// 	fmt.Println(len(e.diskInfos[i].stripeInDisk))
+	// }
 	return fi, nil
 }
 

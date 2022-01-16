@@ -102,10 +102,10 @@ type Erasure struct {
 	fileMap sync.Map
 
 	// the number of stripes
-	stripeNum int64
+	StripeNum int64 `json:"stripeNum"`
 
 	// stripeList
-	stripes []*stripeInfo
+	Stripes []*stripeInfo `json:"stripeList"`
 
 	// the path of file recording all disks path
 	DiskFilePath string `json:"-"`
@@ -155,14 +155,10 @@ type fileInfo struct {
 }
 
 type stripeInfo struct {
-	stripeId      int64
-	DistBit       *stripeDistBit
-	blockToOffset []int
-}
-
-type stripeDistBit struct {
-	num  int
-	dist []uint64
+	StripeId      int64    `json:"stripeId"`
+	DistNum       int      `json:"distNum"`
+	DistBit       []uint64 `json:"distBit"`
+	BlockToOffset []int    `json:"blockToOffset"`
 }
 
 type blockStat uint8

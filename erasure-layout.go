@@ -18,7 +18,6 @@ func (e *Erasure) generateLayout(fi *fileInfo) {
 			countSum[diskId]++
 		}
 	}
-	e.generateStripeInfo(fi)
 }
 
 func (e *Erasure) generateStripeInfo(fi *fileInfo) {
@@ -30,23 +29,28 @@ func (e *Erasure) generateStripeInfo(fi *fileInfo) {
 	for i := 0; i < stripeNum; i++ {
 		dist := fi.Distribution[i]
 		blockToOffset := fi.blockToOffset[i]
-		spDist := &stripeDistBit{num: distNum, dist: make([]uint64, distNum)}
+		distBit := make([]uint64, distNum)
 		for j := 0; j < e.K+e.M; j++ {
 			var mask uint64 = 1
-			mask <<= uint64(dist[j] % intBit)
-			spDist.dist[dist[j]/intBit] |= mask
+			mask <<= uint64(dist[j]%intBit) - 1
+			distBit[dist[j]/intBit] |= mask
+			// fmt.Printf("%b\n", spDist.dist[dist[j]/intBit])
 		}
-		spInfo := &stripeInfo{stripeId: e.stripeNum + int64(i), DistBit: spDist, blockToOffset: blockToOffset}
-		e.stripes = append(e.stripes, spInfo)
+		spInfo := &stripeInfo{StripeId: e.StripeNum + int64(i), DistNum: distNum, DistBit: distBit, BlockToOffset: make([]int, len(blockToOffset))}
+		spInfo.BlockToOffset = blockToOffset
+		e.Stripes = append(e.Stripes, spInfo)
 	}
+	// for _, s := range e.Stripes {
+	// 	fmt.Printf("%b\n", s.DistBit.dist)
+	// }
 }
 
-func (e *Erasure) bitToDist(bit *stripeDistBit) []int {
+func (e *Erasure) bitToDist(distBit []uint64, distNum int) []int {
 	dist := make([]int, e.K+e.M)
-	for i := 0; i < bit.num; i++ {
+	for i := 0; i < distNum; i++ {
 		var mask uint64 = 1
 		for mask/2 < 63 {
-			if bit.dist[i]&mask == 1 {
+			if distBit[i]&mask == 1 {
 				dist = append(dist, i*intBit+int(mask/2))
 			}
 			mask <<= 1
