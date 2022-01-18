@@ -51,9 +51,6 @@ type diskInfo struct {
 
 	// the latency of a disk
 	latency float64
-
-	// stripe id
-	stripeInDisk []int64
 }
 
 //Erasure is the critical erasure coding structure
@@ -107,6 +104,9 @@ type Erasure struct {
 	// stripeList
 	Stripes []*stripeInfo `json:"stripeList"`
 
+	// stripe id
+	StripeInDisk [][]int64 `json:"stripeInDisk"`
+
 	// the path of file recording all disks path
 	DiskFilePath string `json:"-"`
 
@@ -155,10 +155,20 @@ type fileInfo struct {
 }
 
 type stripeInfo struct {
-	StripeId      int64    `json:"stripeId"`
-	DistNum       int      `json:"distNum"`
-	DistBit       []uint64 `json:"distBit"`
-	BlockToOffset []int    `json:"blockToOffset"`
+	// ID of a stripe
+	StripeId int64 `json:"stripeId"`
+
+	// how many elem in DistBit
+	DistNum int `json:"distNum"`
+
+	// the distribution of a stripe, unsigned integer representation
+	DistBit []uint64 `json:"distBit"`
+
+	// the distribution of a stripe
+	Dist []int `json:"dist"`
+
+	// the same meaning
+	BlockToOffset []int `json:"blockToOffset"`
 }
 
 type blockStat uint8

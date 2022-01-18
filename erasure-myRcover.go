@@ -1,7 +1,6 @@
 package grasure
 
 import (
-	"fmt"
 	"io"
 	"log"
 	"os"
@@ -13,9 +12,6 @@ import (
 
 func (e *Erasure) RecoverWithStripe(fileName string, options *Options) (map[string]string, error) {
 	var failDisk int = 0
-	for i := 0; i < e.DiskNum; i++ {
-		fmt.Println(len(e.diskInfos[i].stripeInDisk))
-	}
 	for i := range e.diskInfos {
 		if !e.diskInfos[i].available {
 			failDisk = i
@@ -25,7 +21,7 @@ func (e *Erasure) RecoverWithStripe(fileName string, options *Options) (map[stri
 	// fmt.Println(failDisk)
 	if !e.Quiet {
 		log.Printf("Start recovering with stripe, totally %d stripes need recovery",
-			len(e.diskInfos[failDisk].stripeInDisk))
+			len(e.StripeInDisk[failDisk]))
 	}
 	baseName := filepath.Base(fileName)
 	//the failed disks are mapped to backup disks
@@ -40,7 +36,6 @@ func (e *Erasure) RecoverWithStripe(fileName string, options *Options) (map[stri
 	// start recovering: recover all stripes in this disk
 
 	// open all disks
-	diskFail := false
 	ifs := make([]*os.File, e.DiskNum)
 	erg := new(errgroup.Group)
 	alive := int32(0)
@@ -51,12 +46,11 @@ func (e *Erasure) RecoverWithStripe(fileName string, options *Options) (map[stri
 			folderPath := filepath.Join(disk.diskPath, baseName)
 			blobPath := filepath.Join(folderPath, "BLOB")
 			if !disk.available {
-				diskFail = true
-				return &diskError{disk.diskPath, " avilable flag set flase"}
+				ifs[i] = nil
+				return nil
 			}
-			ifs[i], err = os.OpenFile(blobPath, os.O_RDWR|os.O_TRUNC, 0666)
+			ifs[i], err = os.Open(blobPath)
 			if err != nil {
-				disk.available = false
 				return err
 			}
 
@@ -69,13 +63,12 @@ func (e *Erasure) RecoverWithStripe(fileName string, options *Options) (map[stri
 		if !e.Quiet {
 			log.Printf("read failed %s", err.Error())
 		}
-		if diskFail {
-			return nil, err
-		}
 	}
 	defer func() {
-		for i := range e.diskInfos {
-			ifs[i].Close()
+		for i := 0; i < e.DiskNum; i++ {
+			if ifs[i] != nil {
+				ifs[i].Close()
+			}
 		}
 	}()
 	if int(alive) < e.K {
@@ -112,13 +105,14 @@ func (e *Erasure) RecoverWithStripe(fileName string, options *Options) (map[stri
 
 	// read stripes every blob in parallel
 	// read blocks every stripe in parallel
-	erg = e.errgroupPool.Get().(*errgroup.Group)
-	stripeNum := len(e.diskInfos[failDisk].stripeInDisk)
+	// erg = e.errgroupPool.Get().(*errgroup.Group)
+	stripeNum := len(e.StripeInDisk[failDisk])
 	numBlob := ceilFracInt(stripeNum, e.ConStripes)
 	blobBuf := makeArr2DByte(e.ConStripes, int(e.allStripeSize))
 	stripeCnt := 0
 	nextStripe := 0
-	stripes := e.diskInfos[failDisk].stripeInDisk
+	stripes := e.StripeInDisk[failDisk]
+
 	for blob := 0; blob < numBlob; blob++ {
 		if stripeCnt+e.ConStripes > stripeNum {
 			nextStripe = stripeNum - stripeCnt
@@ -132,11 +126,12 @@ func (e *Erasure) RecoverWithStripe(fileName string, options *Options) (map[stri
 			spId := stripes[stripeNo]
 			spInfo := e.Stripes[spId]
 			eg.Go(func() error {
-				eg := e.errgroupPool.Get().(*errgroup.Group)
+				erg := e.errgroupPool.Get().(*errgroup.Group)
 				defer e.errgroupPool.Put(erg)
 				// get dist and blockToOffset by stripeNo
-				dist := e.bitToDist(spInfo.DistBit, spInfo.DistNum)
+				dist := spInfo.Dist
 				blockToOffset := spInfo.BlockToOffset
+				// fmt.Println(blockToOffset)
 				// read blocks in parallel
 				for i := 0; i < e.K+e.M; i++ {
 					i := i
@@ -145,7 +140,7 @@ func (e *Erasure) RecoverWithStripe(fileName string, options *Options) (map[stri
 					if !disk.available {
 						continue
 					}
-					eg.Go(func() error {
+					erg.Go(func() error {
 						offset := blockToOffset[i]
 						_, err := ifs[diskId].ReadAt(blobBuf[s][int64(i)*e.BlockSize:int64(i+1)*e.BlockSize], int64(offset)*e.BlockSize)
 						if err != nil && err != io.EOF {
@@ -211,9 +206,9 @@ func (e *Erasure) RecoverWithStripe(fileName string, options *Options) (map[stri
 		stripeCnt += nextStripe
 	}
 	//do not forget to recover the meta replicas
-	if err := erg.Wait(); err != nil {
-		return nil, err
-	}
+	// if err := erg.Wait(); err != nil {
+	// 	return nil, err
+	// }
 	err = e.updateDiskPath(replaceMap)
 	if err != nil {
 		return nil, err

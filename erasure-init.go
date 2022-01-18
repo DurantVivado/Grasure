@@ -110,7 +110,7 @@ func (e *Erasure) reset() error {
 
 	g := new(errgroup.Group)
 
-	for _, path := range e.diskInfos[:e.DiskNum] {
+	for _, path := range e.diskInfos {
 		path := path
 		files, err := os.ReadDir(path.diskPath)
 		if err != nil {
@@ -141,6 +141,7 @@ func (e *Erasure) resetSystem() error {
 
 	//in-memory meta reset
 	e.FileMeta = make([]*fileInfo, 0)
+	e.StripeInDisk = make([][]int64, len(e.diskInfos))
 	// for k := range e.fileMap {
 	// 	delete(e.fileMap, k)
 	// }

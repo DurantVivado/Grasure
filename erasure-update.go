@@ -246,7 +246,7 @@ func (e *Erasure) Update(oldFile, newFile string) error {
 							a := i
 							diskID := fi.Distribution[stripeNo][a]
 							sn := e.StripeNum - (int64(newStripeNum) - int64(oldStripeNum))
-							e.diskInfos[diskID].stripeInDisk = append(e.diskInfos[diskID].stripeInDisk, sn+int64(stripeNo))
+							e.StripeInDisk[diskID] = append(e.StripeInDisk[diskID], sn+int64(stripeNo))
 							writeOffset := fi.blockToOffset[stripeNo][a]
 							_, err := ifs[diskID].WriteAt(newData[a], int64(writeOffset)*e.BlockSize)
 							if err != nil {

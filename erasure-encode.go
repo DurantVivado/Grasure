@@ -31,7 +31,7 @@ func (e *Erasure) EncodeFile(filename string) (*fileInfo, error) {
 	}
 	f.Seek(0, 0)
 	fi := &fileInfo{}
-	fi.FileId = int64(len(e.FileMeta))
+	fi.FileId = int64(e.getFileNum())
 	fi.Hash = hashStr
 	fi.FileName = baseFileName
 	fileInfo, err := f.Stat()
@@ -134,7 +134,7 @@ func (e *Erasure) EncodeFile(filename string) (*fileInfo, error) {
 				for i := 0; i < e.K+e.M; i++ {
 					i := i
 					diskId := randDist[i]
-					e.diskInfos[diskId].stripeInDisk = append(e.diskInfos[diskId].stripeInDisk, e.StripeNum+int64(stripeCnt+s))
+					e.StripeInDisk[diskId] = append(e.StripeInDisk[diskId], e.StripeNum+int64(stripeCnt+s))
 					erg.Go(func() error {
 						offset := fi.blockToOffset[stripeCnt+s][i]
 						_, err := of[diskId].WriteAt(encodeData[i], int64(offset)*e.BlockSize)
