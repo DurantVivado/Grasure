@@ -113,7 +113,8 @@ func (e *Erasure) EncodeFile(filename string) (*fileInfo, error) {
 		// blobBuf := *e.dataBlobPool.Get().(*[][]byte)
 		for s := 0; s < nextStripe; s++ {
 			s := s
-			offset := int64(stripeCnt+s) * e.dataStripeSize
+			stripeNo := stripeCnt + s
+			offset := int64(stripeNo) * e.dataStripeSize
 			eg.Go(func() error {
 				_, err := f.ReadAt(blobBuf[s], offset)
 				if err != nil && err != io.EOF {
@@ -125,7 +126,7 @@ func (e *Erasure) EncodeFile(filename string) (*fileInfo, error) {
 					return err
 				}
 				//generate random distrinution for data and parity
-				randDist := fi.Distribution[stripeCnt+s]
+				randDist := fi.Distribution[stripeNo]
 				// randDist := getSeqArr(e.K + e.M)
 
 				erg := e.errgroupPool.Get().(*errgroup.Group)
@@ -134,9 +135,11 @@ func (e *Erasure) EncodeFile(filename string) (*fileInfo, error) {
 				for i := 0; i < e.K+e.M; i++ {
 					i := i
 					diskId := randDist[i]
-					e.StripeInDisk[diskId] = append(e.StripeInDisk[diskId], e.StripeNum+int64(stripeCnt+s))
+					e.mu.Lock()
+					e.StripeInDisk[diskId] = append(e.StripeInDisk[diskId], e.StripeNum+int64(stripeNo))
+					e.mu.Unlock()
 					erg.Go(func() error {
-						offset := fi.blockToOffset[stripeCnt+s][i]
+						offset := fi.blockToOffset[stripeNo][i]
 						_, err := of[diskId].WriteAt(encodeData[i], int64(offset)*e.BlockSize)
 						if err != nil {
 							return err
@@ -167,6 +170,9 @@ func (e *Erasure) EncodeFile(filename string) (*fileInfo, error) {
 	e.fileMap.Store(baseFileName, fi)
 	fi.blockInfos = make([][]*blockInfo, stripeNum)
 	e.StripeNum += int64(stripeNum)
+	// for i := 0; i < len(e.StripeInDisk); i++ {
+	// 	fmt.Println(e.StripeInDisk[i], len(e.StripeInDisk[i]))
+	// }
 	for row := range fi.Distribution {
 		fi.blockInfos[row] = make([]*blockInfo, e.K+e.M)
 		for line := range fi.Distribution[row] {

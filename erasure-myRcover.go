@@ -5,7 +5,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"sync/atomic"
 
 	"golang.org/x/sync/errgroup"
 )
@@ -23,6 +22,8 @@ func (e *Erasure) RecoverWithStripe(fileName string, options *Options) (map[stri
 		log.Printf("Start recovering with stripe, totally %d stripes need recovery",
 			len(e.StripeInDisk[failDisk]))
 	}
+	// fmt.Println("failDisk:")
+	// fmt.Println(failDisk)
 	baseName := filepath.Base(fileName)
 	//the failed disks are mapped to backup disks
 	replaceMap := make(map[int]int)
@@ -38,7 +39,7 @@ func (e *Erasure) RecoverWithStripe(fileName string, options *Options) (map[stri
 	// open all disks
 	ifs := make([]*os.File, e.DiskNum)
 	erg := new(errgroup.Group)
-	alive := int32(0)
+	// alive := int32(0)
 	for i, disk := range e.diskInfos[0:e.DiskNum] {
 		i := i
 		disk := disk
@@ -55,7 +56,7 @@ func (e *Erasure) RecoverWithStripe(fileName string, options *Options) (map[stri
 			}
 
 			disk.available = true
-			atomic.AddInt32(&alive, 1)
+			// atomic.AddInt32(&alive, 1)
 			return nil
 		})
 	}
@@ -71,19 +72,19 @@ func (e *Erasure) RecoverWithStripe(fileName string, options *Options) (map[stri
 			}
 		}
 	}()
-	if int(alive) < e.K {
-		//the disk renders inrecoverable
-		return nil, errTooFewDisksAlive
+	// if int(alive) < e.K {
+	// 	//the disk renders inrecoverable
+	// 	return nil, errTooFewDisksAlive
+	// }
+	// if int(alive) == e.DiskNum {
+	// 	if !e.Quiet {
+	// 		log.Println("start reading blocks")
+	// 	}
+	// } else {
+	if !e.Quiet {
+		log.Println("start reconstructing blocks")
 	}
-	if int(alive) == e.DiskNum {
-		if !e.Quiet {
-			log.Println("start reading blocks")
-		}
-	} else {
-		if !e.Quiet {
-			log.Println("start reconstructing blocks")
-		}
-	}
+	// }
 
 	// create BLOB in the backup disk
 	disk := e.diskInfos[e.DiskNum]
@@ -108,10 +109,13 @@ func (e *Erasure) RecoverWithStripe(fileName string, options *Options) (map[stri
 	// erg = e.errgroupPool.Get().(*errgroup.Group)
 	stripeNum := len(e.StripeInDisk[failDisk])
 	numBlob := ceilFracInt(stripeNum, e.ConStripes)
+	// fmt.Println(e.ConStripes, numBlob)
 	blobBuf := makeArr2DByte(e.ConStripes, int(e.allStripeSize))
 	stripeCnt := 0
 	nextStripe := 0
 	stripes := e.StripeInDisk[failDisk]
+	// fmt.Println("stripeIds:")
+	// fmt.Println(stripes)
 
 	for blob := 0; blob < numBlob; blob++ {
 		if stripeCnt+e.ConStripes > stripeNum {
@@ -123,15 +127,16 @@ func (e *Erasure) RecoverWithStripe(fileName string, options *Options) (map[stri
 		for s := 0; s < nextStripe; s++ {
 			s := s
 			stripeNo := stripeCnt + s
-			spId := stripes[stripeNo]
-			spInfo := e.Stripes[spId]
 			eg.Go(func() error {
+				// s := s
+				spId := stripes[stripeNo]
+				spInfo := e.Stripes[spId]
 				erg := e.errgroupPool.Get().(*errgroup.Group)
 				defer e.errgroupPool.Put(erg)
 				// get dist and blockToOffset by stripeNo
 				dist := spInfo.Dist
 				blockToOffset := spInfo.BlockToOffset
-				// fmt.Println(blockToOffset)
+				// fmt.Println(spId, dist, blockToOffset)
 				// read blocks in parallel
 				for i := 0; i < e.K+e.M; i++ {
 					i := i
@@ -142,7 +147,8 @@ func (e *Erasure) RecoverWithStripe(fileName string, options *Options) (map[stri
 					}
 					erg.Go(func() error {
 						offset := blockToOffset[i]
-						_, err := ifs[diskId].ReadAt(blobBuf[s][int64(i)*e.BlockSize:int64(i+1)*e.BlockSize], int64(offset)*e.BlockSize)
+						_, err := ifs[diskId].ReadAt(blobBuf[s][int64(i)*e.BlockSize:int64(i+1)*e.BlockSize],
+							int64(offset)*e.BlockSize)
 						if err != nil && err != io.EOF {
 							return err
 						}
@@ -170,32 +176,36 @@ func (e *Erasure) RecoverWithStripe(fileName string, options *Options) (map[stri
 					return nil
 				}
 				//write the Blob to restore paths
-				egp := e.errgroupPool.Get().(*errgroup.Group)
-				defer e.errgroupPool.Put(egp)
+				// egp := e.errgroupPool.Get().(*errgroup.Group)
+				// defer e.errgroupPool.Put(egp)
 				for i := 0; i < e.K+e.M; i++ {
 					i := i
 					diskId := dist[i]
-					if v, ok := replaceMap[diskId]; ok {
-						restoreId := v - e.DiskNum
+					// if v, ok := replaceMap[diskId]; ok {
+					if diskId == failDisk {
+						// restoreId := v - e.DiskNum
 						writeOffset := blockToOffset[i]
-						egp.Go(func() error {
-							_, err := rfs.WriteAt(splitData[i], int64(writeOffset)*e.BlockSize)
-							if err != nil {
+						// fmt.Println(spId, spInfo.BlockToOffset, blockToOffset)
+						// egp.Go(func() error {
+						_, err := rfs.WriteAt(splitData[i], int64(writeOffset)*e.BlockSize)
+						if err != nil {
+							return err
+						}
+						if e.diskInfos[diskId].ifMetaExist {
+							newMetapath := filepath.Join(e.diskInfos[e.DiskNum].diskPath, "META")
+							if _, err := copyFile(e.ConfigFile, newMetapath); err != nil {
 								return err
 							}
-							if e.diskInfos[diskId].ifMetaExist {
-								newMetapath := filepath.Join(e.diskInfos[restoreId].diskPath, "META")
-								if _, err := copyFile(e.ConfigFile, newMetapath); err != nil {
-									return err
-								}
-							}
-							return nil
-						})
+						}
+						break
 					}
+					// return nil
+					// })
+					// }
 				}
-				if err := egp.Wait(); err != nil {
-					return err
-				}
+				// if err := egp.Wait(); err != nil {
+				// 	return err
+				// }
 				return nil
 			})
 		}

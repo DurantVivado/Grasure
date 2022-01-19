@@ -2,17 +2,21 @@
 file=testfile.txt
 go build -o main ./main.go
 
-rm -rf .hdr.disks.path
-mv .hdr.disks.path.old .hdr.disks.path
+if [ -f ".hdr.disks.path.old" ]; then
+    rm -rf .hdr.disks.path  
+    mv .hdr.disks.path.old .hdr.disks.path
+fi
 
 # init the system
+
 ./main -md init -k 4 -m 2 -dn 6 -bs 1
 
 # to encode a file 
 ./main -md encode -f ~/input/$file -conStripes 100 -o
 
 # to recover a disk
-./main -md rws -fmd diskFail -fn 1 -f ~/input/$file
+# ./main -md recover -fmd diskFail -fn 1
+./main -md rws -fmd diskFail -fn 1 -f ~/input/$file -conStripes 200
 
 # to read a file
 ./main -md read -f $file -conStripes 100 -sp ~/output/$file
@@ -27,7 +31,7 @@ else
     echo "hash check fails"
 fi
 
-rm -rf ~/output/$file
+# rm -rf ~/output/$file
 
 # to update a file
 # ./main -md update -f $file -nf test/$file
