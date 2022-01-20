@@ -15,8 +15,8 @@ fi
 ./main -md encode -f ~/input/$file -conStripes 100 -o
 
 # to recover a disk
-# ./main -md recover -fmd diskFail -fn 1
-./main -md rws -fmd diskFail -fn 1 -f ~/input/$file -conStripes 200
+./main -md recover -fmd diskFail -fn 1 -conStripes 100
+# ./main -md rws -fmd diskFail -fn 1 -f ~/input/$file -conStripes 100
 
 # to read a file
 ./main -md read -f $file -conStripes 100 -sp ~/output/$file
