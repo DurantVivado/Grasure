@@ -218,9 +218,7 @@ func (e *Erasure) Recover(options *Options) (map[string]string, error) {
 							if err != nil {
 								return err
 							}
-						} else {
-							return nil
-						}
+						} 
 						//write the Blob to restore paths
 						egp := e.errgroupPool.Get().(*errgroup.Group)
 						defer e.errgroupPool.Put(egp)
@@ -237,6 +235,7 @@ func (e *Erasure) Recover(options *Options) (map[string]string, error) {
 										return err
 									}
 									if e.diskInfos[diskId].ifMetaExist {
+										e.diskInfos[diskId].ifMetaExist = false
 										newMetapath := filepath.Join(e.diskInfos[restoreId].diskPath, "META")
 										if _, err := copyFile(e.ConfigFile, newMetapath); err != nil {
 											return err
@@ -265,6 +264,14 @@ func (e *Erasure) Recover(options *Options) (map[string]string, error) {
 			if !e.Quiet {
 				log.Printf("reading %s!", filename)
 			}
+			//integrity check, comment below codes
+			// for old, new := range ReplaceMap {
+			// 	oldPath := filepath.Join(old, basefilename, "BLOB")
+			// 	newPath := filepath.Join(new, basefilename, "BLOB")
+			// 	if ok, err := checkFileIfSame(newPath, oldPath); !ok {
+			// 		return err
+			// 	}
+			// }
 			return nil
 		})
 		return true
