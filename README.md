@@ -64,6 +64,7 @@ go build -o main ./main.go
 /home/server1/data/data15
 /home/server1/data/data16
 ```
+Please remind that carriage return (CR), line feed (LF) are not allowed in the last line.
 
 2. Initialise the system, you should explictly attach the number of data(k) and parity shards (m) as well as blocksize (in bytes), remember k+m must NOT be bigger than 256.
 ```
