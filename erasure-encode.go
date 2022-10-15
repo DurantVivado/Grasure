@@ -10,7 +10,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-//EncodeFile takes filepath as input and encodes the file into data and parity blocks concurrently.
+// EncodeFile takes filepath as input and encodes the file into data and parity blocks concurrently.
 //
 // It returns `*fileInfo` and an error. Specify `blocksize` and `conStripe` for better performance.
 func (e *Erasure) EncodeFile(filename string) (*fileInfo, error) {
@@ -96,6 +96,7 @@ func (e *Erasure) EncodeFile(filename string) (*fileInfo, error) {
 	//all described in erasure-layout.go
 
 	e.generateLayout(fi)
+	e.generateStripeInfo(fi)
 	blobBuf := makeArr2DByte(e.ConStripes, int(e.dataStripeSize))
 	for blob := 0; blob < numBlob; blob++ {
 		if stripeCnt+e.ConStripes > stripeNum {
@@ -107,6 +108,7 @@ func (e *Erasure) EncodeFile(filename string) (*fileInfo, error) {
 		// blobBuf := *e.dataBlobPool.Get().(*[][]byte)
 		for s := 0; s < nextStripe; s++ {
 			s := s
+			stripeNo := stripeCnt + s
 			offset := int64(stripeCnt+s) * e.dataStripeSize
 			eg.Go(func() error {
 				_, err := f.ReadAt(blobBuf[s], offset)
@@ -119,7 +121,7 @@ func (e *Erasure) EncodeFile(filename string) (*fileInfo, error) {
 					return err
 				}
 				//generate random distrinution for data and parity
-				randDist := fi.Distribution[stripeCnt+s]
+				randDist := fi.Distribution[stripeNo]
 				// randDist := getSeqArr(e.K + e.M)
 
 				erg := e.errgroupPool.Get().(*errgroup.Group)
@@ -128,6 +130,9 @@ func (e *Erasure) EncodeFile(filename string) (*fileInfo, error) {
 				for i := 0; i < e.K+e.M; i++ {
 					i := i
 					diskId := randDist[i]
+					e.mu.Lock()
+					e.StripeInDisk[diskId] = append(e.StripeInDisk[diskId], e.StripeNum+int64(stripeNo))
+					e.mu.Unlock()
 					erg.Go(func() error {
 						offset := fi.blockToOffset[stripeCnt+s][i]
 						_, err := of[diskId].WriteAt(encodeData[i], int64(offset)*e.BlockSize)
@@ -159,6 +164,7 @@ func (e *Erasure) EncodeFile(filename string) (*fileInfo, error) {
 	//transform map into array for json marshaling
 	e.fileMap.Store(baseFileName, fi)
 	fi.blockInfos = make([][]*blockInfo, stripeNum)
+	e.StripeNum += int64(stripeNum)
 	for row := range fi.Distribution {
 		fi.blockInfos[row] = make([]*blockInfo, e.K+e.M)
 		for line := range fi.Distribution[row] {
@@ -173,7 +179,7 @@ func (e *Erasure) EncodeFile(filename string) (*fileInfo, error) {
 	return fi, nil
 }
 
-//split and encode data
+// split and encode data
 func (e *Erasure) encodeData(data []byte) ([][]byte, error) {
 	if len(data) == 0 {
 		return make([][]byte, e.K+e.M), nil
@@ -188,9 +194,9 @@ func (e *Erasure) encodeData(data []byte) ([][]byte, error) {
 	return encoded, nil
 }
 
-//return final erasure size from original size,
-//Every block spans all the data disks and split into shards
-//the shardSize is the same except for the last one
+// return final erasure size from original size,
+// Every block spans all the data disks and split into shards
+// the shardSize is the same except for the last one
 func (e *Erasure) stripedFileSize(totalLen int64) int64 {
 	if totalLen <= 0 {
 		return 0

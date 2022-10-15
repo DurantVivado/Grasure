@@ -1,7 +1,6 @@
 // Package grasure is an Universal Erasure Coding Architecture in Go
 //
 // For usage and examples, see https://github.com/DurantVivado/Grasure
-//
 package grasure
 
 import (
@@ -25,9 +24,12 @@ import (
 // 	filenum int
 // }
 
-//diskInfo contains the disk-level information
-//but not mechanical and electrical parameters
+// diskInfo contains the disk-level information
+// but not mechanical and electrical parameters
 type diskInfo struct {
+	// id
+	diskId int64
+
 	//the disk path
 	diskPath string
 
@@ -44,7 +46,7 @@ type diskInfo struct {
 	capacity int64
 }
 
-//Erasure is the critical erasure coding structure
+// Erasure is the critical erasure coding structure
 // contains fundamental encode/decode parameters
 type Erasure struct {
 	// the number of data blocks in a stripe
@@ -89,6 +91,15 @@ type Erasure struct {
 	//file map
 	fileMap sync.Map
 
+	// the total number of stripes
+	StripeNum int64 `json:"stripeNum"`
+
+	// stripeInfos for each stripe
+	Stripes []*stripeInfo `json:"stripeList"`
+
+	//the stored stripe Ids for each disks respectively
+	StripeInDisk [][]int64 `json:"stripeInDisk"`
+
 	// the path of file recording all disks path
 	DiskFilePath string `json:"-"`
 
@@ -103,10 +114,13 @@ type Erasure struct {
 
 	//whether or not to mute outputs
 	Quiet bool `json:"-"`
+
+	// memory size
+	MemSize int64 `json:"memSize"`
 }
 
-//fileInfo defines the file-level information,
-//it's concurrently safe
+// fileInfo defines the file-level information,
+// it's concurrently safe
 type fileInfo struct {
 	//file name
 	FileName string `json:"fileName"`
@@ -132,13 +146,29 @@ type fileInfo struct {
 	//loadBalancedScheme is the most load-balanced scheme derived by SGA algo
 	loadBalancedScheme [][]int
 }
+type stripeInfo struct {
+	// ID of a stripe
+	StripeId int64 `json:"stripeId"`
+
+	// length of DistBit
+	DistNum int `json:"distNum"`
+
+	// the distribution of a stripe with a bitmap style
+	DistBit []uint64 `json:"distBit"`
+
+	// the distribution of a stripe
+	Dist []int `json:"dist"`
+
+	// the same meaning
+	BlockToOffset []int `json:"blockToOffset"`
+}
 
 type blockStat uint8
 type blockInfo struct {
 	bstat blockStat
 }
 
-//Options define the parameters for read and recover mode
+// Options define the parameters for read and recover mode
 type Options struct {
 	//Degrade tells if degrade read is on
 	Degrade bool
@@ -146,7 +176,7 @@ type Options struct {
 	WithGCA bool
 }
 
-//SimOptions defines the parameters for simulation
+// SimOptions defines the parameters for simulation
 type SimOptions struct {
 	//switch between "diskFail" and "bitRot"
 	Mode string
@@ -158,17 +188,23 @@ type SimOptions struct {
 	FileName string
 }
 
-//global system-level variables
+// global system-level variables
 var (
 	err error
 )
 
-//constant variables
+// constant variables
 const (
 	blkOK         blockStat = 0
 	blkFail       blockStat = 1
 	tempFile                = "./test/file.temp"
 	maxGoroutines           = 10240
+	intBit                  = 64
+	TiB           int64     = 1 << 40
+	GiB           int64     = 1 << 30
+	MiB           int64     = 1 << 20
+	KiB           int64     = 1 << 10
+	Byte          int64     = 1
 )
 
 //templates

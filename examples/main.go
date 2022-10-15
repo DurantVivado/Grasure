@@ -23,9 +23,9 @@ var failOnErr = func(mode string, e error) {
 	}
 }
 
-//if you want to enable cpu,memory or block profile functionality
-//set profileEnable as true, otherwise false
-//it's strongly advised to close this in production
+// if you want to enable cpu,memory or block profile functionality
+// set profileEnable as true, otherwise false
+// it's strongly advised to close this in production
 const profileEnable = false
 
 var err error
@@ -50,6 +50,7 @@ func main() {
 		K:               k,
 		M:               m,
 		BlockSize:       blockSize,
+		MemSize:         memSize,
 		ConStripes:      conStripes,
 		Override:        override,
 		Quiet:           quiet,
@@ -119,6 +120,20 @@ func main() {
 		failOnErr(mode, err)
 		err = erasure.WriteConfig()
 		failOnErr(mode, err)
+	// below listed are experimental methods of recovery
+	// i.e., the recovery routine detached from read()
+	case "baseline":
+		// recover with stripe
+		err = erasure.ReadConfig()
+		failOnErr(mode, err)
+		erasure.Destroy(&grasure.SimOptions{
+			Mode:     failMode,
+			FailNum:  failNum,
+			FailDisk: failDisk,
+			FileName: filePath,
+		})
+		_, err = erasure.Baseline(filePath, &grasure.Options{})
+		failOnErr(mode, err)
 	default:
 		log.Fatalf("Can't parse the parameters, please check %s!", mode)
 	}
@@ -137,6 +152,7 @@ var (
 	newFilePath     string
 	new_k           int
 	new_m           int
+	memSize         int64
 	failMode        string
 	failNum         int
 	failDisk        string
@@ -150,11 +166,14 @@ var (
 	// recoveredDiskPath string
 )
 
-//the parameter lists, with fullname or abbreviation
+// the parameter lists, with fullname or abbreviation
 func flag_init() {
 
 	flag.StringVar(&mode, "md", "encode", "the mode of ec system, one of (encode, decode, update, scaling, recover)")
 	flag.StringVar(&mode, "mode", "encode", "the mode of ec system, one of (encode, decode, update, scaling, recover)")
+
+	flag.Int64Var(&memSize, "mem", 4, "memory size in GiB")
+	flag.Int64Var(&memSize, "memSize", 4, "memory size in GiB")
 
 	flag.IntVar(&k, "k", 12, "the number of data shards(<256)")
 	flag.IntVar(&k, "dataNum", 12, "the number of data shards(<256)")

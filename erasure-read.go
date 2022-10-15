@@ -1,7 +1,6 @@
 package grasure
 
 import (
-	"fmt"
 	"io"
 	"log"
 	"os"
@@ -12,10 +11,10 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-//ReadFile reads ONE file  on the system and save it to local `savePath`.
+// ReadFile reads ONE file  on the system and save it to local `savePath`.
 //
-//In case of any failure within fault tolerance, the file will be decoded first.
-//`Degrade` indicates whether degraded read is enabled.
+// In case of any failure within fault tolerance, the file will be decoded first.
+// `Degrade` indicates whether degraded read is enabled.
 func (e *Erasure) ReadFile(filename string, savepath string, options *Options) error {
 	baseFileName := filepath.Base(filename)
 	intFi, ok := e.fileMap.Load(baseFileName)
@@ -84,12 +83,12 @@ func (e *Erasure) ReadFile(filename string, savepath string, options *Options) e
 			log.Println("start reconstructing blocks")
 		}
 		//--------------------------------
-		if options.WithSGA {
-			fi.loadBalancedScheme, stripeOrder, err = e.SGA(fi, options.WithGCA)
-			if err != nil {
-				return err
-			}
-		}
+		// if options.WithSGA {
+		// 	fi.loadBalancedScheme, stripeOrder, err = e.SGA(fi, options.WithGCA)
+		// 	if err != nil {
+		// 		return err
+		// 	}
+		// }
 		//-------------------------------
 	}
 	//for local save path
@@ -345,14 +344,14 @@ func (e *Erasure) ReadFile(filename string, savepath string, options *Options) e
 	}
 	if !e.Quiet {
 		//--------------------------------------------
-		fmt.Printf("------------------Normal--------------------")
-		maxload, sumload := 0, 0
-		for i := range diskLoads {
-			maxload = max(maxload, int(diskLoads[i]))
-			sumload += int(diskLoads[i])
-		}
-		fmt.Printf("\nmaxLoad:%d, sumLoad: %d\n", maxload, sumload)
-		fmt.Printf("disk loads:\n%v\n", diskLoads)
+		// fmt.Printf("------------------Normal--------------------")
+		// maxload, sumload := 0, 0
+		// for i := range diskLoads {
+		// 	maxload = max(maxload, int(diskLoads[i]))
+		// 	sumload += int(diskLoads[i])
+		// }
+		// fmt.Printf("\nmaxLoad:%d, sumLoad: %d\n", maxload, sumload)
+		// fmt.Printf("disk loads:\n%v\n", diskLoads)
 		//-------------------------------------------
 		log.Printf("reading %s...", filename)
 	}

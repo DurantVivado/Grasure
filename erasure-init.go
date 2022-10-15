@@ -14,10 +14,10 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-//ReadDiskPath reads the disk paths from diskFilePath.
-//There should be exactly ONE disk path at each line.
+// ReadDiskPath reads the disk paths from diskFilePath.
+// There should be exactly ONE disk path at each line.
 //
-//This func can NOT be called concurrently.
+// This func can NOT be called concurrently.
 func (e *Erasure) ReadDiskPath() error {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
@@ -55,13 +55,13 @@ func (e *Erasure) ReadDiskPath() error {
 	return nil
 }
 
-//Init initiates the erasure-coded system, this func can NOT be called concurrently.
+// Init initiates the erasure-coded system, this func can NOT be called concurrently.
 // It will clear all the data on the storage, so a consulting procedure is added in advance of perilous action.
 //
-//Note if `assume` renders yes then the consulting part will be skipped.
+// Note if `assume` renders yes then the consulting part will be skipped.
 func (e *Erasure) InitSystem(assume bool) error {
 	if !e.Quiet {
-		fmt.Println("Warning: you are intializing a new erasure-coded system, which means the previous data will also be reset.")
+		fmt.Println("Warning: you are initializing a new erasure-coded system, which means the previous data will also be reset.")
 	}
 	if !assume {
 		if ans, err := consultUserBeforeAction(); !ans && err == nil {
@@ -102,7 +102,7 @@ func (e *Erasure) InitSystem(assume bool) error {
 	return nil
 }
 
-//reset the storage assets
+// reset the storage assets
 func (e *Erasure) reset() error {
 
 	g := new(errgroup.Group)
@@ -133,11 +133,12 @@ func (e *Erasure) reset() error {
 	return nil
 }
 
-//reset the system including config and data
+// reset the system including config and data
 func (e *Erasure) resetSystem() error {
 
 	//in-memory meta reset
 	e.FileMeta = make([]*fileInfo, 0)
+	e.StripeInDisk = make([][]int64, len(e.diskInfos))
 	// for k := range e.fileMap {
 	// 	delete(e.fileMap, k)
 	// }
@@ -161,9 +162,9 @@ func (e *Erasure) resetSystem() error {
 	return nil
 }
 
-//ReadConfig reads the config file during system warm-up.
+// ReadConfig reads the config file during system warm-up.
 //
-//Calling it before actions like encode and read is a good habit.
+// Calling it before actions like encode and read is a good habit.
 func (e *Erasure) ReadConfig() error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -248,8 +249,8 @@ func (e *Erasure) ReadConfig() error {
 	return nil
 }
 
-//Replicate the config file into the system for k-fold
-//it's NOT striped and encoded as a whole piece.
+// Replicate the config file into the system for k-fold
+// it's NOT striped and encoded as a whole piece.
 func (e *Erasure) replicateConfig(k int) error {
 	selectDisk := genRandomArr(e.DiskNum, 0)[:k]
 	for _, i := range selectDisk {
@@ -265,9 +266,9 @@ func (e *Erasure) replicateConfig(k int) error {
 	return nil
 }
 
-//WriteConfig writes the erasure parameters and file information list into config files.
+// WriteConfig writes the erasure parameters and file information list into config files.
 //
-//Calling it after actions like encode and read is a good habit.
+// Calling it after actions like encode and read is a good habit.
 func (e *Erasure) WriteConfig() error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -305,7 +306,7 @@ func (e *Erasure) WriteConfig() error {
 	return nil
 }
 
-//reconstruct the config file if possible
+// reconstruct the config file if possible
 func (e *Erasure) rebuildConfig() error {
 	//we read file meta in the disk path and try to rebuild the config file
 	for i := range e.diskInfos[:e.DiskNum] {
@@ -323,7 +324,7 @@ func (e *Erasure) rebuildConfig() error {
 	return nil
 }
 
-//update the config file of all replica
+// update the config file of all replica
 func (e *Erasure) updateConfigReplica() error {
 
 	//we read file meta in the disk path and try to rebuild the config file
@@ -344,9 +345,9 @@ func (e *Erasure) updateConfigReplica() error {
 	return nil
 }
 
-//RemoveFile deletes specific file `filename`in the system.
+// RemoveFile deletes specific file `filename`in the system.
 //
-//Both the file blobs and meta data are deleted. It's currently irreversible.
+// Both the file blobs and meta data are deleted. It's currently irreversible.
 func (e *Erasure) RemoveFile(filename string) error {
 	baseFilename := filepath.Base(filename)
 	if _, ok := e.fileMap.Load(baseFilename); !ok {
@@ -384,7 +385,7 @@ func (e *Erasure) RemoveFile(filename string) error {
 	return nil
 }
 
-//check if file exists both in config and storage blobs
+// check if file exists both in config and storage blobs
 func (e *Erasure) checkIfFileExist(filename string) (bool, error) {
 	//1. first check the storage blobs if file still exists
 	baseFilename := filepath.Base(filename)
