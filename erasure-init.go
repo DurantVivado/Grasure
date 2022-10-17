@@ -96,8 +96,15 @@ func (e *Erasure) InitSystem(assume bool) error {
 		return err
 	}
 	if !e.Quiet {
-		fmt.Printf("System init!\n Erasure parameters: dataShards:%d, parityShards:%d,blocksize:%d,diskNum:%d\n",
-			e.K, e.M, e.BlockSize, e.DiskNum)
+		log.Printf("System init!\nErasure parameters: \n")
+		fmt.Printf(" %-20s:%20d\n", "data shards", e.K)
+		fmt.Printf(" %-20s:%20d\n", "parity shards", e.M)
+		fmt.Printf(" %-20s:%20d\n", "block size (bytes)", e.BlockSize)
+		fmt.Printf(" %-20s:%20d\n", "used disk number", e.DiskNum)
+		fmt.Printf(" %-20s:%20d\n", "total disk number",
+			len(e.diskInfos))
+		fmt.Printf(" %-20s:%20d\n", "memory limit (GiB)", e.MemSize)
+
 	}
 	return nil
 }

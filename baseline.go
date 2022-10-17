@@ -21,12 +21,9 @@ func (e *Erasure) Baseline(fileName string, options *Options) (map[string]string
 	}
 	baseName := filepath.Base(fileName)
 	//the failed disks are mapped to backup disks
-	replaceMap := make(map[int]int)
 	ReplaceMap := make(map[string]string)
 	diskFailList := make(map[int]bool, 1)
 
-	ReplaceMap[e.diskInfos[failDisk].diskPath] = e.diskInfos[e.DiskNum].diskPath
-	replaceMap[failDisk] = e.DiskNum
 	diskFailList[failDisk] = true
 
 	// start recovering: recover all stripes in this disk
@@ -194,11 +191,11 @@ func (e *Erasure) Baseline(fileName string, options *Options) (map[string]string
 	// fmt.Println("second phase costs: ", time.Since(start2).Seconds())
 
 	// start3 := time.Now()
-	err = e.updateDiskPath(replaceMap)
+	// err = e.updateDiskPath(replaceMap)
 	// fmt.Println("third phase costs: ", time.Since(start3).Seconds())
-	if err != nil {
-		return nil, err
-	}
+	// if err != nil {
+	// 	return nil, err
+	// }
 	if !e.Quiet {
 		log.Println("Finish recovering")
 	}

@@ -8,12 +8,12 @@ import (
 	"strings"
 )
 
-//the proportion of stripe where bitrot occurs of all stripes
+// the proportion of stripe where bitrot occurs of all stripes
 const stripeFailProportion = 0.3
 
-//Destroy simulates disk failure or bitrot:
+// Destroy simulates disk failure or bitrot:
 //
-//for `diskFail mode`, `failNum` random disks are marked as unavailable, `failName` is ignored.
+// for `diskFail mode`, `failNum` random disks are marked as unavailable, `failName` is ignored.
 //
 // for `bitRot`, `failNum` random blocks in a stripe of the file corrupts, that only works in Read Mode;
 //
@@ -27,9 +27,14 @@ func (e *Erasure) Destroy(simOption *SimOptions) {
 	//if failDisk is specialized, then use that
 	if simOption.FailDisk != "" {
 		disks := strings.Split(simOption.FailDisk, ",")
+		//we randomly picked up failNum disks and mark as unavailable
+		if !e.Quiet {
+			log.Println("simulate failure on:")
+		}
 		for _, d := range disks {
-			dd, _ := strconv.Atoi(d)
-			e.diskInfos[dd].available = false
+			id, _ := strconv.Atoi(d)
+			e.diskInfos[id].available = false
+			fmt.Printf("%s(%d)\n", e.diskInfos[id].diskPath, id)
 		}
 		return
 	}
@@ -50,7 +55,7 @@ func (e *Erasure) Destroy(simOption *SimOptions) {
 		for i := 0; i < simOption.FailNum; i++ {
 
 			if !e.Quiet {
-				log.Println(e.diskInfos[shuff[i]].diskPath)
+				fmt.Printf("%s(%d)\n", e.diskInfos[shuff[i]].diskPath, i)
 			}
 			e.diskInfos[shuff[i]].available = false
 		}
@@ -104,7 +109,7 @@ func (e *Erasure) Destroy(simOption *SimOptions) {
 	}
 }
 
-//print disk status
+// print disk status
 func (e *Erasure) printDiskStatus() {
 	for i, disk := range e.diskInfos {
 
@@ -113,7 +118,7 @@ func (e *Erasure) printDiskStatus() {
 	}
 }
 
-//check system health
+// check system health
 // 1. if currently working disks' number is less than DiskNum, inform the user
 func (e *Erasure) isDiskHealthy() bool {
 	for _, v := range e.diskInfos[:e.DiskNum] {

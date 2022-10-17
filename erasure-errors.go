@@ -11,7 +11,7 @@ type diskError struct {
 }
 
 func (e *diskError) Error() string {
-	return fmt.Sprintf("disk %s is not available for :%s", e.diskPath, e.cause)
+	return fmt.Sprintf("disk %s is not available for %s", e.diskPath, e.cause)
 }
 
 //Error definitions

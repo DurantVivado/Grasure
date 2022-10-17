@@ -2,7 +2,15 @@ package grasure
 
 import (
 	"fmt"
+	"io"
+	"log"
+	"os"
+	"path/filepath"
 	"sort"
+	"sync/atomic"
+	"time"
+
+	"golang.org/x/sync/errgroup"
 )
 
 const (
@@ -12,11 +20,11 @@ const (
 	GREEDY
 )
 
-//SGA is a fast-recovery  algorithm that balance the read block amount for each disk
-//Currently, only support diskFail mode
+// SGA is a fast-recovery  algorithm that balance the read block amount for each disk
+// Currently, only support diskFail mode
 //
-//output: loadBalancedScheme stripeNum x K array
-func (e *Erasure) SGA(fi *fileInfo, gca_enable bool) (loadBalancedScheme [][]int, stripeOrder map[int][]int, err error) {
+// output: loadBalancedScheme stripeNum x K array
+func (e *Erasure) getLoadBalancedDist(fi *fileInfo, gca_enable bool) (loadBalancedScheme [][]int, stripeOrder map[int][]int, err error) {
 	//first, make clear how many disks need to be recovered
 	//Second, match backup partners
 	//Third, concurrently recover the part of the files
@@ -35,10 +43,6 @@ func (e *Erasure) SGA(fi *fileInfo, gca_enable bool) (loadBalancedScheme [][]int
 	if failNodeNum > e.M {
 		return nil, nil, errTooFewDisksAlive
 	}
-	// maxRepairPerSlice := (e.DiskNum - int(failNodeNum)) / e.M
-	// if !e.Quiet {
-	// 	log.Println("The maximum stripes could be repaired in parallel is", sga.maxRepairPerSlice)
-	// }
 	//failStripeNum is the number of failed stripes
 	failStripeNum := 0
 	//failStripeSet marks which file has which failed stripe
@@ -262,17 +266,291 @@ func (e *Erasure) SGA(fi *fileInfo, gca_enable bool) (loadBalancedScheme [][]int
 	return loadBalancedScheme, stripeOrder, nil
 }
 
-func isConflict(arr1, arr2 *[]int, failnodeSet *IntSet) bool {
-	for _, a := range *arr1 {
-		if !failnodeSet.Exist(a) {
-			for _, b := range *arr2 {
-				if !failnodeSet.Exist(b) {
-					if a == b {
-						return true
-					}
-				}
+// SGA algorithm
+func (e *Erasure) SGA(filename string, options *Options) (
+	map[string]string, error) {
+	baseFileName := filepath.Base(filename)
+	ReplaceMap := make(map[string]string)
+	intFi, ok := e.fileMap.Load(baseFileName)
+	if !ok {
+		return nil, errFileNotFound
+	}
+	fi := intFi.(*fileInfo)
+
+	fileSize := fi.FileSize
+	stripeNum := int(ceilFracInt64(fileSize, e.dataStripeSize))
+	dist := fi.Distribution
+	//first we check the number of alive disks
+	// to judge if any part need reconstruction
+	alive := int32(0)
+	failed := int32(0)
+	ifs := make([]*os.File, e.DiskNum)
+	erg := new(errgroup.Group)
+
+	for i, disk := range e.diskInfos[:e.DiskNum] {
+		i := i
+		disk := disk
+		erg.Go(func() error {
+			folderPath := filepath.Join(disk.diskPath, baseFileName)
+			blobPath := filepath.Join(folderPath, "BLOB")
+			if !disk.available {
+				ReplaceMap[disk.diskPath] =
+					e.diskInfos[e.DiskNum+int(failed)].diskPath
+				atomic.AddInt32(&failed, 1)
+				return &diskError{disk.diskPath,
+					" available flag set false"}
 			}
+			ifs[i], err = os.Open(blobPath)
+			if err != nil {
+				disk.available = false
+				ReplaceMap[disk.diskPath] =
+					e.diskInfos[e.DiskNum+int(failed)].diskPath
+				atomic.AddInt32(&failed, 1)
+				return err
+			}
+
+			disk.available = true
+			atomic.AddInt32(&alive, 1)
+			return nil
+		})
+	}
+	if err := erg.Wait(); err != nil {
+		if !e.Quiet {
+			log.Printf("%s", err.Error())
 		}
 	}
-	return false
+	defer func() {
+		for i := 0; i < e.DiskNum; i++ {
+			if ifs[i] != nil {
+				ifs[i].Close()
+			}
+		}
+	}()
+	if int(alive) < e.K {
+		//the disk renders unrecoverable
+		return nil, errTooFewDisksAlive
+	}
+	//---------------------------------------
+	//stripeOrder arranges the repairing order of each stripe
+	//i.e., stripe[t] contains the failed stripe(s) that could be
+	// recover in the t_th time slice. So on and so forth.
+	var stripeOrder map[int][]int
+	//---------------------------------------
+	if int(alive) == e.DiskNum {
+		if !e.Quiet {
+			log.Println("start reading blocks")
+		}
+	} else {
+		if !e.Quiet {
+			log.Println("start reconstructing blocks")
+		}
+
+		start := time.Now()
+		fi.loadBalancedScheme, stripeOrder, err =
+			e.getLoadBalancedDist(fi, options.WithGCA)
+		if err != nil {
+			return nil, err
+		}
+		fmt.Printf("sga algorithm consumes:%q\n", time.Since(start))
+	}
+
+	//Since the file is striped, we have to reconstruct each stripe
+	//for each stripe we rejoin the data
+	numBlob := ceilFracInt(stripeNum, e.ConStripes)
+	stripeCnt := 0
+	nextStripe := 0
+	//-----------------------------------
+	//diskLoads records the load level of each disks(in blocks).
+	diskLoads := make([]int32, e.DiskNum)
+	//-----------------------------------
+
+	//Without SGA: for every stripe pick up the first k alive blocks for repairing
+	//With SGA: for maximal load-balance, pick up k alive blocks chosen by SGA
+	//
+	//Without GCA: the stripes are repaired in consecutive order
+	//With GCA:  the stripes are repaired concurrently so that the total time slice is minimized
+	for blob := 0; blob < numBlob; blob++ {
+		if stripeCnt+e.ConStripes > stripeNum {
+			nextStripe = stripeNum - stripeCnt
+		} else {
+			nextStripe = e.ConStripes
+		}
+		eg := e.errgroupPool.Get().(*errgroup.Group)
+		blobBuf := makeArr2DByte(e.ConStripes, int(e.allStripeSize))
+		for s := 0; s < nextStripe; s++ {
+			s := s
+			stripeNo := stripeCnt + s
+			// offset := int64(subCnt) * e.allStripeSize
+			func() error {
+				erg := e.errgroupPool.Get().(*errgroup.Group)
+				defer e.errgroupPool.Put(erg)
+				//read all blocks in parallel
+				//We only have to read k blocks to rec
+				failList := make(map[int]bool)
+				for i := 0; i < e.K+e.M; i++ {
+					i := i
+					diskId := dist[stripeNo][i]
+					disk := e.diskInfos[diskId]
+					blkStat := fi.blockInfos[stripeNo][i]
+					if !disk.available || blkStat.bstat != blkOK {
+						failList[diskId] = true
+						continue
+					}
+					erg.Go(func() error {
+
+						//we also need to know the block's accurate offset with respect to disk
+						offset := fi.blockToOffset[stripeNo][i]
+						_, err := ifs[diskId].ReadAt(
+							blobBuf[s][int64(i)*e.BlockSize:int64(i+1)*e.BlockSize],
+							int64(offset)*e.BlockSize)
+						// fmt.Println("Read ", n, " bytes at", i, ", block ", block)
+						if err != nil && err != io.EOF {
+							return err
+						}
+						return nil
+					})
+				}
+				if err := erg.Wait(); err != nil {
+					return err
+				}
+				//Split the blob into k+m parts
+				splitData, err := e.splitStripe(blobBuf[s])
+				if err != nil {
+					return err
+				}
+				//verify and reconstruct if broken
+				ok, err := e.enc.Verify(splitData)
+				if err != nil {
+					return err
+				}
+				//the failed ones are left to next step
+				if !ok && !options.WithGCA {
+
+					if options.WithSGA {
+						err = e.enc.ReconstructWithKBlocks(splitData,
+							&failList,
+							&fi.loadBalancedScheme[stripeNo],
+							&(fi.Distribution[stripeNo]),
+							options.Degrade)
+					} else {
+						err = e.enc.ReconstructWithList(splitData,
+							&failList,
+							&(fi.Distribution[stripeNo]),
+							options.Degrade)
+					}
+					if err != nil {
+						return err
+					}
+					tempCnt := 0
+					for _, disk := range dist[stripeNo] {
+						if _, ok := failList[disk]; !ok {
+							atomic.AddInt32(&diskLoads[disk], 1)
+							tempCnt++
+							if tempCnt >= e.K {
+								break
+							}
+						}
+					}
+				}
+				return nil
+			}()
+
+		}
+		if err := eg.Wait(); err != nil {
+			return nil, err
+		}
+		e.errgroupPool.Put(eg)
+		stripeCnt += nextStripe
+	}
+	if options.WithGCA {
+		//the reading upheld by GCA algorithm
+		minTimeSlice := len(stripeOrder)
+		for t := 1; t <= minTimeSlice; t++ {
+			eg := e.errgroupPool.Get().(*errgroup.Group)
+			strps := stripeOrder[t]
+			blobBuf := makeArr2DByte(len(strps), int(e.allStripeSize))
+			for s, stripeNo := range strps {
+				stripeNo := stripeNo
+				s := s
+				eg.Go(func() error {
+					erg := e.errgroupPool.Get().(*errgroup.Group)
+					defer e.errgroupPool.Put(erg)
+					//read all blocks in parallel
+					//We only have to read k blocks to rec
+					failList := make(map[int]bool)
+					for i := 0; i < e.K+e.M; i++ {
+						i := i
+						diskId := dist[stripeNo][i]
+						disk := e.diskInfos[diskId]
+						blkStat := fi.blockInfos[stripeNo][i]
+						if !disk.available || blkStat.bstat != blkOK {
+							failList[diskId] = true
+							continue
+						}
+						erg.Go(func() error {
+
+							//we also need to know the block's accurate offset with respect to disk
+							offset := fi.blockToOffset[stripeNo][i]
+							_, err := ifs[diskId].ReadAt(
+								blobBuf[s][int64(i)*e.BlockSize:int64(i+1)*e.BlockSize],
+								int64(offset)*e.BlockSize)
+							// fmt.Println("Read ", n, " bytes at", i, ", block ", block)
+							if err != nil && err != io.EOF {
+								return err
+							}
+							return nil
+						})
+					}
+					if err := erg.Wait(); err != nil {
+						return err
+					}
+					//Split the blob into k+m parts
+					splitData, err := e.splitStripe(blobBuf[s])
+					if err != nil {
+						return err
+					}
+
+					err = e.enc.ReconstructWithKBlocks(splitData,
+						&failList,
+						&fi.loadBalancedScheme[stripeNo],
+						&(fi.Distribution[stripeNo]),
+						options.Degrade)
+					if err != nil {
+						return err
+					}
+					//----------------------------------------
+					tempCnt := 0
+					for _, disk := range fi.loadBalancedScheme[stripeNo] {
+						if _, ok := failList[disk]; !ok {
+							atomic.AddInt32(&diskLoads[disk], 1)
+							tempCnt++
+							if tempCnt >= e.K {
+								break
+							}
+						}
+					}
+
+					return nil
+				})
+			}
+			if err := eg.Wait(); err != nil {
+				return nil, err
+			}
+			e.errgroupPool.Put(eg)
+		}
+	}
+	if !e.Quiet {
+		//--------------------------------------------
+		// fmt.Printf("------------------Normal--------------------")
+		// maxload, sumload := 0, 0
+		// for i := range diskLoads {
+		// 	maxload = max(maxload, int(diskLoads[i]))
+		// 	sumload += int(diskLoads[i])
+		// }
+		// fmt.Printf("\nmaxLoad:%d, sumLoad: %d\n", maxload, sumload)
+		// fmt.Printf("disk loads:\n%v\n", diskLoads)
+		//-------------------------------------------
+		log.Printf("reading %s...", filename)
+	}
+	return ReplaceMap, nil
 }

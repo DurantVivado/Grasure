@@ -134,8 +134,32 @@ func main() {
 		})
 		_, err = erasure.Baseline(filePath, &grasure.Options{})
 		failOnErr(mode, err)
+	case "sga":
+		// recover with stripe
+		err = erasure.ReadConfig()
+		failOnErr(mode, err)
+		erasure.Destroy(&grasure.SimOptions{
+			Mode:     failMode,
+			FailNum:  failNum,
+			FailDisk: failDisk,
+			FileName: filePath,
+		})
+		_, err = erasure.SGA(filePath, &grasure.Options{})
+		failOnErr(mode, err)
+	case "gca":
+		// recover with stripe
+		err = erasure.ReadConfig()
+		failOnErr(mode, err)
+		erasure.Destroy(&grasure.SimOptions{
+			Mode:     failMode,
+			FailNum:  failNum,
+			FailDisk: failDisk,
+			FileName: filePath,
+		})
+		_, err = erasure.GCA(filePath, &grasure.Options{})
+		failOnErr(mode, err)
 	default:
-		log.Fatalf("Can't parse the parameters, please check %s!", mode)
+		log.Fatalf("mode unrecognized, please check mode:%s!", mode)
 	}
 	//It functions as a testbed, so currently I won't use goroutines.
 	log.Printf("%s consumes %.3f s", mode, time.Since(start).Seconds())

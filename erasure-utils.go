@@ -14,9 +14,11 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/DurantVivado/reedsolomon"
 )
 
-//A Go-version Set
+// A Go-version Set
 type IntSet map[int]struct{}
 
 func (is *IntSet) Insert(x int) {
@@ -71,7 +73,7 @@ func sumInt(arrs []int, base int) int {
 	return sum
 }
 
-//consult user to avoid maloperation
+// consult user to avoid maloperation
 func consultUserBeforeAction() (bool, error) {
 	fmt.Println("If you are sure to proceed, type:\n [Y]es or [N]o.")
 	inputReader := bufio.NewReader(os.Stdin)
@@ -94,7 +96,7 @@ func consultUserBeforeAction() (bool, error) {
 
 //an instant error dealer
 
-//look if path exists
+// look if path exists
 func pathExist(path string) (bool, error) {
 	_, err := os.Stat(path)
 	if err == nil {
@@ -106,12 +108,12 @@ func pathExist(path string) (bool, error) {
 	return false, err
 }
 
-//ceilFrac return (a+b-1)/b
+// ceilFrac return (a+b-1)/b
 func ceilFracInt(a, b int) int {
 	return (a + b - 1) / b
 }
 
-//ceilFrac return (a+b-1)/b
+// ceilFrac return (a+b-1)/b
 func ceilFracInt64(a, b int64) int64 {
 	return (a + b - 1) / b
 }
@@ -142,7 +144,7 @@ func max(args ...int) int {
 	return ret
 }
 
-//each stripe randomized distribution
+// each stripe randomized distribution
 func genRandomArr(n, start int) []int {
 	shuff := make([]int, n)
 	for i := 0; i < n; i++ {
@@ -153,7 +155,7 @@ func genRandomArr(n, start int) []int {
 	return shuff
 }
 
-//get arr of default sequence
+// get arr of default sequence
 func getSeqArr(n int) []int {
 	out := make([]int, n)
 	for i := 0; i < n; i++ {
@@ -162,12 +164,12 @@ func getSeqArr(n int) []int {
 	return out
 }
 
-//classical robin-round style
-//e.g.
-//1 2 3 4 5
-//5 1 2 3 4
-//4 5 1 2 3
-//...
+// classical robin-round style
+// e.g.
+// 1 2 3 4 5
+// 5 1 2 3 4
+// 4 5 1 2 3
+// ...
 func rightRotateLayout(row, col int) [][]int {
 	arr2D := make([][]int, row)
 	for i := 0; i < row; i++ {
@@ -190,7 +192,7 @@ func goroutineNum() int {
 	return runtime.NumGoroutine()
 }
 
-//make an 2D byte slice
+// make an 2D byte slice
 func makeArr2DByte(row, col int) [][]byte {
 	out := make([][]byte, row)
 	for i := range out {
@@ -199,7 +201,7 @@ func makeArr2DByte(row, col int) [][]byte {
 	return out
 }
 
-//make an 2D int slice
+// make an 2D int slice
 func makeArr2DInt(row, col int) [][]int {
 	out := make([][]int, row)
 	for i := range out {
@@ -208,8 +210,8 @@ func makeArr2DInt(row, col int) [][]int {
 	return out
 }
 
-//check if two file are completely same
-//warning: use io.copy
+// check if two file are completely same
+// warning: use io.copy
 func checkFileIfSame(dst, src string) (bool, error) {
 	if ok, err := pathExist(dst); err != nil || !ok {
 		return false, err
@@ -238,7 +240,7 @@ func checkFileIfSame(dst, src string) (bool, error) {
 	return hashDst == hashSrc, nil
 }
 
-//retain hashstr
+// retain hashstr
 func hashStr(f *os.File) (string, error) {
 	h := sha256.New()
 	if _, err := io.Copy(h, f); err != nil {
@@ -248,7 +250,7 @@ func hashStr(f *os.File) (string, error) {
 	return out, nil
 }
 
-//fillRandom
+// fillRandom
 func fillRandom(p []byte) {
 	for i := 0; i < len(p); i += 7 {
 		val := rand.Int()
@@ -259,7 +261,7 @@ func fillRandom(p []byte) {
 	}
 }
 
-//string2Slice
+// string2Slice
 func stringToSlice2D(s string) [][]int {
 	s = strings.Trim(s, "[]\n")
 	strs := strings.Split(s, ",")
@@ -275,7 +277,7 @@ func stringToSlice2D(s string) [][]int {
 	return out
 }
 
-//copyfile
+// copyfile
 func copyFile(srcFile, destFile string) (int64, error) {
 	file1, err := os.Open(srcFile)
 	if err != nil {
@@ -288,4 +290,36 @@ func copyFile(srcFile, destFile string) (int64, error) {
 	}
 	defer file2.Close()
 	return io.Copy(file2, file1)
+}
+
+func (e *Erasure) splitStripe(data []byte) ([][]byte, error) {
+	if len(data) == 0 {
+		return nil, reedsolomon.ErrShortData
+	}
+	// Calculate number of bytes per data shard.
+	perShard := ceilFracInt(len(data), e.K+e.M)
+
+	// Split into equal-length shards.
+	dst := make([][]byte, e.K+e.M)
+	i := 0
+	for ; i < len(dst) && len(data) >= perShard; i++ {
+		dst[i], data = data[:perShard:perShard], data[perShard:]
+	}
+
+	return dst, nil
+}
+
+func isConflict(arr1, arr2 *[]int, failnodeSet *IntSet) bool {
+	for _, a := range *arr1 {
+		if !failnodeSet.Exist(a) {
+			for _, b := range *arr2 {
+				if !failnodeSet.Exist(b) {
+					if a == b {
+						return true
+					}
+				}
+			}
+		}
+	}
+	return false
 }
