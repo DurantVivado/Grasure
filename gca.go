@@ -123,6 +123,8 @@ func (e *Erasure) getParalledDist(fi *fileInfo) (
 	stripeOrder = make(map[int][]int)
 	//we use the disk_vec generated from last step
 	//to give assistance to coloring sequence
+	maxStripe := e.MemSize * GiB / e.dataStripeSize
+	fmt.Println("max stripe number:", maxStripe)
 	cur, maxColor := 0, 0
 	for s := range *failStripeSet {
 		if _, ok := stripeColor[s]; !ok {
@@ -136,9 +138,13 @@ func (e *Erasure) getParalledDist(fi *fileInfo) (
 			for t := 1; t <= maxColor+1; t++ {
 				if !record.Exist(t) {
 					stripeColor[cur] = t
-					stripeOrder[t] = append(stripeOrder[t], cur)
-					minTimeSlice = max(minTimeSlice, t)
-					break
+					// consider the memory limit
+					if len(stripeOrder[t]) < int(maxStripe) {
+						stripeOrder[t] = append(stripeOrder[t], cur)
+						minTimeSlice = max(minTimeSlice, t)
+						break
+					}
+					fmt.Println("skip")
 				}
 			}
 		}
