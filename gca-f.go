@@ -1,3 +1,4 @@
+// gca-f: gca algorithm with full-stripe preview
 package grasure
 
 import (
@@ -154,7 +155,7 @@ func (e *Erasure) getParalledDist(fi *fileInfo) (
 }
 
 // SGA algorithm
-func (e *Erasure) GCA(filename string, options *Options) (
+func (e *Erasure) GCA_F(filename string, options *Options) (
 	map[string]string, error) {
 	baseFileName := filepath.Base(filename)
 	ReplaceMap := make(map[string]string)
@@ -244,7 +245,7 @@ func (e *Erasure) GCA(filename string, options *Options) (
 	//for each stripe we rejoin the data
 	//-----------------------------------
 	//diskLoads records the load level of each disks(in blocks).
-	diskLoads := make([]int32, e.DiskNum)
+	// diskLoads := make([]int32, e.DiskNum)
 	//-----------------------------------
 
 	//the reading upheld by GCA algorithm
@@ -303,16 +304,16 @@ func (e *Erasure) GCA(filename string, options *Options) (
 					return err
 				}
 				//----------------------------------------
-				tempCnt := 0
-				for _, disk := range fi.loadBalancedScheme[stripeNo] {
-					if _, ok := failList[disk]; !ok {
-						atomic.AddInt32(&diskLoads[disk], 1)
-						tempCnt++
-						if tempCnt >= e.K {
-							break
-						}
-					}
-				}
+				// tempCnt := 0
+				// for _, disk := range fi.loadBalancedScheme[stripeNo] {
+				// 	if _, ok := failList[disk]; !ok {
+				// 		atomic.AddInt32(&diskLoads[disk], 1)
+				// 		tempCnt++
+				// 		if tempCnt >= e.K {
+				// 			break
+				// 		}
+				// 	}
+				// }
 
 				return nil
 			})

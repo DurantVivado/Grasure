@@ -193,7 +193,7 @@ the command-line parameters of `./examples/main.go` are listed as below.
 |conReads(cr)|whether to enable concurrent read, default is false|false|
 |failMode(fmd)|simulate [diskFail] or [bitRot] mode"|diskFail|
 |failNum(fn)|simulate multiple disk failure, provides the fail number of disks|0|
-|conStripes(cs)|how many stripes are allowed to encode/decode concurrently|100|
+|conStripes(cs)|how many stripes are allowed to encode/decode concurrently(conStripe=min(conStripe, stripeNum))|100|
 |quiet(q)|whether or not to mute outputs in terminal|false|
 
 ## Performance

@@ -1,3 +1,4 @@
+// gca-p: gca algorithm with partial-stripe view
 package grasure
 
 import (
@@ -7,11 +8,13 @@ import (
 	"os"
 	"path/filepath"
 	"sync/atomic"
+	"time"
 
 	"golang.org/x/sync/errgroup"
 )
 
-func (e *Erasure) Baseline(filename string, options *Options) (
+// GCA-P algorithm
+func (e *Erasure) GCA_P(filename string, options *Options) (
 	map[string]string, error) {
 	baseFileName := filepath.Base(filename)
 	ReplaceMap := make(map[string]string)
@@ -21,8 +24,8 @@ func (e *Erasure) Baseline(filename string, options *Options) (
 	}
 	fi := intFi.(*fileInfo)
 
-	fileSize := fi.FileSize
-	stripeNum := int(ceilFracInt64(fileSize, e.dataStripeSize))
+	// fileSize := fi.FileSize
+	// stripeNum := int(ceilFracInt64(fileSize, e.dataStripeSize))
 	dist := fi.Distribution
 	//first we check the number of alive disks
 	// to judge if any part need reconstruction
@@ -41,11 +44,15 @@ func (e *Erasure) Baseline(filename string, options *Options) (
 				ReplaceMap[disk.diskPath] =
 					e.diskInfos[e.DiskNum+int(failed)].diskPath
 				atomic.AddInt32(&failed, 1)
-				return &diskError{disk.diskPath, " available flag set false"}
+				return &diskError{disk.diskPath,
+					" available flag set false"}
 			}
 			ifs[i], err = os.Open(blobPath)
 			if err != nil {
 				disk.available = false
+				ReplaceMap[disk.diskPath] =
+					e.diskInfos[e.DiskNum+int(failed)].diskPath
+				atomic.AddInt32(&failed, 1)
 				return err
 			}
 
@@ -67,9 +74,15 @@ func (e *Erasure) Baseline(filename string, options *Options) (
 		}
 	}()
 	if int(alive) < e.K {
-		//the disk renders inrecoverable
+		//the disk renders unrecoverable
 		return nil, errTooFewDisksAlive
 	}
+	//---------------------------------------
+	//stripeOrder arranges the repairing order of each stripe
+	//i.e., stripe[t] contains the failed stripe(s) that could be
+	// recover in the t_th time slice. So on and so forth.
+	var stripeOrder map[int][]int
+	//---------------------------------------
 	if int(alive) == e.DiskNum {
 		if !e.Quiet {
 			log.Println("start reading blocks")
@@ -78,29 +91,31 @@ func (e *Erasure) Baseline(filename string, options *Options) (
 		if !e.Quiet {
 			log.Println("start reconstructing blocks")
 		}
+		start := time.Now()
+		fi.loadBalancedScheme, stripeOrder, err =
+			e.getParalledDist(fi)
+		if err != nil {
+			return nil, err
+		}
+		fmt.Printf("gca algorithm consumes:%q\n", time.Since(start))
 	}
 
 	//Since the file is striped, we have to reconstruct each stripe
 	//for each stripe we rejoin the data
-	e.ConStripes = int(e.MemSize * GiB / (e.dataStripeSize + e.BlockSize*int64(failed)))
-	e.ConStripes = min(e.ConStripes, stripeNum)
-	fmt.Println("constripe:", e.ConStripes)
-	fmt.Println("stripeNum:", stripeNum)
-	numBlob := ceilFracInt(stripeNum, e.ConStripes)
-	stripeCnt := 0
-	nextStripe := 0
-	for blob := 0; blob < numBlob; blob++ {
-		if stripeCnt+e.ConStripes > stripeNum {
-			nextStripe = stripeNum - stripeCnt
-		} else {
-			nextStripe = e.ConStripes
-		}
+	//-----------------------------------
+	//diskLoads records the load level of each disks(in blocks).
+	// diskLoads := make([]int32, e.DiskNum)
+	//-----------------------------------
+
+	//the reading upheld by GCA algorithm
+	minTimeSlice := len(stripeOrder)
+	for t := 1; t <= minTimeSlice; t++ {
 		eg := e.errgroupPool.Get().(*errgroup.Group)
-		blobBuf := makeArr2DByte(e.ConStripes, int(e.allStripeSize))
-		for s := 0; s < nextStripe; s++ {
+		strps := stripeOrder[t]
+		blobBuf := makeArr2DByte(len(strps), int(e.allStripeSize))
+		for s, stripeNo := range strps {
+			stripeNo := stripeNo
 			s := s
-			stripeNo := stripeCnt + s
-			// offset := int64(subCnt) * e.allStripeSize
 			eg.Go(func() error {
 				erg := e.errgroupPool.Get().(*errgroup.Group)
 				defer e.errgroupPool.Put(erg)
@@ -120,7 +135,8 @@ func (e *Erasure) Baseline(filename string, options *Options) (
 
 						//we also need to know the block's accurate offset with respect to disk
 						offset := fi.blockToOffset[stripeNo][i]
-						_, err := ifs[diskId].ReadAt(blobBuf[s][int64(i)*e.BlockSize:int64(i+1)*e.BlockSize],
+						_, err := ifs[diskId].ReadAt(
+							blobBuf[s][int64(i)*e.BlockSize:int64(i+1)*e.BlockSize],
 							int64(offset)*e.BlockSize)
 						// fmt.Println("Read ", n, " bytes at", i, ", block ", block)
 						if err != nil && err != io.EOF {
@@ -137,38 +153,36 @@ func (e *Erasure) Baseline(filename string, options *Options) (
 				if err != nil {
 					return err
 				}
-				//verify and reconstruct if broken
-				ok, err := e.enc.Verify(splitData)
+				// fmt.Printf("stripeNo:%d, %v\n", stripeNo, fi.loadBalancedScheme[stripeNo])
+				err = e.enc.ReconstructWithKBlocks(splitData,
+					&failList,
+					&fi.loadBalancedScheme[stripeNo],
+					&(fi.Distribution[stripeNo]),
+					options.Degrade)
 				if err != nil {
 					return err
 				}
-				if !ok {
-					// fmt.Println("reconstruct data of stripe:", stripeNo)
-					err = e.enc.ReconstructWithList(splitData,
-						&failList,
-						&(fi.Distribution[stripeNo]),
-						options.Degrade)
+				//----------------------------------------
+				// tempCnt := 0
+				// for _, disk := range fi.loadBalancedScheme[stripeNo] {
+				// 	if _, ok := failList[disk]; !ok {
+				// 		atomic.AddInt32(&diskLoads[disk], 1)
+				// 		tempCnt++
+				// 		if tempCnt >= e.K {
+				// 			break
+				// 		}
+				// 	}
+				// }
 
-					// err = e.enc.ReconstructWithKBlocks(splitData,
-					// 	&failList,
-					// 	&loadBalancedScheme[stripeNo],
-					// 	&(fi.Distribution[stripeNo]),
-					// 	degrade)
-					if err != nil {
-						return err
-					}
-				}
 				return nil
 			})
-
 		}
 		if err := eg.Wait(); err != nil {
 			return nil, err
 		}
 		e.errgroupPool.Put(eg)
-		stripeCnt += nextStripe
-
 	}
+
 	if !e.Quiet {
 		log.Printf("reading %s...", filename)
 	}

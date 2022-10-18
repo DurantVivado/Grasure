@@ -146,7 +146,7 @@ func main() {
 		})
 		_, err = erasure.SGA(filePath, &grasure.Options{})
 		failOnErr(mode, err)
-	case "gca":
+	case "gca-f":
 		// recover with stripe
 		err = erasure.ReadConfig()
 		failOnErr(mode, err)
@@ -156,7 +156,19 @@ func main() {
 			FailDisk: failDisk,
 			FileName: filePath,
 		})
-		_, err = erasure.GCA(filePath, &grasure.Options{})
+		_, err = erasure.GCA_F(filePath, &grasure.Options{})
+		failOnErr(mode, err)
+	case "gca-p":
+		// recover with stripe
+		err = erasure.ReadConfig()
+		failOnErr(mode, err)
+		erasure.Destroy(&grasure.SimOptions{
+			Mode:     failMode,
+			FailNum:  failNum,
+			FailDisk: failDisk,
+			FileName: filePath,
+		})
+		_, err = erasure.GCA_P(filePath, &grasure.Options{})
 		failOnErr(mode, err)
 	default:
 		log.Fatalf("mode unrecognized, please check mode:%s!", mode)

@@ -81,6 +81,7 @@ func (e *Erasure) EncodeFile(filename string) (*fileInfo, error) {
 		return nil, err
 	}
 	numBlob := ceilFracInt(stripeNum, e.ConStripes)
+	e.ConStripes = min(e.ConStripes, stripeNum)
 	stripeCnt := 0
 	//for every conStripe stripes, we set one goroutine
 	nextStripe := 0

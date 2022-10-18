@@ -28,7 +28,7 @@ fd=1,2
 go build -o main ./main.go
 start=`date +%s%N`
 now=`date +%c` 
-echo "The program starts at $now."  
+echo -e "sh: The program starts at $now."  
 #------------------------encode a file--------------------------
 mode="none"
 if [ $mode == "encode" ]; then
@@ -48,19 +48,19 @@ if [ $mode == "encode" ]; then
 
     srchash=(`sha256sum $inputdir$filename|tr ' ' ' '`) #6cb118a8f8b3c19385874297e291dcbcdf3a9837ba1ca7b00ace2491adbff551
     dsthash=(`sha256sum $outputdir$filename|tr ' ' ' '`)
-    echo $srchash
-    echo $dsthash
+    echo -e "source file hash: $srchash"
+    echo -e "target file hash: $dsthash"
     if [ $srchash == $dsthash ];then 
-        echo "hash check succeeds"
+        echo -e "hash check succeeds"
     else
-        echo "hash check fails"
+        echo -e "hash check fails"
     fi
 else
 #---------------------------repair the file----------------------
     # recover a file
-    # methods: baseline, sga, gca
-    ./main -md gca -fmd diskFail -fd $fd -f $inputdir$filename -conStripes 100 -o
+    # methods: baseline, sga, gca-p, gca-f
+    ./main -md gca-f -fmd diskFail -fd $fd -f $inputdir$filename -conStripes 100 -o
     end=`date +%s%N`
     cost=`echo $start $end | awk '{ printf("%.3f", ($2-$1)/1000000000) }'`
-    echo "sh: previous procedure consumed $cost s"
+    echo -e "sh: previous procedure consumed $cost s"
 fi

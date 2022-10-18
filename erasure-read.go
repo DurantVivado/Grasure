@@ -86,6 +86,7 @@ func (e *Erasure) ReadFile(filename string, savepath string, options *Options) e
 	//Since the file is striped, we have to reconstruct each stripe
 	//for each stripe we rejoin the data
 	numBlob := ceilFracInt(stripeNum, e.ConStripes)
+	e.ConStripes = min(e.ConStripes, stripeNum)
 	stripeCnt := 0
 	nextStripe := 0
 	for blob := 0; blob < numBlob; blob++ {
@@ -200,20 +201,3 @@ func (e *Erasure) ReadFile(filename string, savepath string, options *Options) e
 	}
 	return nil
 }
-
-// func (e *Erasure) splitStripe(data []byte) ([][]byte, error) {
-// 	if len(data) == 0 {
-// 		return nil, reedsolomon.ErrShortData
-// 	}
-// 	// Calculate number of bytes per data shard.
-// 	perShard := ceilFracInt(len(data), e.K+e.M)
-
-// 	// Split into equal-length shards.
-// 	dst := make([][]byte, e.K+e.M)
-// 	i := 0
-// 	for ; i < len(dst) && len(data) >= perShard; i++ {
-// 		dst[i], data = data[:perShard:perShard], data[perShard:]
-// 	}
-
-// 	return dst, nil
-// }
