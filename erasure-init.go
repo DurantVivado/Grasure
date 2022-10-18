@@ -96,7 +96,7 @@ func (e *Erasure) InitSystem(assume bool) error {
 		return err
 	}
 	if !e.Quiet {
-		log.Printf("System init!\nErasure parameters: \n")
+		log.Printf("System initialized!\nSystem parameters: \n")
 		fmt.Printf(" %-20s:%20d\n", "data shards", e.K)
 		fmt.Printf(" %-20s:%20d\n", "parity shards", e.M)
 		fmt.Printf(" %-20s:%20d\n", "block size (bytes)", e.BlockSize)

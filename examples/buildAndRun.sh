@@ -12,11 +12,11 @@ dn=12
 #block size
 bs=67108864
 #memory limit
-mem=8
+mem=2
 #failed disk number
 fn=1
 #specified failed disk, starting from 0, use comma to split
-fd=0
+fd=1,2
 # 4k 4096
 # 1M 1048576
 # 4M 4194304
