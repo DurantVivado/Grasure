@@ -134,7 +134,7 @@ func TestUpdateNormalExchange(t *testing.T) {
 						}
 
 						//evaluate the results
-						if ok, err := checkFileIfSame(inpath, outpath); !ok && err != nil {
+						if ok, err := checkFileIfSame(inpath, outpath); !ok && err == nil {
 							t.Fatalf("k:%d,m:%d,bs:%d,N:%d,mode:%d read fails when fileSize is %d, for hash check fail", k, m, bs, N, 1, fileSize)
 						} else if err != nil {
 							t.Fatalf("k:%d,m:%d,bs:%d,N:%d,mode:%d read fails when fileSize is %d, for %s", k, m, bs, N, 1, fileSize, err.Error())
@@ -216,7 +216,7 @@ func TestUpdateNormalAppend(t *testing.T) {
 						}
 
 						//evaluate the results
-						if ok, err := checkFileIfSame(inpath, outpath); !ok && err != nil {
+						if ok, err := checkFileIfSame(inpath, outpath); !ok && err == nil {
 							t.Fatalf("k:%d,m:%d,bs:%d,N:%d,mode:%d read fails when fileSize is %d, for hash check fail", k, m, bs, N, 2, fileSize)
 						} else if err != nil {
 							t.Fatalf("k:%d,m:%d,bs:%d,N:%d,mode:%d read fails when fileSize is %d, for %s", k, m, bs, N, 2, fileSize, err.Error())
@@ -298,7 +298,7 @@ func TestUpdateNormalDelete(t *testing.T) {
 						}
 
 						//evaluate the results
-						if ok, err := checkFileIfSame(inpath, outpath); !ok && err != nil {
+						if ok, err := checkFileIfSame(inpath, outpath); !ok && err == nil {
 							t.Fatalf("k:%d,m:%d,bs:%d,N:%d,mode:%d read fails when fileSize is %d, for hash check fail", k, m, bs, N, 3, fileSize)
 						} else if err != nil {
 							t.Fatalf("k:%d,m:%d,bs:%d,N:%d,mode:%d read fails when fileSize is %d, for %s", k, m, bs, N, 3, fileSize, err.Error())
@@ -310,7 +310,7 @@ func TestUpdateNormalDelete(t *testing.T) {
 	}
 }
 
-//---------------------BENCHMARK---------------------------------
+// ---------------------BENCHMARK---------------------------------
 func benchmarkUpdate(b *testing.B, dataShards, parityShards, diskNum int, blockSize, fileSize int64) {
 	genTempDir()
 	b.ResetTimer()
@@ -375,7 +375,7 @@ func benchmarkUpdate(b *testing.B, dataShards, parityShards, diskNum int, blockS
 		}
 
 		//evaluate the results
-		if ok, err := checkFileIfSame(inpath, outpath); !ok && err != nil {
+		if ok, err := checkFileIfSame(inpath, outpath); !ok && err == nil {
 			b.Fatalf("k:%d,m:%d,bs:%d,N:%d,mode:%d read fails when fileSize is %d, for hash check fail", dataShards, parityShards, blockSize, diskNum, mode, fileSize)
 		} else if err != nil {
 			b.Fatalf("k:%d,m:%d,bs:%d,N:%d,mode:%d read fails when fileSize is %d, for %s", dataShards, parityShards, blockSize, diskNum, mode, fileSize, err.Error())
@@ -518,7 +518,7 @@ func benchmarkUpdateParallel(b *testing.B, dataShards, parityShards, diskNum int
 			}
 
 			//evaluate the results
-			if ok, err := checkFileIfSame(inpath[i], outpath[i]); !ok && err != nil {
+			if ok, err := checkFileIfSame(inpath[i], outpath[i]); !ok && err == nil {
 				b.Fatalf("k:%d,m:%d,bs:%d,N:%d,mode:%d read fails when fileSize is %d, for hash check fail", dataShards, parityShards, blockSize, diskNum, mode, fileSize)
 			} else if err != nil {
 				b.Fatalf("k:%d,m:%d,bs:%d,N:%d,mode:%d read fails when fileSize is %d, for %s", dataShards, parityShards, blockSize, diskNum, mode, fileSize, err.Error())
