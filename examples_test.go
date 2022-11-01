@@ -67,7 +67,7 @@ func delDir(diskNum int) error {
 
 }
 
-//An intriguing example of how to encode a file into the system
+// An intriguing example of how to encode a file into the system
 func ExampleErasure_EncodeFile() {
 	// Create some sample data
 	data := make([]byte, 250000)
@@ -132,7 +132,7 @@ func ExampleErasure_EncodeFile() {
 	// encode ok!
 }
 
-//A canonical example of how to read a file normally from the system
+// A canonical example of how to read a file normally from the system
 func ExampleErasure_ReadFile_a() {
 	filepath := "example.file"
 	savePath := "example.file.decode"
@@ -163,7 +163,7 @@ func ExampleErasure_ReadFile_a() {
 		log.Fatal(err)
 	}
 	//check if two file are same
-	if ok, err := checkFileIfSame(filepath, savePath); !ok && err != nil {
+	if ok, err := checkFileIfSame(filepath, savePath); !ok && err == nil {
 		log.Fatal(err)
 	} else if err != nil {
 		log.Fatal(err)
@@ -173,7 +173,7 @@ func ExampleErasure_ReadFile_a() {
 	// read ok!
 }
 
-//A heuristical example on read file in case of double failure
+// A heuristical example on read file in case of double failure
 func ExampleErasure_ReadFile_b() {
 	filepath := "example.file"
 	savePath := "example.file.decode"
@@ -203,7 +203,7 @@ func ExampleErasure_ReadFile_b() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	if ok, err := checkFileIfSame(filepath, savePath); !ok && err != nil {
+	if ok, err := checkFileIfSame(filepath, savePath); !ok && err == nil {
 		log.Fatal(err)
 	} else if err != nil {
 		log.Fatal(err)
@@ -213,7 +213,7 @@ func ExampleErasure_ReadFile_b() {
 	// read ok!
 }
 
-//A curious example on removal of file, please encode the file into system first
+// A curious example on removal of file, please encode the file into system first
 func ExampleErasure_RemoveFile() {
 	filepath := "example.file"
 	erasure := &grasure.Erasure{
@@ -249,7 +249,7 @@ func ExampleErasure_RemoveFile() {
 	//file removed
 }
 
-//A fabulous example on recovery of disks
+// A fabulous example on recovery of disks
 func ExampleErasure_Recover() {
 	erasure := &grasure.Erasure{
 		DiskFilePath:    ".hdr.disks.path",
@@ -313,7 +313,7 @@ func checkFileIfSame(dst, src string) (bool, error) {
 	return hashDst == hashSrc, nil
 }
 
-//get a file's hash (shasum256)
+// get a file's hash (shasum256)
 func hashStr(f *os.File) (string, error) {
 	h := sha256.New()
 	if _, err := io.Copy(h, f); err != nil {
@@ -323,7 +323,7 @@ func hashStr(f *os.File) (string, error) {
 	return out, nil
 }
 
-//look if path exists
+// look if path exists
 func pathExist(path string) (bool, error) {
 	_, err := os.Stat(path)
 	if err == nil {
